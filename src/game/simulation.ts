@@ -1,7 +1,10 @@
 import {
   COUNTRIES,
+  PHOTO_SPOTS,
   type CountryDefinition,
   type CountryId,
+  type PhotoSpotDefinition,
+  type PhotoSpotId,
   MAP_BOUNDS,
   START_POINT,
   geoToWorld,
@@ -21,7 +24,7 @@ export type GameEvent =
   | { type: "country-entered"; country: CountryDefinition; firstVisit: boolean }
   | { type: "mode-changed"; mode: VehicleMode }
   | { type: "map-edge" }
-  | { type: "postcard-collected"; country: CountryDefinition; firstCollection: boolean };
+  | { type: "postcard-collected"; spot: PhotoSpotDefinition; firstCollection: boolean };
 
 export interface GameState {
   position: { x: number; z: number };
@@ -30,9 +33,9 @@ export interface GameState {
   vehicleMode: VehicleMode;
   currentCountry?: CountryDefinition;
   currentWorldCountryName?: string;
-  nearestLandmark?: CountryDefinition;
+  nearestPhotoSpot?: PhotoSpotDefinition;
   visitedCountries: Set<CountryId>;
-  collectedPostcards: Set<CountryId>;
+  collectedPostcards: Set<PhotoSpotId>;
   elapsed: number;
 }
 
@@ -48,9 +51,9 @@ export class GameSimulation {
     vehicleMode: "car",
     currentCountry: undefined,
     currentWorldCountryName: undefined,
-    nearestLandmark: undefined,
+    nearestPhotoSpot: undefined,
     visitedCountries: new Set<CountryId>(),
-    collectedPostcards: new Set<CountryId>(),
+    collectedPostcards: new Set<PhotoSpotId>(),
     elapsed: 0,
   };
 
@@ -110,18 +113,18 @@ export class GameSimulation {
     }
 
     this.updateLocation();
-    this.updateNearestLandmark();
+    this.updateNearestPhotoSpot();
   }
 
   interact(): void {
-    const country = this.state.nearestLandmark;
-    if (!country) {
+    const spot = this.state.nearestPhotoSpot;
+    if (!spot) {
       return;
     }
 
-    const firstCollection = !this.state.collectedPostcards.has(country.id);
-    this.state.collectedPostcards.add(country.id);
-    this.events.push({ type: "postcard-collected", country, firstCollection });
+    const firstCollection = !this.state.collectedPostcards.has(spot.id);
+    this.state.collectedPostcards.add(spot.id);
+    this.events.push({ type: "postcard-collected", spot, firstCollection });
   }
 
   teleport(longitude: number, latitude: number): void {
@@ -131,7 +134,7 @@ export class GameSimulation {
     this.state.velocity.x = 0;
     this.state.velocity.z = 0;
     this.updateLocation();
-    this.updateNearestLandmark();
+    this.updateNearestPhotoSpot();
   }
 
   consumeEvents(): GameEvent[] {
@@ -139,12 +142,24 @@ export class GameSimulation {
   }
 
   private updateLocation(): void {
-    const nextCountry = getCountryAtWorld(this.state.position.x, this.state.position.z);
-    const worldCountry = getWorldCountryAtGeo(
-      worldToGeo(this.state.position.x, this.state.position.z),
+    const geoPosition = worldToGeo(
+      this.state.position.x,
+      this.state.position.z,
     );
+    const worldCountry = getWorldCountryAtGeo(geoPosition);
+    const preciseCountry = worldCountry
+      ? COUNTRIES.find(
+          (country) =>
+            country.englishName.toLowerCase() === worldCountry.name.toLowerCase(),
+        )
+      : undefined;
+    const fallbackCountry = getCountryAtWorld(
+      this.state.position.x,
+      this.state.position.z,
+    );
+    const nextCountry = preciseCountry ?? fallbackCountry;
     const previousCountry = this.state.currentCountry;
-    const nextMode: VehicleMode = worldCountry ? "car" : "boat";
+    const nextMode: VehicleMode = worldCountry || fallbackCountry ? "car" : "boat";
 
     this.state.currentCountry = nextCountry;
     this.state.currentWorldCountryName = worldCountry?.name;
@@ -161,24 +176,24 @@ export class GameSimulation {
     }
   }
 
-  private updateNearestLandmark(): void {
-    let nearest: CountryDefinition | undefined;
+  private updateNearestPhotoSpot(): void {
+    let nearest: PhotoSpotDefinition | undefined;
     let nearestDistance = Number.POSITIVE_INFINITY;
 
-    for (const country of COUNTRIES) {
-      const cityWorld = geoToWorld(country.city.point);
+    for (const spot of PHOTO_SPOTS) {
+      const spotWorld = geoToWorld(spot.point);
       const distance = Math.hypot(
-        cityWorld.x - this.state.position.x,
-        cityWorld.z - this.state.position.z,
+        spotWorld.x - this.state.position.x,
+        spotWorld.z - this.state.position.z,
       );
 
-      if (distance < 2.1 && distance < nearestDistance) {
-        nearest = country;
+      if (distance < 2.6 && distance < nearestDistance) {
+        nearest = spot;
         nearestDistance = distance;
       }
     }
 
-    this.state.nearestLandmark = nearest;
+    this.state.nearestPhotoSpot = nearest;
   }
 }
 

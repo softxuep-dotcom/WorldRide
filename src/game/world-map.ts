@@ -10,7 +10,7 @@ import type {
   Objects,
   Topology,
 } from "topojson-specification";
-import worldAtlas from "world-atlas/countries-110m.json";
+import worldAtlas from "world-atlas/countries-50m.json";
 import type { GeoPoint } from "./data";
 
 interface AtlasProperties {
@@ -68,6 +68,32 @@ export const WORLD_COUNTRIES: readonly WorldCountry[] = countriesGeoJson.feature
   })
   .filter((country): country is WorldCountry => country !== undefined);
 
+const worldCountriesByName = new Map(
+  WORLD_COUNTRIES.map((country) => [country.name.toLowerCase(), country]),
+);
+
+export function getWorldCountryByName(name: string): WorldCountry | undefined {
+  return worldCountriesByName.get(name.toLowerCase());
+}
+
+export function isGeoPointInWorldCountry(
+  point: GeoPoint,
+  country: WorldCountry,
+): boolean {
+  const [longitude, latitude] = point;
+  const { bounds } = country;
+  if (
+    longitude < bounds.minLongitude ||
+    longitude > bounds.maxLongitude ||
+    latitude < bounds.minLatitude ||
+    latitude > bounds.maxLatitude
+  ) {
+    return false;
+  }
+
+  return country.polygons.some((polygon) => isPointInsideRing(point, polygon));
+}
+
 export function getWorldCountryAtGeo(point: GeoPoint): WorldCountry | undefined {
   const [longitude, latitude] = point;
 
@@ -82,7 +108,7 @@ export function getWorldCountryAtGeo(point: GeoPoint): WorldCountry | undefined 
       continue;
     }
 
-    if (country.polygons.some((polygon) => isPointInsideRing(point, polygon))) {
+    if (isGeoPointInWorldCountry(point, country)) {
       return country;
     }
   }

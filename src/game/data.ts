@@ -19,7 +19,17 @@ export type CountryId =
   | "india"
   | "thailand"
   | "vietnam"
-  | "indonesia";
+  | "indonesia"
+  | "netherlands"
+  | "switzerland"
+  | "austria"
+  | "poland"
+  | "norway"
+  | "russia"
+  | "iran"
+  | "saudi-arabia"
+  | "pakistan"
+  | "mongolia";
 
 export interface CountryDefinition {
   id: CountryId;
@@ -36,7 +46,6 @@ export interface CountryDefinition {
   city: {
     name: string;
     point: GeoPoint;
-    postcard: string;
   };
   scenery:
     | "atlantic"
@@ -47,6 +56,32 @@ export interface CountryDefinition {
     | "monsoon"
     | "tropical"
     | "highland";
+}
+
+export type PhotoSpotId =
+  | "gibraltar-strait"
+  | "big-ben"
+  | "brandenburg-gate"
+  | "colosseum"
+  | "acropolis"
+  | "swiss-alps"
+  | "norway-fjord"
+  | "giza-pyramids"
+  | "hagia-sophia"
+  | "great-wall"
+  | "fuji-view"
+  | "taj-mahal"
+  | "java-volcano"
+  | "moscow-domes";
+
+export interface PhotoSpotDefinition {
+  id: PhotoSpotId;
+  name: string;
+  kind: "wonder" | "landmark" | "natural";
+  countryId: CountryId;
+  point: GeoPoint;
+  postcard: string;
+  fact: string;
 }
 
 export const MAP_BOUNDS = {
@@ -96,7 +131,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "里斯本",
       point: [-9.14, 38.72],
-      postcard: "大西洋灯塔与黄色电车",
     },
     scenery: "atlantic",
   },
@@ -135,7 +169,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "加的斯",
       point: [-6.28, 36.53],
-      postcard: "白色海岸小城与橙树广场",
     },
     scenery: "mediterranean",
   },
@@ -173,7 +206,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "马赛",
       point: [5.25, 43.3],
-      postcard: "旧港帆船与薰衣草色山坡",
     },
     scenery: "green",
   },
@@ -208,7 +240,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "伦敦",
       point: [-0.13, 51.51],
-      postcard: "河畔钟楼与红色巴士",
     },
     scenery: "atlantic",
   },
@@ -242,7 +273,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "柏林",
       point: [13.41, 52.52],
-      postcard: "城市大门与穿城列车",
     },
     scenery: "green",
   },
@@ -278,7 +308,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "罗马",
       point: [12.5, 41.9],
-      postcard: "圆形古建筑与街角喷泉",
     },
     scenery: "mediterranean",
   },
@@ -309,7 +338,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "雅典",
       point: [23.73, 37.98],
-      postcard: "山丘神庙与爱琴海航线",
     },
     scenery: "mediterranean",
   },
@@ -342,7 +370,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "丹吉尔",
       point: [-5.81, 35.76],
-      postcard: "蓝白山城与海峡渡船",
     },
     scenery: "atlas",
   },
@@ -376,7 +403,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "阿尔及尔",
       point: [3.05, 36.5],
-      postcard: "白色海滨城与沙漠方向牌",
     },
     scenery: "sahara",
   },
@@ -406,7 +432,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "突尼斯城",
       point: [10.18, 36.81],
-      postcard: "蓝白门窗与地中海港湾",
     },
     scenery: "atlas",
   },
@@ -434,7 +459,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "开罗",
       point: [31.24, 30.04],
-      postcard: "尼罗河、城市与金色金字塔",
     },
     scenery: "sahara",
   },
@@ -464,7 +488,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "伊斯坦布尔",
       point: [28.98, 41.0],
-      postcard: "海峡渡船、圆顶与跨洲街道",
     },
     scenery: "mediterranean",
   },
@@ -502,7 +525,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "北京",
       point: [116.41, 39.9],
-      postcard: "红色城门、长城与城市列车",
     },
     scenery: "highland",
   },
@@ -547,7 +569,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "东京",
       point: [139.69, 35.68],
-      postcard: "红色鸟居、城市灯光与海湾列车",
     },
     scenery: "monsoon",
   },
@@ -575,7 +596,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "首尔",
       point: [126.98, 37.57],
-      postcard: "城市宫门、汉江与夜间列车",
     },
     scenery: "monsoon",
   },
@@ -608,7 +628,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "新德里",
       point: [77.21, 28.61],
-      postcard: "白色穹顶、恒河平原与彩色街道",
     },
     scenery: "tropical",
   },
@@ -638,7 +657,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "曼谷",
       point: [100.5, 13.75],
-      postcard: "河上小船、金色屋顶与城市轻轨",
     },
     scenery: "tropical",
   },
@@ -670,7 +688,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "河内",
       point: [105.85, 21.03],
-      postcard: "湖畔塔楼、街道列车与红河平原",
     },
     scenery: "tropical",
   },
@@ -723,11 +740,445 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     city: {
       name: "雅加达",
       point: [106.85, -6.2],
-      postcard: "群岛航线、火山与城市清真寺",
     },
     scenery: "tropical",
   },
+  {
+    id: "netherlands",
+    name: "荷兰",
+    englishName: "NETHERLANDS",
+    flag: "🇳🇱",
+    color: "#79b995",
+    darkColor: "#4b7c68",
+    accent: "#e48a49",
+    intro: "面向北海的低地国家，河流、运河、堤坝与城市紧密相连。",
+    facts: [
+      "荷兰有相当一部分土地低于海平面。",
+      "阿姆斯特丹拥有密集的运河网络。",
+      "堤坝、泵站和水利工程长期参与塑造荷兰地貌。",
+    ],
+    border: [
+      [3.4, 51.2],
+      [4.0, 53.5],
+      [7.2, 53.4],
+      [7.0, 50.8],
+      [5.2, 50.7],
+    ],
+    city: {
+      name: "阿姆斯特丹",
+      point: [4.9, 52.37],
+    },
+    scenery: "green",
+  },
+  {
+    id: "switzerland",
+    name: "瑞士",
+    englishName: "SWITZERLAND",
+    flag: "🇨🇭",
+    color: "#86ae78",
+    darkColor: "#5d7858",
+    accent: "#dc584f",
+    intro: "位于欧洲中部的内陆山地国家，阿尔卑斯山、湖泊与河谷塑造了交通路线。",
+    facts: [
+      "瑞士位于阿尔卑斯山地区，是欧洲重要的山地交通节点。",
+      "莱茵河和罗讷河都发源于瑞士附近的阿尔卑斯山区。",
+      "伯尔尼位于阿勒河弯曲环绕的高地上。",
+    ],
+    border: [
+      [5.9, 45.8],
+      [7.0, 47.8],
+      [9.7, 47.5],
+      [10.5, 46.8],
+      [9.0, 45.8],
+    ],
+    city: {
+      name: "伯尔尼",
+      point: [7.45, 46.95],
+    },
+    scenery: "highland",
+  },
+  {
+    id: "austria",
+    name: "奥地利",
+    englishName: "AUSTRIA",
+    flag: "🇦🇹",
+    color: "#8fba7f",
+    darkColor: "#617b58",
+    accent: "#cf5d55",
+    intro: "从阿尔卑斯山谷向多瑙河平原展开，是中欧陆路与河路交汇的国家。",
+    facts: [
+      "奥地利西部和中部大部分位于阿尔卑斯山区。",
+      "多瑙河自西向东流经奥地利北部和维也纳。",
+      "维也纳长期以音乐、建筑和城市公共交通闻名。",
+    ],
+    border: [
+      [9.5, 46.4],
+      [10.4, 47.6],
+      [13.0, 48.8],
+      [17.2, 48.0],
+      [16.5, 46.8],
+      [13.5, 46.4],
+    ],
+    city: {
+      name: "维也纳",
+      point: [16.37, 48.21],
+    },
+    scenery: "highland",
+  },
+  {
+    id: "poland",
+    name: "波兰",
+    englishName: "POLAND",
+    flag: "🇵🇱",
+    color: "#8cbb82",
+    darkColor: "#5c7b59",
+    accent: "#db675e",
+    intro: "位于欧洲平原中部，波罗的海、森林、湖区与南部山地形成清晰层次。",
+    facts: [
+      "波兰北部面向波罗的海，中部以平原为主。",
+      "维斯瓦河自南向北流经华沙并最终汇入波罗的海。",
+      "波兰南部连接喀尔巴阡山和苏台德山地区。",
+    ],
+    border: [
+      [14.1, 49.0],
+      [14.2, 54.3],
+      [19.0, 54.9],
+      [24.2, 54.4],
+      [24.1, 49.0],
+      [19.0, 49.0],
+    ],
+    city: {
+      name: "华沙",
+      point: [21.01, 52.23],
+    },
+    scenery: "green",
+  },
+  {
+    id: "norway",
+    name: "挪威",
+    englishName: "NORWAY",
+    flag: "🇳🇴",
+    color: "#6fa996",
+    darkColor: "#4a756a",
+    accent: "#d85f55",
+    intro: "沿斯堪的纳维亚半岛西侧狭长延伸，峡湾、山脉与岛屿不断切分海岸。",
+    facts: [
+      "挪威拥有非常曲折的海岸线和大量峡湾。",
+      "斯堪的纳维亚山脉贯穿挪威许多地区。",
+      "奥斯陆坐落在深入陆地的奥斯陆峡湾北端。",
+    ],
+    border: [
+      [4.0, 58.0],
+      [6.0, 62.0],
+      [12.0, 66.0],
+      [17.0, 70.0],
+      [28.0, 71.2],
+      [31.0, 69.0],
+      [23.0, 65.0],
+      [17.0, 60.0],
+      [10.0, 58.0],
+    ],
+    city: {
+      name: "奥斯陆",
+      point: [10.75, 59.91],
+    },
+    scenery: "highland",
+  },
+  {
+    id: "russia",
+    name: "俄罗斯",
+    englishName: "RUSSIA",
+    flag: "🇷🇺",
+    color: "#83ad91",
+    darkColor: "#577665",
+    accent: "#d46158",
+    intro: "横跨欧洲东部与亚洲北部，森林、草原、冻土和漫长河流覆盖巨大的东西距离。",
+    facts: [
+      "俄罗斯横跨欧洲和亚洲，是世界上国土面积最大的国家。",
+      "伏尔加河流经俄罗斯欧洲部分并注入里海。",
+      "西伯利亚覆盖俄罗斯亚洲部分的广大区域。",
+    ],
+    border: [
+      [27.0, 55.0],
+      [30.0, 62.0],
+      [24.0, 68.0],
+      [42.0, 72.0],
+      [75.0, 77.0],
+      [120.0, 76.0],
+      [160.0, 71.0],
+      [180.0, 66.0],
+      [180.0, 52.0],
+      [155.0, 49.0],
+      [135.0, 43.0],
+      [115.0, 50.0],
+      [95.0, 51.0],
+      [80.0, 55.0],
+      [65.0, 50.0],
+      [50.0, 43.0],
+      [37.0, 44.0],
+      [30.0, 48.0],
+    ],
+    city: {
+      name: "莫斯科",
+      point: [37.62, 55.75],
+    },
+    scenery: "green",
+  },
+  {
+    id: "iran",
+    name: "伊朗",
+    englishName: "IRAN",
+    flag: "🇮🇷",
+    color: "#b69b70",
+    darkColor: "#806a52",
+    accent: "#cf514a",
+    intro: "位于西亚高原，山脉、盆地、沙漠与里海和波斯湾两侧海岸共同塑造路线。",
+    facts: [
+      "伊朗大部分国土位于伊朗高原。",
+      "扎格罗斯山脉沿伊朗西部和西南部延伸。",
+      "德黑兰位于厄尔布尔士山脉南麓。",
+    ],
+    border: [
+      [44.0, 39.0],
+      [49.0, 40.0],
+      [54.0, 38.0],
+      [61.0, 37.0],
+      [63.0, 31.0],
+      [61.0, 25.0],
+      [56.0, 25.0],
+      [52.0, 27.0],
+      [48.0, 29.0],
+      [45.0, 33.0],
+    ],
+    city: {
+      name: "德黑兰",
+      point: [51.39, 35.69],
+    },
+    scenery: "highland",
+  },
+  {
+    id: "saudi-arabia",
+    name: "沙特阿拉伯",
+    englishName: "SAUDI ARABIA",
+    flag: "🇸🇦",
+    color: "#c5aa6c",
+    darkColor: "#89744e",
+    accent: "#4d986e",
+    intro: "占据阿拉伯半岛大部，红海、波斯湾、岩石高原与广阔沙漠围成漫长旅行线。",
+    facts: [
+      "沙特阿拉伯占据阿拉伯半岛的大部分地区。",
+      "鲁卜哈利沙漠位于阿拉伯半岛南部，是大型流动沙漠之一。",
+      "利雅得位于阿拉伯半岛内部的高原地区。",
+    ],
+    border: [
+      [34.5, 29.5],
+      [39.0, 32.0],
+      [48.0, 29.0],
+      [55.5, 23.0],
+      [52.0, 17.0],
+      [44.0, 16.0],
+      [39.0, 19.0],
+      [35.0, 25.0],
+    ],
+    city: {
+      name: "利雅得",
+      point: [46.68, 24.71],
+    },
+    scenery: "sahara",
+  },
+  {
+    id: "pakistan",
+    name: "巴基斯坦",
+    englishName: "PAKISTAN",
+    flag: "🇵🇰",
+    color: "#83af78",
+    darkColor: "#557650",
+    accent: "#4d916b",
+    intro: "从阿拉伯海岸沿印度河谷向北延伸至世界级高山，是南亚重要的地理通道。",
+    facts: [
+      "印度河自北向南贯穿巴基斯坦并注入阿拉伯海。",
+      "巴基斯坦北部连接喀喇昆仑山和喜马拉雅山地区。",
+      "伊斯兰堡位于波特瓦尔高原北缘。",
+    ],
+    border: [
+      [61.0, 25.0],
+      [67.0, 24.0],
+      [71.0, 24.0],
+      [77.0, 35.0],
+      [74.0, 37.0],
+      [70.0, 36.0],
+      [66.0, 31.0],
+      [61.0, 29.0],
+    ],
+    city: {
+      name: "伊斯兰堡",
+      point: [73.05, 33.69],
+    },
+    scenery: "highland",
+  },
+  {
+    id: "mongolia",
+    name: "蒙古国",
+    englishName: "MONGOLIA",
+    flag: "🇲🇳",
+    color: "#a9ad70",
+    darkColor: "#74784f",
+    accent: "#d17a48",
+    intro: "位于亚洲内陆，辽阔草原、戈壁与山地让地平线成为最醒目的景观。",
+    facts: [
+      "蒙古国是内陆国家，北邻俄罗斯、南邻中国。",
+      "戈壁分布在蒙古国南部及中国北部的部分地区。",
+      "乌兰巴托位于蒙古国中北部的河谷中。",
+    ],
+    border: [
+      [87.0, 49.0],
+      [90.0, 43.0],
+      [105.0, 42.0],
+      [120.0, 44.0],
+      [120.0, 50.0],
+      [110.0, 52.0],
+      [98.0, 50.0],
+    ],
+    city: {
+      name: "乌兰巴托",
+      point: [106.91, 47.92],
+    },
+    scenery: "highland",
+  },
 ] as const;
+
+/**
+ * 手机打卡点是一层独立的精选世界内容，不是国家配额。
+ * 一个国家可以没有，也可以拥有多个；countryId 只记录它所在的地理背景。
+ */
+export const PHOTO_SPOTS: readonly PhotoSpotDefinition[] = [
+  {
+    id: "gibraltar-strait",
+    name: "直布罗陀海峡",
+    kind: "natural",
+    countryId: "spain",
+    point: [-5.62, 36.03],
+    postcard: "欧洲与非洲隔海相望的蓝色海峡",
+    fact: "海峡最窄处只有约十四公里，是地中海通往大西洋的门户。",
+  },
+  {
+    id: "big-ben",
+    name: "大本钟",
+    kind: "landmark",
+    countryId: "united-kingdom",
+    point: [-0.125, 51.501],
+    postcard: "泰晤士河畔的钟楼与红色巴士",
+    fact: "“大本钟”最初是钟的昵称，所在钟楼现名为伊丽莎白塔。",
+  },
+  {
+    id: "brandenburg-gate",
+    name: "勃兰登堡门",
+    kind: "landmark",
+    countryId: "germany",
+    point: [13.378, 52.516],
+    postcard: "柏林林荫道尽头的古典城门",
+    fact: "它从旧城门变成了德国历史与统一的重要象征。",
+  },
+  {
+    id: "colosseum",
+    name: "罗马斗兽场",
+    kind: "wonder",
+    countryId: "italy",
+    point: [12.492, 41.89],
+    postcard: "夕阳下的椭圆形古罗马建筑",
+    fact: "这座大型圆形剧场在公元一世纪建成，可容纳数万名观众。",
+  },
+  {
+    id: "acropolis",
+    name: "雅典卫城",
+    kind: "wonder",
+    countryId: "greece",
+    point: [23.726, 37.972],
+    postcard: "石灰岩山丘上的古典神庙",
+    fact: "卫城位于雅典制高点，帕特农神庙是其中最醒目的建筑。",
+  },
+  {
+    id: "swiss-alps",
+    name: "瑞士阿尔卑斯",
+    kind: "natural",
+    countryId: "switzerland",
+    point: [7.98, 46.58],
+    postcard: "雪峰、山谷与红色列车",
+    fact: "阿尔卑斯山塑造了瑞士的地貌、交通与四季旅游。",
+  },
+  {
+    id: "norway-fjord",
+    name: "挪威峡湾",
+    kind: "natural",
+    countryId: "norway",
+    point: [7.2, 62.1],
+    postcard: "陡峭雪山之间深入陆地的蓝色海湾",
+    fact: "许多挪威峡湾由冰川侵蚀形成，海水沿深谷进入陆地。",
+  },
+  {
+    id: "giza-pyramids",
+    name: "吉萨金字塔群",
+    kind: "wonder",
+    countryId: "egypt",
+    point: [31.134, 29.979],
+    postcard: "沙漠边缘的金色金字塔",
+    fact: "胡夫金字塔是古代世界七大奇迹中唯一大体保存至今的一处。",
+  },
+  {
+    id: "hagia-sophia",
+    name: "圣索菲亚大教堂",
+    kind: "wonder",
+    countryId: "turkey",
+    point: [28.98, 41.008],
+    postcard: "博斯普鲁斯海峡旁的巨大穹顶",
+    fact: "这座建筑跨越不同历史时期，长期影响着穹顶建筑的发展。",
+  },
+  {
+    id: "great-wall",
+    name: "长城",
+    kind: "wonder",
+    countryId: "china",
+    point: [116.57, 40.43],
+    postcard: "沿山脊起伏的城墙与烽火台",
+    fact: "今天所见的长城由不同朝代、不同地段共同构成，并非一条单一城墙。",
+  },
+  {
+    id: "fuji-view",
+    name: "富士山",
+    kind: "natural",
+    countryId: "japan",
+    point: [138.73, 35.36],
+    postcard: "湖面后方对称的火山雪峰",
+    fact: "富士山是日本最高峰，也是一座仍被列为活火山的成层火山。",
+  },
+  {
+    id: "taj-mahal",
+    name: "泰姬陵",
+    kind: "wonder",
+    countryId: "india",
+    point: [78.042, 27.175],
+    postcard: "水池倒影中的白色穹顶建筑",
+    fact: "泰姬陵以白色大理石和近乎对称的布局闻名。",
+  },
+  {
+    id: "java-volcano",
+    name: "爪哇火山群",
+    kind: "natural",
+    countryId: "indonesia",
+    point: [110.2, -7.6],
+    postcard: "热带晨雾中的层叠火山",
+    fact: "印度尼西亚位于环太平洋火山带，拥有数量众多的活火山。",
+  },
+  {
+    id: "moscow-domes",
+    name: "圣瓦西里大教堂",
+    kind: "landmark",
+    countryId: "russia",
+    point: [37.62, 55.75],
+    postcard: "红场旁色彩鲜明的洋葱形穹顶",
+    fact: "这组各不相同的穹顶让建筑形成了极强的远距离识别度。",
+  },
+];
 
 export const START_POINT: GeoPoint = [-5.72, 36.52];
 

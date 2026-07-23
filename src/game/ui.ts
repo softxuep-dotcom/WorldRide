@@ -2,13 +2,26 @@ import {
   COUNTRIES,
   MAP_BOUNDS,
   type CountryDefinition,
+  type PhotoSpotDefinition,
   getSeaName,
   geoToWorld,
   getCountryBorders,
 } from "./data";
 import type { GameEvent, GameState } from "./simulation";
 import { getCurrentGeoPosition } from "./simulation";
-import { WORLD_COUNTRIES } from "./world-map";
+import { WORLD_COUNTRIES, getWorldCountryByName } from "./world-map";
+
+const HUD_WORLD_NAME_FALLBACKS: Readonly<Record<string, string>> = {
+  Taiwan: "中国台湾",
+  "Hong Kong": "中国香港",
+  Macao: "中国澳门",
+  Palestine: "巴勒斯坦",
+  Kosovo: "科索沃",
+  "W. Sahara": "西撒哈拉",
+  "N. Cyprus": "北塞浦路斯",
+  Somaliland: "索马里兰",
+  "Falkland Is.": "福克兰群岛（马尔维纳斯群岛）",
+};
 
 interface UIElements {
   placeName: HTMLElement;
@@ -39,7 +52,7 @@ export class GameUI {
   private readonly playerHalo: SVGCircleElement;
   private revealTimer?: number;
   private toastTimer?: number;
-  private previousNearestLandmark?: string;
+  private previousNearestPhotoSpot?: string;
 
   constructor(onInteract: () => void, onToggleWorldView: () => void) {
     this.elements = {
@@ -82,7 +95,7 @@ export class GameUI {
     const geoPosition = getCurrentGeoPosition(state);
     const placeName =
       state.currentCountry?.name ??
-      state.currentWorldCountryName ??
+      getHudWorldName(state.currentWorldCountryName) ??
       getSeaName(geoPosition);
 
     this.elements.placeName.textContent = placeName;
@@ -104,19 +117,23 @@ export class GameUI {
       stamp?.classList.toggle("is-visited", state.visitedCountries.has(country.id));
     }
 
-    const nearestId = state.nearestLandmark?.id;
+    const nearestId = state.nearestPhotoSpot?.id;
     this.elements.interactButton.classList.toggle("is-visible", Boolean(nearestId));
-    if (state.nearestLandmark) {
-      const collected = state.collectedPostcards.has(state.nearestLandmark.id);
+    this.elements.interactButton.disabled = !nearestId;
+    this.elements.interactButton.setAttribute("aria-hidden", String(!nearestId));
+    if (state.nearestPhotoSpot) {
+      const collected = state.collectedPostcards.has(state.nearestPhotoSpot.id);
       this.elements.interactButton.lastElementChild!.textContent = collected
-        ? `重拍 · ${state.nearestLandmark.city.name}`
-        : `拍照 · ${state.nearestLandmark.city.name}`;
+        ? `再次打卡 · ${state.nearestPhotoSpot.name}`
+        : `手机打卡 · ${state.nearestPhotoSpot.name}`;
+    } else {
+      this.elements.interactButton.lastElementChild!.textContent = "手机打卡";
     }
 
-    if (nearestId && nearestId !== this.previousNearestLandmark) {
-      this.showToast(`发现拍照点：${state.nearestLandmark!.city.name}`);
+    if (nearestId && nearestId !== this.previousNearestPhotoSpot) {
+      this.showToast(`发现手机打卡点：${state.nearestPhotoSpot!.name}`);
     }
-    this.previousNearestLandmark = nearestId;
+    this.previousNearestPhotoSpot = nearestId;
   }
 
   handleEvent(event: GameEvent): void {
@@ -131,7 +148,7 @@ export class GameUI {
         this.showToast("这里是原型地图的边缘，换个方向继续旅行吧");
         break;
       case "postcard-collected":
-        this.capturePostcard(event.country, event.firstCollection);
+        this.capturePostcard(event.spot, event.firstCollection);
         break;
     }
   }
@@ -167,16 +184,15 @@ export class GameUI {
     }, firstVisit ? 3900 : 2000);
   }
 
-  private capturePostcard(country: CountryDefinition, firstCollection: boolean): void {
+  private capturePostcard(spot: PhotoSpotDefinition, firstCollection: boolean): void {
     this.elements.flash.classList.remove("is-active");
     void this.elements.flash.offsetWidth;
     this.elements.flash.classList.add("is-active");
 
-    const fact = country.facts[Math.floor(Math.random() * country.facts.length)];
     this.showToast(
       firstCollection
-        ? `明信片已收藏：${country.city.postcard} · ${fact}`
-        : `又拍了一张 ${country.city.name} 的照片`,
+        ? `明信片已收藏：${spot.postcard} · ${spot.fact}`
+        : `又拍了一张 ${spot.name} 的照片`,
     );
   }
 
@@ -211,7 +227,10 @@ export class GameUI {
 
     for (const country of COUNTRIES) {
       const path = document.createElementNS(namespace, "path");
-      const commands = getCountryBorders(country)
+      const commands = (
+        getWorldCountryByName(country.englishName)?.renderPolygons ??
+        getCountryBorders(country)
+      )
         .map(
           (border) =>
             border
@@ -253,6 +272,10 @@ export class GameUI {
       this.elements.stampGrid.append(stamp);
     });
   }
+}
+
+function getHudWorldName(name: string | undefined): string | undefined {
+  return name ? (HUD_WORLD_NAME_FALLBACKS[name] ?? name) : undefined;
 }
 
 function geoToMiniMap(point: readonly [number, number]): { x: number; y: number } {

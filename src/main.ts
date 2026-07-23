@@ -20,6 +20,7 @@ const requestedCountry = requestedStart
 if (requestedCountry) {
   game.simulation.state.visitedCountries.clear();
   game.simulation.state.collectedPostcards.clear();
+  game.simulation.state.currentCountry = undefined;
   game.simulation.teleport(
     requestedCountry.city.point[0],
     requestedCountry.city.point[1],
