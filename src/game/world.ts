@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import {
-  COUNTRIES,
   MAP_BOUNDS,
   MAP_SCALE,
   PHOTO_SPOTS,
@@ -8,14 +7,13 @@ import {
   type GeoPoint,
   type PhotoSpotDefinition,
   geoToWorld,
-  getCountryBorders,
   getCountryById,
-  isGeoPointInCountry,
   worldToGeo,
 } from "./data";
 import {
+  COUNTRY_ATLAS_BINDINGS,
   WORLD_COUNTRIES,
-  getWorldCountryByName,
+  getWorldCountryAtGeo,
   isGeoPointInWorldCountry,
   type WorldCountry,
 } from "./world-map";
@@ -284,10 +282,10 @@ export class WorldView {
   }
 
   private addCountries(): void {
-    for (const country of COUNTRIES) {
-      this.addCountryBase(country);
-      this.addCountryBorder(country);
-      this.addScenery(country);
+    for (const { content: country, atlas } of COUNTRY_ATLAS_BINDINGS) {
+      this.addCountryBase(country, atlas);
+      this.addCountryBorder(atlas);
+      this.addScenery(country, atlas);
       this.addCountryAnchor(country);
     }
 
@@ -296,8 +294,11 @@ export class WorldView {
     }
   }
 
-  private addCountryBase(country: CountryDefinition): void {
-    const shapes = getDetailedCountryBorders(country).map((border) => {
+  private addCountryBase(
+    country: CountryDefinition,
+    atlas: WorldCountry,
+  ): void {
+    const shapes = atlas.renderPolygons.map((border) => {
       const shape = new THREE.Shape();
       border.forEach((point, index) => {
         const world = geoToWorld(point);
@@ -341,14 +342,14 @@ export class WorldView {
     this.root.add(land);
   }
 
-  private addCountryBorder(country: CountryDefinition): void {
+  private addCountryBorder(atlas: WorldCountry): void {
     const material = new THREE.LineBasicMaterial({
       color: 0xfff7df,
       transparent: true,
       opacity: 0.78,
     });
 
-    for (const border of getDetailedCountryBorders(country)) {
+    for (const border of atlas.renderPolygons) {
       const positions: number[] = [];
       for (const point of border) {
         const world = geoToWorld(point);
@@ -363,9 +364,12 @@ export class WorldView {
     }
   }
 
-  private addScenery(country: CountryDefinition): void {
+  private addScenery(
+    country: CountryDefinition,
+    atlas: WorldCountry,
+  ): void {
     const random = mulberry32(hashString(country.id));
-    const allBorderPoints = getDetailedCountryBorders(country).flat();
+    const allBorderPoints = atlas.renderPolygons.flat();
     const longitudes = allBorderPoints.map((point) => point[0]);
     const latitudes = allBorderPoints.map((point) => point[1]);
     const minimumLongitude = Math.min(...longitudes);
@@ -391,7 +395,7 @@ export class WorldView {
         THREE.MathUtils.lerp(minimumLatitude, maximumLatitude, random()),
       ] as const;
 
-      if (!isGeoPointInDetailedCountry(point, country)) {
+      if (!isGeoPointInWorldCountry(point, atlas)) {
         continue;
       }
 
@@ -425,7 +429,7 @@ export class WorldView {
         (country.scenery === "tropical" || country.scenery === "monsoon") &&
         choice < 0.52
       ) {
-        this.addTreeCluster(world.x, world.z, size, country, random);
+        this.addTreeCluster(world.x, world.z, size, country, atlas, random);
       } else if (
         (country.scenery === "tropical" || country.scenery === "monsoon") &&
         choice < 0.68
@@ -440,7 +444,7 @@ export class WorldView {
         (country.scenery === "green" || country.scenery === "atlantic") &&
         choice < 0.42
       ) {
-        this.addTreeCluster(world.x, world.z, size, country, random);
+        this.addTreeCluster(world.x, world.z, size, country, atlas, random);
       } else if (
         (country.scenery === "green" || country.scenery === "atlantic") &&
         choice < 0.58
@@ -452,13 +456,13 @@ export class WorldView {
       ) {
         this.addMeadowPatch(world.x, world.z, size, true);
       } else if (country.scenery === "mediterranean" && choice < 0.34) {
-        this.addTreeCluster(world.x, world.z, size, country, random);
+        this.addTreeCluster(world.x, world.z, size, country, atlas, random);
       } else if (country.scenery === "mediterranean" && choice < 0.52) {
         this.addFieldPatch(world.x, world.z, size, country);
       } else if (country.scenery === "mediterranean" && choice < 0.72) {
         this.addMeadowPatch(world.x, world.z, size, false);
       } else if (country.scenery === "highland" && choice < 0.66) {
-        this.addTreeCluster(world.x, world.z, size, country, random);
+        this.addTreeCluster(world.x, world.z, size, country, atlas, random);
       } else if (country.scenery === "highland" && choice < 0.82) {
         this.addMeadowPatch(world.x, world.z, size, false);
       } else {
@@ -984,7 +988,7 @@ export class WorldView {
       const x = (random() - 0.5) * (width - 2);
       const z = (random() - 0.5) * (depth - 2);
       const geo = worldToGeo(x, z);
-      if (COUNTRIES.some((country) => isGeoPointInCountry(geo, country))) {
+      if (getWorldCountryAtGeo(geo)) {
         continue;
       }
       const wave = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.025, 4, 10, Math.PI), material);
@@ -1155,6 +1159,7 @@ export class WorldView {
     z: number,
     size: number,
     country: CountryDefinition,
+    atlas: WorldCountry,
     random: () => number,
   ): void {
     const offsets = [
@@ -1166,7 +1171,7 @@ export class WorldView {
     for (const [index, [offsetX, offsetZ]] of offsets.entries()) {
       const treeX = x + offsetX * size;
       const treeZ = z + offsetZ * size;
-      if (!isGeoPointInDetailedCountry(worldToGeo(treeX, treeZ), country)) {
+      if (!isGeoPointInWorldCountry(worldToGeo(treeX, treeZ), atlas)) {
         continue;
       }
       const treeSize = size * (index === 0 ? 0.82 : 0.58 + random() * 0.16);
@@ -1347,25 +1352,6 @@ interface TerrainPalette {
   base: number;
   tileLow: number;
   tileHigh: number;
-}
-
-function getDetailedCountryBorders(
-  country: CountryDefinition,
-): readonly (readonly GeoPoint[])[] {
-  return (
-    getWorldCountryByName(country.englishName)?.renderPolygons ??
-    getCountryBorders(country)
-  );
-}
-
-function isGeoPointInDetailedCountry(
-  point: GeoPoint,
-  country: CountryDefinition,
-): boolean {
-  const detailedCountry = getWorldCountryByName(country.englishName);
-  return detailedCountry
-    ? isGeoPointInWorldCountry(point, detailedCountry)
-    : isGeoPointInCountry(point, country);
 }
 
 const TERRAIN_PALETTES: Record<CountryDefinition["scenery"], TerrainPalette> = {

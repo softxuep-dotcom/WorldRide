@@ -5,11 +5,13 @@ import {
   type PhotoSpotDefinition,
   getSeaName,
   geoToWorld,
-  getCountryBorders,
 } from "./data";
 import type { GameEvent, GameState } from "./simulation";
 import { getCurrentGeoPosition } from "./simulation";
-import { WORLD_COUNTRIES, getWorldCountryByName } from "./world-map";
+import {
+  COUNTRY_ATLAS_BINDINGS,
+  WORLD_COUNTRIES,
+} from "./world-map";
 
 const HUD_WORLD_NAME_FALLBACKS: Readonly<Record<string, string>> = {
   Taiwan: "中国台湾",
@@ -225,12 +227,9 @@ export class GameUI {
       this.elements.miniMapSvg.append(path);
     }
 
-    for (const country of COUNTRIES) {
+    for (const { content: country, atlas } of COUNTRY_ATLAS_BINDINGS) {
       const path = document.createElementNS(namespace, "path");
-      const commands = (
-        getWorldCountryByName(country.englishName)?.renderPolygons ??
-        getCountryBorders(country)
-      )
+      const commands = atlas.renderPolygons
         .map(
           (border) =>
             border

@@ -1,5 +1,4 @@
 import {
-  COUNTRIES,
   PHOTO_SPOTS,
   type CountryDefinition,
   type CountryId,
@@ -8,10 +7,12 @@ import {
   MAP_BOUNDS,
   START_POINT,
   geoToWorld,
-  getCountryAtWorld,
   worldToGeo,
 } from "./data";
-import { getWorldCountryAtGeo } from "./world-map";
+import {
+  getCountryContentForAtlas,
+  getWorldCountryAtGeo,
+} from "./world-map";
 
 export interface MovementInput {
   x: number;
@@ -147,19 +148,9 @@ export class GameSimulation {
       this.state.position.z,
     );
     const worldCountry = getWorldCountryAtGeo(geoPosition);
-    const preciseCountry = worldCountry
-      ? COUNTRIES.find(
-          (country) =>
-            country.englishName.toLowerCase() === worldCountry.name.toLowerCase(),
-        )
-      : undefined;
-    const fallbackCountry = getCountryAtWorld(
-      this.state.position.x,
-      this.state.position.z,
-    );
-    const nextCountry = preciseCountry ?? fallbackCountry;
+    const nextCountry = getCountryContentForAtlas(worldCountry);
     const previousCountry = this.state.currentCountry;
-    const nextMode: VehicleMode = worldCountry || fallbackCountry ? "car" : "boat";
+    const nextMode: VehicleMode = worldCountry ? "car" : "boat";
 
     this.state.currentCountry = nextCountry;
     this.state.currentWorldCountryName = worldCountry?.name;

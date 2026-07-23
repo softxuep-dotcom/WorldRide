@@ -31,6 +31,10 @@ export type CountryId =
   | "pakistan"
   | "mongolia";
 
+/**
+ * Country-specific content only. Geographic geometry is owned by world-map.ts
+ * and comes exclusively from world-atlas.
+ */
 export interface CountryDefinition {
   id: CountryId;
   name: string;
@@ -41,8 +45,6 @@ export interface CountryDefinition {
   accent: string;
   intro: string;
   facts: readonly string[];
-  border: readonly GeoPoint[];
-  additionalBorders?: readonly (readonly GeoPoint[])[];
   city: {
     name: string;
     point: GeoPoint;
@@ -116,21 +118,9 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "里斯本的山坡街道上可以看到有轨电车。",
       "蓝白瓷砖常被用于装饰建筑外墙。",
     ],
-    border: [
-      [-9.5, 42.1],
-      [-8.3, 42.15],
-      [-6.95, 41.9],
-      [-7.1, 40.1],
-      [-7.35, 38.1],
-      [-7.45, 37.2],
-      [-8.75, 37.0],
-      [-9.45, 38.5],
-      [-9.05, 40.0],
-      [-9.5, 41.0],
-    ],
     city: {
       name: "里斯本",
-      point: [-9.14, 38.72],
+      point: [-9.18, 38.78],
     },
     scenery: "atlantic",
   },
@@ -148,27 +138,9 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "从北部山地到南部海岸，地貌变化很丰富。",
       "城市广场、当代街区与海边小镇各有不同节奏。",
     ],
-    border: [
-      [-9.1, 42.4],
-      [-8.2, 43.5],
-      [-5.5, 43.75],
-      [-1.75, 43.35],
-      [0.8, 42.85],
-      [3.2, 42.45],
-      [3.1, 41.8],
-      [1.6, 41.0],
-      [0.15, 39.5],
-      [-0.5, 37.1],
-      [-2.4, 36.7],
-      [-5.6, 36.0],
-      [-7.4, 37.2],
-      [-7.25, 39.8],
-      [-6.95, 41.9],
-      [-8.2, 42.05],
-    ],
     city: {
       name: "加的斯",
-      point: [-6.28, 36.53],
+      point: [-6.22, 36.55],
     },
     scenery: "mediterranean",
   },
@@ -186,26 +158,9 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "马赛是一座面向地中海的港口城市。",
       "不同地区拥有各自鲜明的建筑、食物与生活方式。",
     ],
-    border: [
-      [-5.1, 48.7],
-      [-1.8, 49.7],
-      [1.8, 50.9],
-      [4.3, 49.9],
-      [7.6, 48.4],
-      [7.4, 47.5],
-      [6.1, 46.0],
-      [7.0, 44.7],
-      [6.6, 43.1],
-      [4.5, 43.0],
-      [3.2, 42.45],
-      [0.8, 42.85],
-      [-1.75, 43.35],
-      [-1.8, 46.2],
-      [-4.7, 47.8],
-    ],
     city: {
       name: "马赛",
-      point: [5.25, 43.3],
+      point: [5.35, 43.35],
     },
     scenery: "green",
   },
@@ -222,20 +177,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "英国由大不列颠岛、爱尔兰岛东北部和许多小岛组成。",
       "伦敦的泰晤士河穿过城市中心。",
       "从海岸到高地，不同地区拥有差异明显的景观。",
-    ],
-    border: [
-      [-5.7, 50.0],
-      [-4.4, 51.0],
-      [-5.5, 53.5],
-      [-5.0, 55.5],
-      [-6.0, 57.3],
-      [-3.0, 58.7],
-      [-1.8, 57.5],
-      [-2.1, 55.8],
-      [-0.4, 54.5],
-      [0.9, 52.7],
-      [1.5, 51.0],
-      [-1.8, 50.5],
     ],
     city: {
       name: "伦敦",
@@ -257,19 +198,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "莱茵河、多瑙河等河流流经德国。",
       "德国拥有密集的铁路网络和许多不同规模的城市。",
     ],
-    border: [
-      [6.0, 47.3],
-      [9.0, 47.5],
-      [12.5, 47.5],
-      [13.8, 48.8],
-      [12.5, 50.0],
-      [15.0, 51.0],
-      [14.5, 53.8],
-      [12.0, 54.8],
-      [8.2, 54.7],
-      [6.5, 53.0],
-      [6.0, 50.0],
-    ],
     city: {
       name: "柏林",
       point: [13.41, 52.52],
@@ -289,21 +217,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "意大利半岛伸入地中海，地图轮廓常被形容为靴子。",
       "意大利北部连接阿尔卑斯山地区。",
       "罗马保存着跨越多个历史时期的建筑与城市空间。",
-    ],
-    border: [
-      [6.8, 45.8],
-      [9.4, 46.5],
-      [13.5, 46.6],
-      [13.6, 44.2],
-      [15.8, 42.0],
-      [18.5, 40.0],
-      [17.3, 38.2],
-      [15.3, 38.0],
-      [15.2, 40.2],
-      [13.0, 42.0],
-      [11.5, 43.1],
-      [9.5, 43.8],
-      [7.5, 43.0],
     ],
     city: {
       name: "罗马",
@@ -325,16 +238,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "希腊大部分地区为山地。",
       "雅典周围分布着古代遗迹与现代城市街区。",
     ],
-    border: [
-      [19.5, 41.5],
-      [22.5, 41.7],
-      [26.5, 41.0],
-      [27.0, 39.0],
-      [25.0, 37.0],
-      [24.0, 35.0],
-      [22.0, 36.0],
-      [20.5, 38.0],
-    ],
     city: {
       name: "雅典",
       point: [23.73, 37.98],
@@ -354,18 +257,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "摩洛哥同时面向大西洋与地中海。",
       "阿特拉斯山脉穿过这个国家。",
       "丹吉尔位于直布罗陀海峡附近，是重要港口城市。",
-    ],
-    border: [
-      [-5.9, 35.9],
-      [-3.9, 35.7],
-      [-1.9, 35.1],
-      [-1.2, 32.1],
-      [-3.0, 29.1],
-      [-6.4, 28.0],
-      [-9.7, 29.3],
-      [-10.4, 31.6],
-      [-9.2, 33.5],
-      [-7.0, 34.8],
     ],
     city: {
       name: "丹吉尔",
@@ -387,19 +278,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "北部人口与城市较集中，南部进入撒哈拉地区。",
       "阿尔及尔的白色建筑沿着地中海岸与山坡展开。",
     ],
-    border: [
-      [-1.9, 35.1],
-      [1.0, 36.5],
-      [4.0, 36.9],
-      [8.6, 37.1],
-      [9.3, 34.5],
-      [8.4, 32.0],
-      [8.6, 30.0],
-      [5.5, 28.0],
-      [2.0, 27.2],
-      [-1.2, 28.6],
-      [-1.2, 32.1],
-    ],
     city: {
       name: "阿尔及尔",
       point: [3.05, 36.5],
@@ -419,15 +297,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "突尼斯位于非洲北部，海岸面向地中海。",
       "北部较湿润，向南逐渐进入撒哈拉边缘。",
       "突尼斯城附近可以看到古城、港口与现代城区。",
-    ],
-    border: [
-      [7.4, 37.0],
-      [10.5, 37.4],
-      [11.6, 35.0],
-      [11.0, 33.0],
-      [10.0, 30.3],
-      [8.2, 31.5],
-      [7.5, 34.0],
     ],
     city: {
       name: "突尼斯城",
@@ -449,13 +318,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "尼罗河向北流入地中海。",
       "开罗是一座规模很大的现代城市，附近分布着著名古代遗迹。",
     ],
-    border: [
-      [24.8, 31.5],
-      [31.2, 31.7],
-      [34.8, 31.2],
-      [35.0, 22.0],
-      [25.0, 22.0],
-    ],
     city: {
       name: "开罗",
       point: [31.24, 30.04],
@@ -476,18 +338,9 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "博斯普鲁斯海峡连接黑海与马尔马拉海。",
       "伊斯坦布尔分布在海峡两岸，拥有繁忙港口与城市交通。",
     ],
-    border: [
-      [26.0, 41.5],
-      [29.0, 40.5],
-      [36.0, 42.0],
-      [44.0, 40.0],
-      [44.0, 36.0],
-      [35.0, 36.0],
-      [29.0, 37.0],
-    ],
     city: {
       name: "伊斯坦布尔",
-      point: [28.98, 41.0],
+      point: [28.95, 41.05],
     },
     scenery: "mediterranean",
   },
@@ -504,23 +357,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "中国地势总体西高东低，河流多向东流入海洋。",
       "长江是中国长度最长的河流。",
       "北京位于华北平原北部，是中国的首都。",
-    ],
-    border: [
-      [73.0, 39.0],
-      [78.0, 32.0],
-      [88.0, 28.0],
-      [97.0, 24.0],
-      [106.0, 21.0],
-      [113.0, 22.0],
-      [119.0, 25.0],
-      [122.0, 31.0],
-      [132.0, 43.0],
-      [126.0, 49.0],
-      [118.0, 53.0],
-      [108.0, 50.0],
-      [99.0, 49.0],
-      [90.0, 45.0],
-      [80.0, 49.0],
     ],
     city: {
       name: "北京",
@@ -542,30 +378,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "日本列岛多山，城市主要分布在沿海平原。",
       "东京位于本州岛东部，是规模很大的都市区域。",
     ],
-    border: [
-      [132.0, 31.0],
-      [134.0, 33.0],
-      [137.0, 34.0],
-      [140.0, 35.0],
-      [142.0, 39.0],
-      [140.0, 42.0],
-      [137.0, 38.0],
-      [135.0, 35.0],
-    ],
-    additionalBorders: [
-      [
-        [140.0, 41.5],
-        [145.0, 42.0],
-        [145.5, 45.5],
-        [141.0, 45.5],
-      ],
-      [
-        [129.0, 31.0],
-        [132.0, 31.0],
-        [131.5, 34.0],
-        [129.0, 33.0],
-      ],
-    ],
     city: {
       name: "东京",
       point: [139.69, 35.68],
@@ -585,13 +397,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "韩国三面临海，国土中分布着许多山地。",
       "首尔都市区域位于汉江沿岸。",
       "高速铁路连接多座主要城市。",
-    ],
-    border: [
-      [126.0, 34.0],
-      [129.5, 35.0],
-      [129.0, 38.5],
-      [127.0, 39.0],
-      [125.5, 37.0],
     ],
     city: {
       name: "首尔",
@@ -613,18 +418,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "恒河流域分布着广阔平原和众多城市。",
       "印度半岛向南伸入印度洋。",
     ],
-    border: [
-      [68.0, 23.0],
-      [72.0, 20.0],
-      [76.0, 8.0],
-      [80.0, 9.0],
-      [83.0, 16.0],
-      [88.0, 22.0],
-      [92.0, 27.0],
-      [88.0, 28.0],
-      [80.0, 34.0],
-      [74.0, 32.0],
-    ],
     city: {
       name: "新德里",
       point: [77.21, 28.61],
@@ -644,15 +437,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "泰国北部多山，中部是重要河流平原。",
       "湄南河流经曼谷附近并注入泰国湾。",
       "泰国南部是一条狭长半岛，连接多个海岸区域。",
-    ],
-    border: [
-      [97.0, 20.0],
-      [101.0, 20.0],
-      [105.0, 16.0],
-      [102.0, 12.0],
-      [101.0, 6.0],
-      [99.0, 7.0],
-      [99.0, 14.0],
     ],
     city: {
       name: "曼谷",
@@ -674,17 +458,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "红河三角洲位于北部，湄公河三角洲位于南部。",
       "河内位于越南北部，是越南的首都。",
     ],
-    border: [
-      [102.0, 23.0],
-      [108.0, 23.0],
-      [107.0, 20.0],
-      [109.0, 16.0],
-      [109.0, 10.0],
-      [105.0, 8.0],
-      [104.0, 11.0],
-      [106.0, 16.0],
-      [104.0, 20.0],
-    ],
     city: {
       name: "河内",
       point: [105.85, 21.03],
@@ -704,38 +477,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "印度尼西亚由大量岛屿组成。",
       "印度尼西亚位于环太平洋火山地震带的一部分。",
       "雅加达位于爪哇岛西北部。",
-    ],
-    border: [
-      [95.0, 6.0],
-      [106.0, 6.0],
-      [105.0, -6.0],
-      [99.0, -5.0],
-    ],
-    additionalBorders: [
-      [
-        [105.0, -5.0],
-        [114.0, -6.0],
-        [114.0, -9.0],
-        [106.0, -8.0],
-      ],
-      [
-        [108.0, 4.0],
-        [117.0, 4.0],
-        [119.0, -4.0],
-        [109.0, -4.0],
-      ],
-      [
-        [119.0, 2.0],
-        [125.0, 2.0],
-        [123.0, -6.0],
-        [119.0, -4.0],
-      ],
-      [
-        [130.0, 0.0],
-        [141.0, 0.0],
-        [141.0, -9.0],
-        [131.0, -9.0],
-      ],
     ],
     city: {
       name: "雅加达",
@@ -757,13 +498,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "阿姆斯特丹拥有密集的运河网络。",
       "堤坝、泵站和水利工程长期参与塑造荷兰地貌。",
     ],
-    border: [
-      [3.4, 51.2],
-      [4.0, 53.5],
-      [7.2, 53.4],
-      [7.0, 50.8],
-      [5.2, 50.7],
-    ],
     city: {
       name: "阿姆斯特丹",
       point: [4.9, 52.37],
@@ -783,13 +517,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "瑞士位于阿尔卑斯山地区，是欧洲重要的山地交通节点。",
       "莱茵河和罗讷河都发源于瑞士附近的阿尔卑斯山区。",
       "伯尔尼位于阿勒河弯曲环绕的高地上。",
-    ],
-    border: [
-      [5.9, 45.8],
-      [7.0, 47.8],
-      [9.7, 47.5],
-      [10.5, 46.8],
-      [9.0, 45.8],
     ],
     city: {
       name: "伯尔尼",
@@ -811,14 +538,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "多瑙河自西向东流经奥地利北部和维也纳。",
       "维也纳长期以音乐、建筑和城市公共交通闻名。",
     ],
-    border: [
-      [9.5, 46.4],
-      [10.4, 47.6],
-      [13.0, 48.8],
-      [17.2, 48.0],
-      [16.5, 46.8],
-      [13.5, 46.4],
-    ],
     city: {
       name: "维也纳",
       point: [16.37, 48.21],
@@ -838,14 +557,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "波兰北部面向波罗的海，中部以平原为主。",
       "维斯瓦河自南向北流经华沙并最终汇入波罗的海。",
       "波兰南部连接喀尔巴阡山和苏台德山地区。",
-    ],
-    border: [
-      [14.1, 49.0],
-      [14.2, 54.3],
-      [19.0, 54.9],
-      [24.2, 54.4],
-      [24.1, 49.0],
-      [19.0, 49.0],
     ],
     city: {
       name: "华沙",
@@ -867,17 +578,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "斯堪的纳维亚山脉贯穿挪威许多地区。",
       "奥斯陆坐落在深入陆地的奥斯陆峡湾北端。",
     ],
-    border: [
-      [4.0, 58.0],
-      [6.0, 62.0],
-      [12.0, 66.0],
-      [17.0, 70.0],
-      [28.0, 71.2],
-      [31.0, 69.0],
-      [23.0, 65.0],
-      [17.0, 60.0],
-      [10.0, 58.0],
-    ],
     city: {
       name: "奥斯陆",
       point: [10.75, 59.91],
@@ -897,26 +597,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "俄罗斯横跨欧洲和亚洲，是世界上国土面积最大的国家。",
       "伏尔加河流经俄罗斯欧洲部分并注入里海。",
       "西伯利亚覆盖俄罗斯亚洲部分的广大区域。",
-    ],
-    border: [
-      [27.0, 55.0],
-      [30.0, 62.0],
-      [24.0, 68.0],
-      [42.0, 72.0],
-      [75.0, 77.0],
-      [120.0, 76.0],
-      [160.0, 71.0],
-      [180.0, 66.0],
-      [180.0, 52.0],
-      [155.0, 49.0],
-      [135.0, 43.0],
-      [115.0, 50.0],
-      [95.0, 51.0],
-      [80.0, 55.0],
-      [65.0, 50.0],
-      [50.0, 43.0],
-      [37.0, 44.0],
-      [30.0, 48.0],
     ],
     city: {
       name: "莫斯科",
@@ -938,18 +618,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "扎格罗斯山脉沿伊朗西部和西南部延伸。",
       "德黑兰位于厄尔布尔士山脉南麓。",
     ],
-    border: [
-      [44.0, 39.0],
-      [49.0, 40.0],
-      [54.0, 38.0],
-      [61.0, 37.0],
-      [63.0, 31.0],
-      [61.0, 25.0],
-      [56.0, 25.0],
-      [52.0, 27.0],
-      [48.0, 29.0],
-      [45.0, 33.0],
-    ],
     city: {
       name: "德黑兰",
       point: [51.39, 35.69],
@@ -969,16 +637,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "沙特阿拉伯占据阿拉伯半岛的大部分地区。",
       "鲁卜哈利沙漠位于阿拉伯半岛南部，是大型流动沙漠之一。",
       "利雅得位于阿拉伯半岛内部的高原地区。",
-    ],
-    border: [
-      [34.5, 29.5],
-      [39.0, 32.0],
-      [48.0, 29.0],
-      [55.5, 23.0],
-      [52.0, 17.0],
-      [44.0, 16.0],
-      [39.0, 19.0],
-      [35.0, 25.0],
     ],
     city: {
       name: "利雅得",
@@ -1000,16 +658,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "巴基斯坦北部连接喀喇昆仑山和喜马拉雅山地区。",
       "伊斯兰堡位于波特瓦尔高原北缘。",
     ],
-    border: [
-      [61.0, 25.0],
-      [67.0, 24.0],
-      [71.0, 24.0],
-      [77.0, 35.0],
-      [74.0, 37.0],
-      [70.0, 36.0],
-      [66.0, 31.0],
-      [61.0, 29.0],
-    ],
     city: {
       name: "伊斯兰堡",
       point: [73.05, 33.69],
@@ -1029,15 +677,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       "蒙古国是内陆国家，北邻俄罗斯、南邻中国。",
       "戈壁分布在蒙古国南部及中国北部的部分地区。",
       "乌兰巴托位于蒙古国中北部的河谷中。",
-    ],
-    border: [
-      [87.0, 49.0],
-      [90.0, 43.0],
-      [105.0, 42.0],
-      [120.0, 44.0],
-      [120.0, 50.0],
-      [110.0, 52.0],
-      [98.0, 50.0],
     ],
     city: {
       name: "乌兰巴托",
@@ -1197,49 +836,12 @@ export function worldToGeo(x: number, z: number): GeoPoint {
   ];
 }
 
-export function isPointInPolygon(point: GeoPoint, polygon: readonly GeoPoint[]): boolean {
-  const [x, y] = point;
-  let inside = false;
-
-  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) {
-    const [currentX, currentY] = polygon[index];
-    const [previousX, previousY] = polygon[previous];
-    const crosses =
-      currentY > y !== previousY > y &&
-      x < ((previousX - currentX) * (y - currentY)) / (previousY - currentY) + currentX;
-
-    if (crosses) {
-      inside = !inside;
-    }
-  }
-
-  return inside;
-}
-
-export function getCountryAtWorld(x: number, z: number): CountryDefinition | undefined {
-  const geoPoint = worldToGeo(x, z);
-  return COUNTRIES.find((country) => isGeoPointInCountry(geoPoint, country));
-}
-
 export function getCountryById(id: CountryId): CountryDefinition {
   const country = COUNTRIES.find((candidate) => candidate.id === id);
   if (!country) {
     throw new Error(`Unknown country: ${id}`);
   }
   return country;
-}
-
-export function getCountryBorders(
-  country: CountryDefinition,
-): readonly (readonly GeoPoint[])[] {
-  return [country.border, ...(country.additionalBorders ?? [])];
-}
-
-export function isGeoPointInCountry(
-  point: GeoPoint,
-  country: CountryDefinition,
-): boolean {
-  return getCountryBorders(country).some((border) => isPointInPolygon(point, border));
 }
 
 export function getSeaName(point: GeoPoint): string {

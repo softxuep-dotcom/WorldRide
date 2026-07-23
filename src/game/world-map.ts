@@ -11,7 +11,11 @@ import type {
   Topology,
 } from "topojson-specification";
 import worldAtlas from "world-atlas/countries-50m.json";
-import type { GeoPoint } from "./data";
+import {
+  COUNTRIES,
+  type CountryDefinition,
+  type GeoPoint,
+} from "./data";
 
 interface AtlasProperties {
   name?: string;
@@ -33,6 +37,11 @@ export interface WorldCountry {
     minLatitude: number;
     maxLatitude: number;
   };
+}
+
+export interface CountryAtlasBinding {
+  content: CountryDefinition;
+  atlas: WorldCountry;
 }
 
 const topology = worldAtlas as unknown as Topology<AtlasObjects>;
@@ -72,8 +81,35 @@ const worldCountriesByName = new Map(
   WORLD_COUNTRIES.map((country) => [country.name.toLowerCase(), country]),
 );
 
+export const COUNTRY_ATLAS_BINDINGS: readonly CountryAtlasBinding[] = COUNTRIES.map(
+  (content) => {
+    const atlas = worldCountriesByName.get(content.englishName.toLowerCase());
+    if (!atlas) {
+      throw new Error(
+        `Country content "${content.id}" cannot be matched to world-atlas name "${content.englishName}".`,
+      );
+    }
+    if (!isGeoPointInWorldCountry(content.city.point, atlas)) {
+      throw new Error(
+        `City anchor for country content "${content.id}" is outside its world-atlas geometry.`,
+      );
+    }
+    return { content, atlas };
+  },
+);
+
+const contentCountryByAtlasId = new Map<string, CountryDefinition>(
+  COUNTRY_ATLAS_BINDINGS.map(({ content, atlas }) => [atlas.id, content]),
+);
+
 export function getWorldCountryByName(name: string): WorldCountry | undefined {
   return worldCountriesByName.get(name.toLowerCase());
+}
+
+export function getCountryContentForAtlas(
+  country: WorldCountry | undefined,
+): CountryDefinition | undefined {
+  return country ? contentCountryByAtlasId.get(country.id) : undefined;
 }
 
 export function isGeoPointInWorldCountry(
