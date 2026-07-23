@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#73cee5" />
+    <meta
+      name="description"
+      content="《口袋地球》欧洲、亚洲与北非十九国可玩原型：驾驶一辆会自动变成船的旅行车。"
+    />
+    <title>口袋地球 · 欧洲、亚洲与北非原型</title>
+  </head>
+  <body>
+    <main id="game-shell">
+      <canvas id="game-canvas" aria-label="口袋地球 3D 游戏画面"></canvas>
+
+      <section class="brand-chip" aria-label="游戏标题">
+        <span class="brand-mark" aria-hidden="true">◎</span>
+        <span>
+          <strong>口袋地球</strong>
+          <small>欧洲 · 亚洲 · 北非试玩</small>
+        </span>
+      </section>
+
+      <section class="place-chip" aria-live="polite">
+        <span id="mode-icon" aria-hidden="true">🚗</span>
+        <span>
+          <small id="mode-name">汽车模式</small>
+          <strong id="place-name">西班牙</strong>
+        </span>
+      </section>
+
+      <button
+        id="world-map-button"
+        class="mini-map"
+        type="button"
+        aria-label="切换全球地图视角"
+        aria-pressed="false"
+      >
+        <div class="mini-map__title">
+          <span id="map-view-label">世界地图 · 点击展开</span>
+          <span id="visited-count">1 / 19</span>
+        </div>
+        <svg id="mini-map-svg" viewBox="0 0 360 180" role="img" aria-label="玩家在世界地图中的位置"></svg>
+      </button>
+
+      <section id="country-reveal" class="country-reveal" aria-live="assertive">
+        <span id="country-flag" class="country-reveal__flag">🇪🇸</span>
+        <div>
+          <small id="country-kicker">新国家 · 护照已盖章</small>
+          <strong id="country-name">西班牙</strong>
+          <p id="country-intro">欧洲西南部，同时面向大西洋与地中海。</p>
+        </div>
+      </section>
+
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+      <div id="flash" class="camera-flash" aria-hidden="true"></div>
+
+      <section id="controls-hint" class="controls-hint">
+        <span class="desktop-hint">WASD / 方向键移动 · M 查看世界 · 空格拍照</span>
+        <span class="touch-hint">推动摇杆旅行 · 靠近发光地标拍照</span>
+      </section>
+
+      <div id="joystick" class="joystick" aria-label="移动摇杆">
+        <div class="joystick__ring"></div>
+        <div id="joystick-knob" class="joystick__knob"></div>
+      </div>
+
+      <button id="interact-button" class="interact-button" type="button">
+        <span aria-hidden="true">📷</span>
+        <span>拍张明信片</span>
+      </button>
+
+      <button id="passport-button" class="passport-button" type="button" aria-expanded="false">
+        <span aria-hidden="true">📘</span>
+        <span>护照</span>
+      </button>
+
+      <aside id="passport-panel" class="passport-panel" aria-hidden="true">
+        <header>
+          <div>
+            <small>MY LITTLE PASSPORT</small>
+            <h2>世界旅行护照</h2>
+          </div>
+          <button id="passport-close" type="button" aria-label="关闭护照">×</button>
+        </header>
+        <p>开车跨过陆地，或直接驶入海里。每到一个国家，就会留下自己的旅行印章。</p>
+        <div id="stamp-grid" class="stamp-grid"></div>
+      </aside>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
