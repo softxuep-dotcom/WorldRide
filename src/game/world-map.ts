@@ -16,6 +16,12 @@ import {
   type CountryDefinition,
   type GeoPoint,
 } from "./data";
+import {
+  getLocale,
+  getWorldCountryTranslation,
+  localizeCountry,
+  t,
+} from "../i18n";
 
 interface AtlasProperties {
   name?: string;
@@ -42,6 +48,22 @@ export interface WorldCountry {
 export interface CountryAtlasBinding {
   content: CountryDefinition;
   atlas: WorldCountry;
+}
+
+export type CountryTier = "A" | "B" | "C" | "D";
+
+export interface CountryProfile {
+  id: string;
+  atlasName: string;
+  name: string;
+  flag: string;
+  tier: CountryTier;
+  intro: string;
+  details: readonly string[];
+  passportEligible: boolean;
+  showInHud: boolean;
+  showReveal: boolean;
+  content?: CountryDefinition;
 }
 
 const topology = worldAtlas as unknown as Topology<AtlasObjects>;
@@ -102,6 +124,176 @@ const contentCountryByAtlasId = new Map<string, CountryDefinition>(
   COUNTRY_ATLAS_BINDINGS.map(({ content, atlas }) => [atlas.id, content]),
 );
 
+const TIER_A_COUNTRIES = new Set([
+  "Argentina",
+  "Australia",
+  "Brazil",
+  "Canada",
+  "China",
+  "Egypt",
+  "France",
+  "Germany",
+  "India",
+  "Indonesia",
+  "Iran",
+  "Italy",
+  "Japan",
+  "Mexico",
+  "Netherlands",
+  "Russia",
+  "Saudi Arabia",
+  "Singapore",
+  "South Africa",
+  "South Korea",
+  "Spain",
+  "Switzerland",
+  "Thailand",
+  "Turkey",
+  "United Arab Emirates",
+  "United Kingdom",
+  "United States of America",
+]);
+
+const TIER_C_COUNTRIES = new Set([
+  "Albania",
+  "Armenia",
+  "Belize",
+  "Benin",
+  "Bhutan",
+  "Bosnia and Herz.",
+  "Botswana",
+  "Burkina Faso",
+  "Burundi",
+  "Central African Rep.",
+  "Chad",
+  "Comoros",
+  "Djibouti",
+  "Dominica",
+  "Eq. Guinea",
+  "Eritrea",
+  "Gambia",
+  "Greenland",
+  "Guinea",
+  "Guinea-Bissau",
+  "Guyana",
+  "Kiribati",
+  "Kosovo",
+  "Kyrgyzstan",
+  "Lesotho",
+  "Liberia",
+  "Malawi",
+  "Mauritania",
+  "Moldova",
+  "Montenegro",
+  "Niger",
+  "Palestine",
+  "Rwanda",
+  "Sierra Leone",
+  "Solomon Is.",
+  "Suriname",
+  "Taiwan",
+  "Tajikistan",
+  "Timor-Leste",
+  "Togo",
+  "Turkmenistan",
+  "Vanuatu",
+  "W. Sahara",
+  "Zambia",
+  "eSwatini",
+]);
+
+const TIER_D_COUNTRIES = new Set([
+  "American Samoa",
+  "Andorra",
+  "Anguilla",
+  "Antarctica",
+  "Antigua and Barb.",
+  "Aruba",
+  "Ashmore and Cartier Is.",
+  "Bermuda",
+  "Br. Indian Ocean Ter.",
+  "British Virgin Is.",
+  "Barbados",
+  "Cayman Is.",
+  "Cook Is.",
+  "Curaçao",
+  "Faeroe Is.",
+  "Falkland Is.",
+  "Fr. Polynesia",
+  "Fr. S. Antarctic Lands",
+  "Grenada",
+  "Guam",
+  "Guernsey",
+  "Heard I. and McDonald Is.",
+  "Hong Kong",
+  "Indian Ocean Ter.",
+  "Isle of Man",
+  "Jersey",
+  "Liechtenstein",
+  "Luxembourg",
+  "Macao",
+  "Maldives",
+  "Malta",
+  "Marshall Is.",
+  "Micronesia",
+  "Monaco",
+  "Montserrat",
+  "N. Cyprus",
+  "N. Mariana Is.",
+  "New Caledonia",
+  "Nauru",
+  "Niue",
+  "Norfolk Island",
+  "Palau",
+  "Pitcairn Is.",
+  "Puerto Rico",
+  "S. Geo. and the Is.",
+  "Saint Helena",
+  "Saint Lucia",
+  "Samoa",
+  "San Marino",
+  "Seychelles",
+  "Siachen Glacier",
+  "Sint Maarten",
+  "Somaliland",
+  "St-Barthélemy",
+  "St-Martin",
+  "St. Kitts and Nevis",
+  "St. Pierre and Miquelon",
+  "St. Vin. and Gren.",
+  "São Tomé and Principe",
+  "Tonga",
+  "Turks and Caicos Is.",
+  "U.S. Virgin Is.",
+  "Vatican",
+  "Wallis and Futuna Is.",
+  "Åland",
+]);
+
+const COUNTRY_FLAG_ALIASES: Readonly<Record<string, string>> = {
+  Argentina: "🇦🇷",
+  Australia: "🇦🇺",
+  Brazil: "🇧🇷",
+  Cambodia: "🇰🇭",
+  Canada: "🇨🇦",
+  Chile: "🇨🇱",
+  Jordan: "🇯🇴",
+  Mexico: "🇲🇽",
+  Nepal: "🇳🇵",
+  Peru: "🇵🇪",
+  Singapore: "🇸🇬",
+  "South Africa": "🇿🇦",
+  "United Arab Emirates": "🇦🇪",
+  "United States of America": "🇺🇸",
+};
+
+const TIER_COLORS: Readonly<Record<CountryTier, string>> = {
+  A: "#d45e4f",
+  B: "#397d65",
+  C: "#607587",
+  D: "#8b9298",
+};
+
 export function getWorldCountryByName(name: string): WorldCountry | undefined {
   return worldCountriesByName.get(name.toLowerCase());
 }
@@ -110,6 +302,201 @@ export function getCountryContentForAtlas(
   country: WorldCountry | undefined,
 ): CountryDefinition | undefined {
   return country ? contentCountryByAtlasId.get(country.id) : undefined;
+}
+
+export function getCountryTier(country: WorldCountry): CountryTier {
+  if (TIER_A_COUNTRIES.has(country.name)) {
+    return "A";
+  }
+  if (TIER_D_COUNTRIES.has(country.name)) {
+    return "D";
+  }
+  if (TIER_C_COUNTRIES.has(country.name)) {
+    return "C";
+  }
+  return "B";
+}
+
+export function getCountryProfile(country: WorldCountry): CountryProfile {
+  const sourceContent = getCountryContentForAtlas(country);
+  const content = sourceContent ? localizeCountry(sourceContent) : undefined;
+  const translatedWorldCountry = getWorldCountryTranslation(country.name);
+  const tier = getCountryTier(country);
+  const name = content?.name ?? translatedWorldCountry.name ?? country.name;
+  const region = getWorldRegionName(country);
+  const intro =
+    content?.intro ??
+    translatedWorldCountry.intro ??
+    t("country.regionalIntro", { name, region });
+  const contentDetails =
+    content && content.facts.length > 0
+      ? content.facts
+      : undefined;
+  const details =
+    contentDetails ??
+    translatedWorldCountry.details ?? [
+      t("country.regionalDetailGeography", { name, region }),
+      t("country.regionalDetailCulture", { name, region }),
+    ];
+  const passportEligible = tier === "A" || tier === "B";
+  return {
+    id: country.id,
+    atlasName: country.name,
+    name,
+    flag: content?.flag ?? COUNTRY_FLAG_ALIASES[country.name] ?? "•",
+    tier,
+    intro,
+    details,
+    passportEligible,
+    showInHud: tier !== "D",
+    showReveal: tier !== "D",
+    content,
+  };
+}
+
+type WorldRegion =
+  | "africa"
+  | "asia"
+  | "europe"
+  | "northAmerica"
+  | "southAmerica"
+  | "oceania";
+
+const SOUTH_AMERICAN_COUNTRIES = new Set([
+  "Argentina",
+  "Bolivia",
+  "Brazil",
+  "Chile",
+  "Colombia",
+  "Ecuador",
+  "Guyana",
+  "Paraguay",
+  "Peru",
+  "Suriname",
+  "Uruguay",
+  "Venezuela",
+]);
+
+const OCEANIA_COUNTRIES = new Set([
+  "Australia",
+  "Fiji",
+  "Kiribati",
+  "Micronesia",
+  "New Zealand",
+  "Papua New Guinea",
+  "Samoa",
+  "Solomon Is.",
+  "Tonga",
+  "Vanuatu",
+]);
+
+const ASIAN_EDGE_COUNTRIES = new Set([
+  "Brunei",
+  "Cambodia",
+  "Indonesia",
+  "Iran",
+  "Azerbaijan",
+  "Bahrain",
+  "Cyprus",
+  "Georgia",
+  "Iraq",
+  "Israel",
+  "Jordan",
+  "Kuwait",
+  "Laos",
+  "Lebanon",
+  "Malaysia",
+  "Myanmar",
+  "Oman",
+  "Palestine",
+  "Philippines",
+  "Qatar",
+  "Saudi Arabia",
+  "Singapore",
+  "Syria",
+  "Thailand",
+  "Timor-Leste",
+  "Turkey",
+  "United Arab Emirates",
+  "Vietnam",
+  "Yemen",
+]);
+
+const NORTH_AMERICAN_EDGE_COUNTRIES = new Set([
+  "Canada",
+  "Mexico",
+  "United States of America",
+]);
+
+function getWorldRegionName(country: WorldCountry): string {
+  const region = getWorldRegion(country);
+  const messageKeys: Readonly<Record<WorldRegion, Parameters<typeof t>[0]>> = {
+    africa: "region.africa",
+    asia: "region.asia",
+    europe: "region.europe",
+    northAmerica: "region.northAmerica",
+    southAmerica: "region.southAmerica",
+    oceania: "region.oceania",
+  };
+  return t(messageKeys[region]);
+}
+
+function getWorldRegion(country: WorldCountry): WorldRegion {
+  if (SOUTH_AMERICAN_COUNTRIES.has(country.name)) {
+    return "southAmerica";
+  }
+  if (OCEANIA_COUNTRIES.has(country.name)) {
+    return "oceania";
+  }
+  if (
+    country.name === "Greenland" ||
+    NORTH_AMERICAN_EDGE_COUNTRIES.has(country.name) ||
+    country.bounds.maxLongitude < -30
+  ) {
+    return "northAmerica";
+  }
+  if (ASIAN_EDGE_COUNTRIES.has(country.name)) {
+    return "asia";
+  }
+
+  const longitude =
+    (country.bounds.minLongitude + country.bounds.maxLongitude) / 2;
+  const latitude =
+    (country.bounds.minLatitude + country.bounds.maxLatitude) / 2;
+  if (
+    longitude >= -25 &&
+    longitude <= 45 &&
+    latitude >= 34
+  ) {
+    return "europe";
+  }
+  if (
+    longitude >= -25 &&
+    longitude <= 60 &&
+    latitude >= -40 &&
+    latitude < 37
+  ) {
+    return "africa";
+  }
+  if ((longitude >= 105 && latitude < 5) || longitude >= 150) {
+    return "oceania";
+  }
+  return "asia";
+}
+
+export function getPassportCountryProfiles(): readonly CountryProfile[] {
+  return WORLD_COUNTRIES.map(getCountryProfile)
+    .filter((country) => country.passportEligible)
+    .sort((left, right) => {
+      if (left.tier !== right.tier) {
+        return left.tier.localeCompare(right.tier);
+      }
+      return left.name.localeCompare(right.name, getLocale());
+    });
+}
+
+export function getCountryTierColor(tier: CountryTier): string {
+  return TIER_COLORS[tier];
 }
 
 export function isGeoPointInWorldCountry(

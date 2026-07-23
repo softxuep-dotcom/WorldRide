@@ -74,15 +74,29 @@ export type PhotoSpotId =
   | "fuji-view"
   | "taj-mahal"
   | "java-volcano"
-  | "moscow-domes";
+  | "moscow-domes"
+  | "eiffel-tower"
+  | "statue-of-liberty"
+  | "machu-picchu"
+  | "christ-the-redeemer"
+  | "chichen-itza"
+  | "petra"
+  | "angkor-wat"
+  | "sydney-opera-house"
+  | "grand-canyon"
+  | "mount-everest"
+  | "niagara-falls"
+  | "easter-island-moai";
 
 export interface PhotoSpotDefinition {
   id: PhotoSpotId;
   name: string;
   kind: "wonder" | "landmark" | "natural";
-  countryId: CountryId;
+  atlasCountryName: string;
+  accent?: number;
   point: GeoPoint;
   postcard: string;
+  description: string;
   fact: string;
 }
 
@@ -688,134 +702,305 @@ export const COUNTRIES: readonly CountryDefinition[] = [
 
 /**
  * 手机打卡点是一层独立的精选世界内容，不是国家配额。
- * 一个国家可以没有，也可以拥有多个；countryId 只记录它所在的地理背景。
+ * 一个国家可以没有，也可以拥有多个；名胜直接关联世界地图国家，不受重点国家内容范围限制。
  */
 export const PHOTO_SPOTS: readonly PhotoSpotDefinition[] = [
   {
     id: "gibraltar-strait",
     name: "直布罗陀海峡",
     kind: "natural",
-    countryId: "spain",
+    atlasCountryName: "Spain",
     point: [-5.62, 36.03],
     postcard: "欧洲与非洲隔海相望的蓝色海峡",
+    description:
+      "直布罗陀海峡夹在伊比利亚半岛南端与北非之间。向西连接大西洋，向东进入地中海，航船、海风与两岸山体共同构成这里最鲜明的景观。",
     fact: "海峡最窄处只有约十四公里，是地中海通往大西洋的门户。",
   },
   {
     id: "big-ben",
     name: "大本钟",
     kind: "landmark",
-    countryId: "united-kingdom",
+    atlasCountryName: "United Kingdom",
     point: [-0.125, 51.501],
     postcard: "泰晤士河畔的钟楼与红色巴士",
+    description:
+      "伊丽莎白塔矗立在英国议会大厦北端，是伦敦天际线中辨识度最高的建筑之一。哥特复兴式立面、四面钟盘和报时钟声，让它成为英国公共生活与城市记忆的象征。",
     fact: "“大本钟”最初是钟的昵称，所在钟楼现名为伊丽莎白塔。",
   },
   {
     id: "brandenburg-gate",
     name: "勃兰登堡门",
     kind: "landmark",
-    countryId: "germany",
+    atlasCountryName: "Germany",
     point: [13.378, 52.516],
     postcard: "柏林林荫道尽头的古典城门",
+    description:
+      "勃兰登堡门位于柏林市中心，由十二根多立克式柱构成五条通道。它曾处在城市分裂的边缘，后来又成为德国重新统一与欧洲交流的重要公共空间。",
     fact: "它从旧城门变成了德国历史与统一的重要象征。",
   },
   {
     id: "colosseum",
     name: "罗马斗兽场",
     kind: "wonder",
-    countryId: "italy",
+    atlasCountryName: "Italy",
     point: [12.492, 41.89],
     postcard: "夕阳下的椭圆形古罗马建筑",
+    description:
+      "罗马斗兽场以巨大的椭圆形结构容纳古代公共表演。多层拱券、环形看台和地下空间展示了罗马工程技术，也让这座建筑在近两千年后依然保持清晰轮廓。",
     fact: "这座大型圆形剧场在公元一世纪建成，可容纳数万名观众。",
   },
   {
     id: "acropolis",
     name: "雅典卫城",
     kind: "wonder",
-    countryId: "greece",
+    atlasCountryName: "Greece",
     point: [23.726, 37.972],
     postcard: "石灰岩山丘上的古典神庙",
+    description:
+      "雅典卫城建在城市中央的石灰岩高地上，由神庙、门廊和纪念建筑组成。沿坡而上时，帕特农神庙会逐渐占据视野，形成古典雅典最具代表性的城市景观。",
     fact: "卫城位于雅典制高点，帕特农神庙是其中最醒目的建筑。",
   },
   {
     id: "swiss-alps",
     name: "瑞士阿尔卑斯",
     kind: "natural",
-    countryId: "switzerland",
+    atlasCountryName: "Switzerland",
     point: [7.98, 46.58],
     postcard: "雪峰、山谷与红色列车",
+    description:
+      "瑞士阿尔卑斯由高耸雪峰、冰川谷地、草甸和山间聚落共同组成。铁路与缆车穿行其间，把自然地貌、工程建设和四季旅行连接成紧密的山地网络。",
     fact: "阿尔卑斯山塑造了瑞士的地貌、交通与四季旅游。",
   },
   {
     id: "norway-fjord",
     name: "挪威峡湾",
     kind: "natural",
-    countryId: "norway",
+    atlasCountryName: "Norway",
     point: [7.2, 62.1],
     postcard: "陡峭雪山之间深入陆地的蓝色海湾",
+    description:
+      "挪威峡湾是海水进入冰川侵蚀深谷后形成的狭长水域。陡峭岩壁从水面直接升起，瀑布、农庄和小型港口散落在有限的平缓地带，空间尺度格外鲜明。",
     fact: "许多挪威峡湾由冰川侵蚀形成，海水沿深谷进入陆地。",
   },
   {
     id: "giza-pyramids",
     name: "吉萨金字塔群",
     kind: "wonder",
-    countryId: "egypt",
+    atlasCountryName: "Egypt",
     point: [31.134, 29.979],
     postcard: "沙漠边缘的金色金字塔",
+    description:
+      "吉萨金字塔群位于尼罗河谷与撒哈拉沙漠的交界地带。三座主要金字塔、狮身人面像和周边墓葬共同组成古埃及规模最宏大的纪念性建筑景观之一。",
     fact: "胡夫金字塔是古代世界七大奇迹中唯一大体保存至今的一处。",
   },
   {
     id: "hagia-sophia",
     name: "圣索菲亚大教堂",
     kind: "wonder",
-    countryId: "turkey",
+    atlasCountryName: "Turkey",
     point: [28.98, 41.008],
     postcard: "博斯普鲁斯海峡旁的巨大穹顶",
+    description:
+      "圣索菲亚大教堂坐落于伊斯坦布尔历史城区，中央巨型穹顶与层叠半穹顶形成开阔内部空间。建筑在不同历史阶段承担过宗教与公共文化功能，留下多重文明痕迹。",
     fact: "这座建筑跨越不同历史时期，长期影响着穹顶建筑的发展。",
   },
   {
     id: "great-wall",
     name: "长城",
     kind: "wonder",
-    countryId: "china",
+    atlasCountryName: "China",
     point: [116.57, 40.43],
     postcard: "沿山脊起伏的城墙与烽火台",
+    description:
+      "长城并不是一条在同一时期建成的连续城墙，而是由不同朝代修筑的城墙、关隘、壕堑和烽火台组成。北京北部山地的长城顺着山脊延伸，防御功能与地形关系清晰可见。",
     fact: "今天所见的长城由不同朝代、不同地段共同构成，并非一条单一城墙。",
   },
   {
     id: "fuji-view",
     name: "富士山",
     kind: "natural",
-    countryId: "japan",
+    atlasCountryName: "Japan",
     point: [138.73, 35.36],
     postcard: "湖面后方对称的火山雪峰",
+    description:
+      "富士山是一座轮廓近乎对称的成层火山，晴朗天气下可从关东多地远眺。山麓分布湖泊、森林和聚落，季节变化会不断改变雪线与山体色彩。",
     fact: "富士山是日本最高峰，也是一座仍被列为活火山的成层火山。",
   },
   {
     id: "taj-mahal",
     name: "泰姬陵",
     kind: "wonder",
-    countryId: "india",
+    atlasCountryName: "India",
     point: [78.042, 27.175],
     postcard: "水池倒影中的白色穹顶建筑",
+    description:
+      "泰姬陵以中央陵墓为核心，花园、水渠、清真寺与入口建筑沿轴线展开。白色大理石会随日照呈现细微色彩变化，严格对称的布局则强化了建筑的宁静与纪念性。",
     fact: "泰姬陵以白色大理石和近乎对称的布局闻名。",
   },
   {
     id: "java-volcano",
     name: "爪哇火山群",
     kind: "natural",
-    countryId: "indonesia",
+    atlasCountryName: "Indonesia",
     point: [110.2, -7.6],
     postcard: "热带晨雾中的层叠火山",
+    description:
+      "爪哇岛位于活跃板块边界，火山链几乎贯穿全岛。火山灰形成肥沃土壤，人口密集的农田与城市因此靠近山体，也让自然力量与日常生活保持紧密联系。",
     fact: "印度尼西亚位于环太平洋火山带，拥有数量众多的活火山。",
   },
   {
     id: "moscow-domes",
     name: "圣瓦西里大教堂",
     kind: "landmark",
-    countryId: "russia",
+    atlasCountryName: "Russia",
     point: [37.62, 55.75],
     postcard: "红场旁色彩鲜明的洋葱形穹顶",
+    description:
+      "圣瓦西里大教堂位于莫斯科红场南端，由多座礼拜堂围绕中央核心组合而成。各不相同的穹顶轮廓、纹样和色彩让整体建筑既统一又富于变化。",
     fact: "这组各不相同的穹顶让建筑形成了极强的远距离识别度。",
+  },
+  {
+    id: "eiffel-tower",
+    name: "埃菲尔铁塔",
+    kind: "landmark",
+    atlasCountryName: "France",
+    point: [2.2945, 48.8584],
+    postcard: "塞纳河畔逐级收束的金属铁塔",
+    description:
+      "埃菲尔铁塔位于巴黎战神广场西北端。四座塔脚支撑起向上收束的镂空铁结构，观景平台与顶部天线形成清晰层级；黄昏之后，暖金色灯光让它从巴黎天际线中格外醒目。",
+    fact: "铁塔为1889年巴黎世界博览会建造，高约330米，是巴黎最具辨识度的地标之一。",
+  },
+  {
+    id: "statue-of-liberty",
+    name: "自由女神像",
+    kind: "landmark",
+    atlasCountryName: "United States of America",
+    accent: 0x4e9b85,
+    point: [-74.0445, 40.6892],
+    postcard: "自由岛上高举火炬的绿色身影",
+    description:
+      "自由女神像立于纽约港自由岛的方形基座之上。长袍、七芒冠冕与高举的火炬共同形成远距离也能辨认的轮廓，周围水面则把它与曼哈顿港湾景观连接起来。",
+    fact: "这座铜像由法国赠予美国，于1886年揭幕；铜表面后来形成了今天所见的绿色铜锈。",
+  },
+  {
+    id: "machu-picchu",
+    name: "马丘比丘",
+    kind: "wonder",
+    atlasCountryName: "Peru",
+    accent: 0x64846d,
+    point: [-72.545, -13.1631],
+    postcard: "安第斯云雾中沿山脊展开的梯田古城",
+    description:
+      "马丘比丘坐落在秘鲁安第斯山脊上，农业梯田、石砌建筑和广场顺应陡峭地势分层展开。瓦伊纳比丘峰从遗址后方升起，使城市、山体与云雾共同构成独特景观。",
+    fact: "这座十五世纪的印加遗址位于海拔约2430米处，建筑石块以精密的干砌方式结合。",
+  },
+  {
+    id: "christ-the-redeemer",
+    name: "里约热内卢基督像",
+    kind: "landmark",
+    atlasCountryName: "Brazil",
+    accent: 0x5f9b78,
+    point: [-43.2105, -22.9519],
+    postcard: "科尔科瓦多山顶张开双臂的巨像",
+    description:
+      "基督像矗立在里约热内卢科尔科瓦多山顶，伸展的双臂在薄雾和云层之间形成简洁而有力的剪影。山顶平台俯瞰城市、海湾与群山，是建筑与自然地形共同塑造的地标。",
+    fact: "雕像于1931年落成，连同基座总高约38米，双臂展开约28米。",
+  },
+  {
+    id: "chichen-itza",
+    name: "奇琴伊察",
+    kind: "wonder",
+    atlasCountryName: "Mexico",
+    accent: 0xb68a46,
+    point: [-88.5678, 20.6843],
+    postcard: "尤卡坦平原上层层抬升的阶梯金字塔",
+    description:
+      "奇琴伊察是玛雅文明的重要城市遗址，库库尔坎金字塔以方形台基、四面阶梯和顶部神庙形成鲜明轮廓。周围神庙、柱廊和球场共同展示了城市的宗教与公共空间。",
+    fact: "库库尔坎金字塔的四面阶梯与顶部平台合计常被解读为对应太阳年的365天。",
+  },
+  {
+    id: "petra",
+    name: "佩特拉古城",
+    kind: "wonder",
+    atlasCountryName: "Jordan",
+    accent: 0xb85f48,
+    point: [35.4518, 30.3285],
+    postcard: "红砂岩峡谷尽头显露的宝库立面",
+    description:
+      "佩特拉隐藏在约旦南部的砂岩山谷中。穿过狭窄蛇道后，卡兹尼神殿的柱廊、山花与岩壁一同出现；城市中还有墓室、神殿和水利设施，展现纳巴泰人对沙漠环境的利用。",
+    fact: "佩特拉曾是纳巴泰王国的重要商贸中心，许多建筑直接从玫瑰色砂岩崖壁中凿出。",
+  },
+  {
+    id: "angkor-wat",
+    name: "吴哥窟",
+    kind: "wonder",
+    atlasCountryName: "Cambodia",
+    accent: 0x7c7046,
+    point: [103.867, 13.4125],
+    postcard: "护城河与长堤尽头升起的五座塔",
+    description:
+      "吴哥窟由宽阔护城河、长堤、回廊和中央塔群沿轴线展开。五座莲花苞形高塔从层层抬升的平台上出现，周围雨林衬托出寺庙的规模，却没有遮蔽主体轮廓。",
+    fact: "吴哥窟建于十二世纪，最初奉献给毗湿奴，后来成为延续至今的重要佛教场所。",
+  },
+  {
+    id: "sydney-opera-house",
+    name: "悉尼歌剧院",
+    kind: "landmark",
+    atlasCountryName: "Australia",
+    accent: 0x3a84a5,
+    point: [151.2153, -33.8568],
+    postcard: "悉尼港边向同一方向展开的白色壳体",
+    description:
+      "悉尼歌剧院坐落在贝内朗角伸入港湾的平台上，多组白色拱壳像风帆般沿轴线展开。阶梯基座、海面与附近港湾大桥共同组成澳大利亚最著名的城市景观之一。",
+    fact: "歌剧院由约恩·乌松设计，于1973年开放；屋顶由一组几何上相关的壳体构成。",
+  },
+  {
+    id: "grand-canyon",
+    name: "美国大峡谷",
+    kind: "natural",
+    atlasCountryName: "United States of America",
+    accent: 0xb85b3f,
+    point: [-111.826, 36.0403],
+    postcard: "红岩高原突然裂开的巨大峡谷",
+    description:
+      "从南缘的沙漠景观塔一带望去，大峡谷以多层岩壁、台地和支谷向远处展开。地表颜色随岩层逐级变化，谷底科罗拉多河则在巨大的高差中形成一条细窄水线。",
+    fact: "科罗拉多河及长期侵蚀共同塑造了大峡谷，裸露岩层记录了极其漫长的地质历史。",
+  },
+  {
+    id: "mount-everest",
+    name: "珠穆朗玛峰",
+    kind: "natural",
+    atlasCountryName: "Nepal",
+    accent: 0x7893a3,
+    point: [86.925, 27.9881],
+    postcard: "喜马拉雅群峰之上锐利高耸的雪峰",
+    description:
+      "珠穆朗玛峰位于中国与尼泊尔边界，主峰从冰川谷和周边峰群中继续抬升。裸露岩脊、终年积雪与强风形成不对称而锐利的轮廓，使它与普通圆锥雪山明显不同。",
+    fact: "珠穆朗玛峰海拔8848.86米，是地球上海拔最高的山峰。",
+  },
+  {
+    id: "niagara-falls",
+    name: "尼亚加拉瀑布",
+    kind: "natural",
+    atlasCountryName: "Canada",
+    accent: 0x3b9fb9,
+    point: [-79.0747, 43.0773],
+    postcard: "马蹄形崖缘倾泻而下的白色水幕",
+    description:
+      "尼亚加拉瀑布横跨加拿大与美国边界，由马蹄瀑布、美国瀑布和新娘面纱瀑布组成。宽阔河流在弧形崖缘突然跌落，巨大水量激起持续升腾的水雾。",
+    fact: "马蹄瀑布是三处瀑布中规模最大的一处，大部分崖缘位于加拿大一侧。",
+  },
+  {
+    id: "easter-island-moai",
+    name: "复活节岛摩艾石像群",
+    kind: "wonder",
+    atlasCountryName: "Chile",
+    accent: 0x6f7669,
+    point: [-109.276, -27.125],
+    postcard: "阿胡汤加里基石台上一字排开的摩艾",
+    description:
+      "阿胡汤加里基位于复活节岛东南海岸，十五尊摩艾石像在长石台上面向岛内排列。巨大的头部、突出的眉鼻和修长躯干形成统一而各有差异的剪影，背后是火山草地与太平洋。",
+    fact: "阿胡汤加里基是复活节岛规模最大的修复石台，现有十五尊重新竖立的摩艾石像。",
   },
 ];
 

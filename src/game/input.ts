@@ -3,22 +3,21 @@ import type { MovementInput } from "./simulation";
 export class InputController {
   readonly movement: MovementInput = { x: 0, z: 0 };
   private readonly pressedKeys = new Set<string>();
-  private joystickPointerId?: number;
-  private joystickVector = { x: 0, z: 0 };
+  private dragPointerId?: number;
+  private dragOrigin = { x: 0, y: 0 };
+  private dragVector = { x: 0, z: 0 };
   private interactRequested = false;
 
-  constructor(
-    private readonly joystick: HTMLElement,
-    private readonly joystickKnob: HTMLElement,
-  ) {
+  constructor(private readonly surface: HTMLElement) {
     window.addEventListener("keydown", this.onKeyDown, { passive: false });
     window.addEventListener("keyup", this.onKeyUp);
     window.addEventListener("blur", this.onBlur);
 
-    joystick.addEventListener("pointerdown", this.onJoystickDown);
-    joystick.addEventListener("pointermove", this.onJoystickMove);
-    joystick.addEventListener("pointerup", this.onJoystickUp);
-    joystick.addEventListener("pointercancel", this.onJoystickUp);
+    surface.addEventListener("pointerdown", this.onDragStart);
+    surface.addEventListener("pointermove", this.onDragMove);
+    surface.addEventListener("pointerup", this.onDragEnd);
+    surface.addEventListener("pointercancel", this.onDragEnd);
+    surface.addEventListener("lostpointercapture", this.onDragEnd);
   }
 
   update(): MovementInput {
@@ -29,8 +28,8 @@ export class InputController {
       Number(this.pressedKeys.has("ArrowDown") || this.pressedKeys.has("KeyS")) -
       Number(this.pressedKeys.has("ArrowUp") || this.pressedKeys.has("KeyW"));
 
-    this.movement.x = keyboardX || this.joystickVector.x;
-    this.movement.z = keyboardZ || this.joystickVector.z;
+    this.movement.x = keyboardX || this.dragVector.x;
+    this.movement.z = keyboardZ || this.dragVector.z;
     return this.movement;
   }
 
@@ -44,6 +43,11 @@ export class InputController {
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
     window.removeEventListener("blur", this.onBlur);
+    this.surface.removeEventListener("pointerdown", this.onDragStart);
+    this.surface.removeEventListener("pointermove", this.onDragMove);
+    this.surface.removeEventListener("pointerup", this.onDragEnd);
+    this.surface.removeEventListener("pointercancel", this.onDragEnd);
+    this.surface.removeEventListener("lostpointercapture", this.onDragEnd);
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
@@ -67,48 +71,74 @@ export class InputController {
 
   private readonly onBlur = (): void => {
     this.pressedKeys.clear();
-    this.resetJoystick();
+    this.resetDrag();
   };
 
-  private readonly onJoystickDown = (event: PointerEvent): void => {
-    this.joystickPointerId = event.pointerId;
-    this.joystick.setPointerCapture(event.pointerId);
-    this.updateJoystick(event);
-  };
-
-  private readonly onJoystickMove = (event: PointerEvent): void => {
-    if (event.pointerId !== this.joystickPointerId) {
+  private readonly onDragStart = (event: PointerEvent): void => {
+    if (
+      this.dragPointerId !== undefined ||
+      !event.isPrimary ||
+      (event.pointerType === "mouse" && event.button !== 0)
+    ) {
       return;
     }
-    this.updateJoystick(event);
+
+    event.preventDefault();
+    this.dragPointerId = event.pointerId;
+    this.dragOrigin.x = event.clientX;
+    this.dragOrigin.y = event.clientY;
+    this.surface.setPointerCapture(event.pointerId);
+    this.dragVector.x = 0;
+    this.dragVector.z = 0;
   };
 
-  private readonly onJoystickUp = (event: PointerEvent): void => {
-    if (event.pointerId !== this.joystickPointerId) {
+  private readonly onDragMove = (event: PointerEvent): void => {
+    if (event.pointerId !== this.dragPointerId) {
       return;
     }
-    this.resetJoystick();
+
+    event.preventDefault();
+    this.updateDrag(event);
   };
 
-  private updateJoystick(event: PointerEvent): void {
-    const bounds = this.joystick.getBoundingClientRect();
-    const radius = bounds.width * 0.31;
-    const rawX = event.clientX - (bounds.left + bounds.width / 2);
-    const rawY = event.clientY - (bounds.top + bounds.height / 2);
+  private readonly onDragEnd = (event: PointerEvent): void => {
+    if (event.pointerId !== this.dragPointerId) {
+      return;
+    }
+
+    this.resetDrag();
+  };
+
+  private updateDrag(event: PointerEvent): void {
+    const deadZone = 6;
+    const fullSpeedDistance = 72;
+    const rawX = event.clientX - this.dragOrigin.x;
+    const rawY = event.clientY - this.dragOrigin.y;
     const length = Math.hypot(rawX, rawY);
-    const scale = length > radius ? radius / length : 1;
-    const x = rawX * scale;
-    const y = rawY * scale;
 
-    this.joystickVector.x = x / radius;
-    this.joystickVector.z = y / radius;
-    this.joystickKnob.style.transform = `translate(${x}px, ${y}px)`;
+    if (length <= deadZone) {
+      this.dragVector.x = 0;
+      this.dragVector.z = 0;
+      return;
+    }
+
+    const strength = Math.min(
+      1,
+      (length - deadZone) / (fullSpeedDistance - deadZone),
+    );
+    this.dragVector.x = (rawX / length) * strength;
+    this.dragVector.z = (rawY / length) * strength;
   }
 
-  private resetJoystick(): void {
-    this.joystickPointerId = undefined;
-    this.joystickVector.x = 0;
-    this.joystickVector.z = 0;
-    this.joystickKnob.style.transform = "translate(0, 0)";
+  private resetDrag(): void {
+    if (
+      this.dragPointerId !== undefined &&
+      this.surface.hasPointerCapture(this.dragPointerId)
+    ) {
+      this.surface.releasePointerCapture(this.dragPointerId);
+    }
+    this.dragPointerId = undefined;
+    this.dragVector.x = 0;
+    this.dragVector.z = 0;
   }
 }

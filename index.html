@@ -1,92 +1,135 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#73cee5" />
     <meta
       name="description"
-      content="《口袋地球》欧洲、亚洲与北非二十九国可玩原型：驾驶一辆会自动变成船的旅行车。"
+      content="Explore the world in Pocket Earth, driving a travel car that transforms into a boat."
     />
-    <title>口袋地球 · 欧洲、亚洲与北非原型</title>
+    <title>Pocket Earth · World Travel Prototype</title>
   </head>
   <body>
     <main id="game-shell">
-      <canvas id="game-canvas" aria-label="口袋地球 3D 游戏画面"></canvas>
-
-      <section class="brand-chip" aria-label="游戏标题">
-        <span class="brand-mark" aria-hidden="true">◎</span>
-        <span>
-          <strong>口袋地球</strong>
-          <small>欧洲 · 亚洲 · 北非试玩</small>
-        </span>
-      </section>
-
-      <section class="place-chip" aria-live="polite">
-        <span id="mode-icon" aria-hidden="true">🚗</span>
-        <span>
-          <small id="mode-name">汽车模式</small>
-          <strong id="place-name">西班牙</strong>
-        </span>
-      </section>
+      <canvas
+        id="game-canvas"
+        aria-label="Pocket Earth 3D game view"
+        data-i18n-attr="aria-label:canvas.label"
+      ></canvas>
 
       <button
         id="world-map-button"
         class="mini-map"
         type="button"
-        aria-label="切换全球地图视角"
+        aria-label="Toggle the world map view"
+        data-i18n-attr="aria-label:worldMap.toggle"
         aria-pressed="false"
       >
         <div class="mini-map__title">
-          <span id="map-view-label">世界地图 · 点击展开</span>
+          <span id="map-view-label" data-i18n="worldMap.label">World map</span>
           <span id="visited-count">1 / 29</span>
         </div>
-        <svg id="mini-map-svg" viewBox="0 0 360 180" role="img" aria-label="玩家在世界地图中的位置"></svg>
+        <svg
+          id="mini-map-svg"
+          viewBox="0 0 360 180"
+          role="img"
+          aria-label="Player position on the world map"
+          data-i18n-attr="aria-label:worldMap.playerPosition"
+        ></svg>
       </button>
 
-      <section id="country-reveal" class="country-reveal" aria-live="assertive">
-        <span id="country-flag" class="country-reveal__flag">🇪🇸</span>
-        <div>
-          <small id="country-kicker">新国家 · 护照已盖章</small>
-          <strong id="country-name">西班牙</strong>
-          <p id="country-intro">欧洲西南部，同时面向大西洋与地中海。</p>
-        </div>
+      <section id="country-reveal" class="country-reveal" aria-live="polite">
+        <button id="interact-button" class="travel-info" type="button">
+          <span class="travel-info__copy">
+            <span class="travel-info__title">
+              <strong id="country-name">Spain</strong>
+              <span class="travel-info__action" aria-hidden="true">›</span>
+            </span>
+            <span id="country-intro" class="travel-info__intro">A country in southwestern Europe facing both the Atlantic and the Mediterranean.</span>
+          </span>
+        </button>
       </section>
 
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
       <div id="flash" class="camera-flash" aria-hidden="true"></div>
 
       <section id="controls-hint" class="controls-hint">
-        <span class="desktop-hint">WASD / 方向键移动 · M 查看世界 · 靠近奇观按空格打卡</span>
-        <span class="touch-hint">推动摇杆旅行 · 靠近发光奇观用手机打卡</span>
+        <span class="desktop-hint" data-i18n="controls.desktop">Move with WASD / arrow keys · M opens the world map · Space explores nearby landmarks</span>
+        <span class="touch-hint" data-i18n="controls.touch">Hold and drag anywhere to travel · Approach a diamond marker to explore a landmark</span>
       </section>
-
-      <div id="joystick" class="joystick" aria-label="移动摇杆">
-        <div class="joystick__ring"></div>
-        <div id="joystick-knob" class="joystick__knob"></div>
-      </div>
-
-      <button id="interact-button" class="interact-button" type="button">
-        <span aria-hidden="true">📱</span>
-        <span>手机打卡</span>
-      </button>
 
       <button id="passport-button" class="passport-button" type="button" aria-expanded="false">
         <span aria-hidden="true">📘</span>
-        <span>护照</span>
+        <span data-i18n="passport.open">Passport</span>
       </button>
+
+      <label class="language-picker">
+        <span aria-hidden="true">🌐</span>
+        <select
+          id="language-select"
+          aria-label="Choose language"
+          data-i18n-attr="aria-label:language.label"
+        ></select>
+      </label>
 
       <aside id="passport-panel" class="passport-panel" aria-hidden="true">
         <header>
           <div>
-            <small>MY LITTLE PASSPORT</small>
-            <h2>世界旅行护照</h2>
+            <small data-i18n="passport.eyebrow">MY LITTLE PASSPORT</small>
+            <h2 data-i18n="passport.title">World Travel Passport</h2>
           </div>
-          <button id="passport-close" type="button" aria-label="关闭护照">×</button>
+          <button
+            id="passport-close"
+            type="button"
+            aria-label="Close passport"
+            data-i18n-attr="aria-label:passport.close"
+          >×</button>
         </header>
-        <p>开车跨过陆地，或直接驶入海里。每到一个国家，就会留下自己的旅行印章。</p>
+        <p data-i18n="passport.description">Important countries you visit are added automatically, creating a record of your journey.</p>
         <div id="stamp-grid" class="stamp-grid"></div>
       </aside>
+
+      <section
+        id="landmark-detail"
+        class="landmark-detail"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="landmark-detail-name"
+        aria-hidden="true"
+      >
+        <button
+          id="landmark-detail-backdrop"
+          class="landmark-detail__backdrop"
+          type="button"
+          aria-label="Close landmark details"
+          data-i18n-attr="aria-label:landmark.close"
+        ></button>
+        <article class="landmark-detail__card">
+          <header>
+            <div>
+              <p id="landmark-detail-kind" class="landmark-detail__kind" data-i18n="landmark.defaultKind">World wonder</p>
+              <h2 id="landmark-detail-name" data-i18n="landmark.defaultName">Landmark</h2>
+              <p id="landmark-detail-country" class="landmark-detail__country"></p>
+            </div>
+            <button
+              id="landmark-detail-close"
+              type="button"
+              aria-label="Close landmark details"
+              data-i18n-attr="aria-label:landmark.close"
+            >×</button>
+          </header>
+          <p id="landmark-detail-intro" class="landmark-detail__lead"></p>
+          <div class="landmark-detail__body">
+            <p id="landmark-detail-description"></p>
+            <p id="landmark-detail-fact"></p>
+          </div>
+          <footer>
+            <span id="landmark-detail-status" data-i18n="landmark.defaultStatus">Added to your travel postcards</span>
+            <button id="landmark-detail-confirm" type="button" data-i18n="action.done">Done</button>
+          </footer>
+        </article>
+      </section>
     </main>
 
     <script type="module" src="/src/main.ts"></script>

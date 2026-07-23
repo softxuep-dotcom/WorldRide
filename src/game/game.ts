@@ -4,6 +4,7 @@ import { InputController } from "./input";
 import { GameSimulation } from "./simulation";
 import { GameUI } from "./ui";
 import { WorldView } from "./world";
+import { t } from "../i18n";
 
 export class PocketEarthGame {
   readonly simulation = new GameSimulation();
@@ -16,6 +17,9 @@ export class PocketEarthGame {
   private readonly input: InputController;
   private readonly ui: GameUI;
   private cameraViewSize = 17;
+  private projectionViewSize = 17;
+  private overviewBlend = 0;
+  private hasSizedCamera = false;
   private worldOverview = false;
   private animationFrame?: number;
 
@@ -38,9 +42,7 @@ export class PocketEarthGame {
     this.scene.add(this.world.root);
     this.addLighting();
 
-    const joystick = requireHTMLElement("joystick");
-    const joystickKnob = requireHTMLElement("joystick-knob");
-    this.input = new InputController(joystick, joystickKnob);
+    this.input = new InputController(canvas);
     this.ui = new GameUI(
       () => this.simulation.interact(),
       () => this.toggleWorldOverview(),
@@ -86,16 +88,22 @@ export class PocketEarthGame {
 
   toggleWorldOverview(): void {
     this.worldOverview = !this.worldOverview;
-    this.scene.fog = this.worldOverview ? null : this.localFog;
     this.ui.setWorldOverview(this.worldOverview);
     this.onResize();
   }
 
   private readonly tick = (): void => {
     const delta = Math.min(this.clock.getDelta(), 0.05);
-    const movement = this.worldOverview ? { x: 0, z: 0 } : this.input.update();
+    const movement =
+      this.worldOverview || this.ui.isInputBlocked()
+        ? { x: 0, z: 0 }
+        : this.input.update();
 
-    if (!this.worldOverview && this.input.consumeInteractRequest()) {
+    if (
+      !this.worldOverview &&
+      !this.ui.isInputBlocked() &&
+      this.input.consumeInteractRequest()
+    ) {
       this.simulation.interact();
     }
 
@@ -118,22 +126,53 @@ export class PocketEarthGame {
 
   private processEvents(): void {
     for (const event of this.simulation.consumeEvents()) {
+      if (event.type === "world-wrapped") {
+        this.camera.position.x += event.deltaX;
+      }
       this.ui.handleEvent(event);
     }
   }
 
   private updateCamera(delta: number): void {
     const { position } = this.simulation.state;
-    const targetPosition = this.worldOverview
-      ? new THREE.Vector3(0, 240, 92)
-      : new THREE.Vector3(position.x, 20, position.z + 16);
+    const transitionSmoothing = 1 - Math.exp(-3.2 * delta);
+    this.overviewBlend +=
+      ((this.worldOverview ? 1 : 0) - this.overviewBlend) *
+      transitionSmoothing;
+    const easedOverviewBlend = THREE.MathUtils.smoothstep(
+      this.overviewBlend,
+      0,
+      1,
+    );
+    const targetPosition = new THREE.Vector3(
+      position.x,
+      20,
+      position.z + 16,
+    ).lerp(new THREE.Vector3(0, 240, 92), easedOverviewBlend);
     const smoothing = 1 - Math.exp(-4.5 * delta);
     this.camera.position.lerp(targetPosition, smoothing);
-    if (this.worldOverview) {
-      this.camera.lookAt(0, 0, 0);
-    } else {
-      this.camera.lookAt(position.x, 0, position.z - 2.4);
-    }
+    const lookAtTarget = new THREE.Vector3(
+      position.x,
+      0,
+      position.z - 2.4,
+    ).lerp(new THREE.Vector3(0, 0, 0), easedOverviewBlend);
+    this.camera.lookAt(lookAtTarget);
+
+    const targetViewSize = this.getTargetViewSize();
+    this.projectionViewSize +=
+      (targetViewSize - this.projectionViewSize) * transitionSmoothing;
+    this.applyCameraProjection(this.projectionViewSize);
+
+    this.localFog.near = THREE.MathUtils.lerp(
+      32,
+      175,
+      easedOverviewBlend,
+    );
+    this.localFog.far = THREE.MathUtils.lerp(
+      62,
+      520,
+      easedOverviewBlend,
+    );
   }
 
   private addLighting(): void {
@@ -158,22 +197,11 @@ export class PocketEarthGame {
   private readonly onResize = (): void => {
     const width = window.innerWidth;
     const height = window.innerHeight;
-    const aspect = width / height;
-    const mobileAdjustment = width < 700 ? 1.16 : 1;
-    const northWest = geoToWorld([MAP_BOUNDS.minLongitude, MAP_BOUNDS.maxLatitude]);
-    const southEast = geoToWorld([MAP_BOUNDS.maxLongitude, MAP_BOUNDS.minLatitude]);
-    const mapWidth = southEast.x - northWest.x;
-    const mapDepth = southEast.z - northWest.z;
-    const overviewSize = Math.max(mapDepth * 1.24, (mapWidth + 18) / aspect);
-    const viewSize = this.worldOverview
-      ? overviewSize
-      : this.cameraViewSize * mobileAdjustment;
-
-    this.camera.left = (-viewSize * aspect) / 2;
-    this.camera.right = (viewSize * aspect) / 2;
-    this.camera.top = viewSize / 2;
-    this.camera.bottom = -viewSize / 2;
-    this.camera.updateProjectionMatrix();
+    if (!this.hasSizedCamera) {
+      this.projectionViewSize = this.getTargetViewSize();
+      this.hasSizedCamera = true;
+    }
+    this.applyCameraProjection(this.projectionViewSize);
 
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     this.renderer.setSize(width, height, false);
@@ -192,14 +220,47 @@ export class PocketEarthGame {
     this.onResize();
   };
 
+  private getTargetViewSize(): number {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const aspect = width / height;
+    const mobileAdjustment = width < 700 ? 1.16 : 1;
+    const northWest = geoToWorld([
+      MAP_BOUNDS.minLongitude,
+      MAP_BOUNDS.maxLatitude,
+    ]);
+    const southEast = geoToWorld([
+      MAP_BOUNDS.maxLongitude,
+      MAP_BOUNDS.minLatitude,
+    ]);
+    const mapWidth = southEast.x - northWest.x;
+    const mapDepth = southEast.z - northWest.z;
+    const overviewSize = Math.max(
+      mapDepth * 1.24,
+      (mapWidth + 18) / aspect,
+    );
+    return this.worldOverview
+      ? overviewSize
+      : this.cameraViewSize * mobileAdjustment;
+  }
+
+  private applyCameraProjection(viewSize: number): void {
+    const aspect = window.innerWidth / window.innerHeight;
+    this.camera.left = (-viewSize * aspect) / 2;
+    this.camera.right = (viewSize * aspect) / 2;
+    this.camera.top = viewSize / 2;
+    this.camera.bottom = -viewSize / 2;
+    this.camera.updateProjectionMatrix();
+  }
+
   private readonly onContextLost = (event: Event): void => {
     event.preventDefault();
     this.stop();
-    this.ui.showToast("3D 画面暂时中断，正在恢复……");
+    this.ui.showToast(t("toast.contextLost"));
   };
 
   private readonly onContextRestored = (): void => {
-    this.ui.showToast("画面已恢复，继续旅行吧");
+    this.ui.showToast(t("toast.contextRestored"));
     this.start();
   };
 
@@ -208,12 +269,4 @@ export class PocketEarthGame {
       this.toggleWorldOverview();
     }
   };
-}
-
-function requireHTMLElement(id: string): HTMLElement {
-  const element = document.getElementById(id);
-  if (!element) {
-    throw new Error(`Missing element #${id}`);
-  }
-  return element;
 }

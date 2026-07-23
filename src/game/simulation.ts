@@ -1,7 +1,6 @@
 import {
   PHOTO_SPOTS,
   type CountryDefinition,
-  type CountryId,
   type PhotoSpotDefinition,
   type PhotoSpotId,
   MAP_BOUNDS,
@@ -10,6 +9,8 @@ import {
   worldToGeo,
 } from "./data";
 import {
+  type CountryProfile,
+  getCountryProfile,
   getCountryContentForAtlas,
   getWorldCountryAtGeo,
 } from "./world-map";
@@ -22,9 +23,10 @@ export interface MovementInput {
 export type VehicleMode = "car" | "boat";
 
 export type GameEvent =
-  | { type: "country-entered"; country: CountryDefinition; firstVisit: boolean }
+  | { type: "country-entered"; country: CountryProfile; firstVisit: boolean }
   | { type: "mode-changed"; mode: VehicleMode }
   | { type: "map-edge" }
+  | { type: "world-wrapped"; deltaX: number }
   | { type: "postcard-collected"; spot: PhotoSpotDefinition; firstCollection: boolean };
 
 export interface GameState {
@@ -33,9 +35,10 @@ export interface GameState {
   heading: number;
   vehicleMode: VehicleMode;
   currentCountry?: CountryDefinition;
+  currentCountryProfile?: CountryProfile;
   currentWorldCountryName?: string;
   nearestPhotoSpot?: PhotoSpotDefinition;
-  visitedCountries: Set<CountryId>;
+  visitedCountries: Set<string>;
   collectedPostcards: Set<PhotoSpotId>;
   elapsed: number;
 }
@@ -51,9 +54,10 @@ export class GameSimulation {
     heading: 0,
     vehicleMode: "car",
     currentCountry: undefined,
+    currentCountryProfile: undefined,
     currentWorldCountryName: undefined,
     nearestPhotoSpot: undefined,
-    visitedCountries: new Set<CountryId>(),
+    visitedCountries: new Set<string>(),
     collectedPostcards: new Set<PhotoSpotId>(),
     elapsed: 0,
   };
@@ -84,13 +88,20 @@ export class GameSimulation {
     this.state.position.x += this.state.velocity.x * dt;
     this.state.position.z += this.state.velocity.z * dt;
 
-    let wrappedX = this.state.position.x;
+    const unwrappedX = this.state.position.x;
+    let wrappedX = unwrappedX;
     if (wrappedX < minimumWorld.x) {
       wrappedX = maximumWorld.x - 0.8;
     } else if (wrappedX > maximumWorld.x) {
       wrappedX = minimumWorld.x + 0.8;
     }
     this.state.position.x = wrappedX;
+    if (wrappedX !== unwrappedX) {
+      this.events.push({
+        type: "world-wrapped",
+        deltaX: wrappedX - unwrappedX,
+      });
+    }
 
     const clampedX = this.state.position.x;
     const clampedZ = Math.min(maximumWorld.z - 0.8, Math.max(minimumWorld.z + 0.8, this.state.position.z));
@@ -149,10 +160,12 @@ export class GameSimulation {
     );
     const worldCountry = getWorldCountryAtGeo(geoPosition);
     const nextCountry = getCountryContentForAtlas(worldCountry);
-    const previousCountry = this.state.currentCountry;
+    const nextProfile = worldCountry ? getCountryProfile(worldCountry) : undefined;
+    const previousProfile = this.state.currentCountryProfile;
     const nextMode: VehicleMode = worldCountry ? "car" : "boat";
 
     this.state.currentCountry = nextCountry;
+    this.state.currentCountryProfile = nextProfile;
     this.state.currentWorldCountryName = worldCountry?.name;
 
     if (nextMode !== this.state.vehicleMode) {
@@ -160,10 +173,16 @@ export class GameSimulation {
       this.events.push({ type: "mode-changed", mode: nextMode });
     }
 
-    if (nextCountry && nextCountry.id !== previousCountry?.id) {
-      const firstVisit = !this.state.visitedCountries.has(nextCountry.id);
-      this.state.visitedCountries.add(nextCountry.id);
-      this.events.push({ type: "country-entered", country: nextCountry, firstVisit });
+    if (nextProfile && nextProfile.id !== previousProfile?.id) {
+      const firstVisit = !this.state.visitedCountries.has(nextProfile.id);
+      if (nextProfile.passportEligible) {
+        this.state.visitedCountries.add(nextProfile.id);
+      }
+      this.events.push({
+        type: "country-entered",
+        country: nextProfile,
+        firstVisit,
+      });
     }
   }
 

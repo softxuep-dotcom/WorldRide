@@ -1,6 +1,13 @@
 import "./styles.css";
-import { COUNTRIES } from "./game/data";
+import { COUNTRIES, PHOTO_SPOTS } from "./game/data";
 import { PocketEarthGame } from "./game/game";
+import {
+  getLocale,
+  initializeI18n,
+  setLocale,
+} from "./i18n";
+
+initializeI18n();
 
 const canvas = document.getElementById("game-canvas");
 if (!(canvas instanceof HTMLCanvasElement)) {
@@ -16,15 +23,16 @@ const requestedCountry = requestedStart
         country.englishName.toLowerCase() === requestedStart.toLowerCase(),
     )
   : undefined;
+const requestedPhotoSpot = requestedStart
+  ? PHOTO_SPOTS.find((spot) => spot.id === requestedStart)
+  : undefined;
 
-if (requestedCountry) {
+if (requestedCountry || requestedPhotoSpot) {
   game.simulation.state.visitedCountries.clear();
   game.simulation.state.collectedPostcards.clear();
   game.simulation.state.currentCountry = undefined;
-  game.simulation.teleport(
-    requestedCountry.city.point[0],
-    requestedCountry.city.point[1],
-  );
+  const point = requestedPhotoSpot?.point ?? requestedCountry!.city.point;
+  game.simulation.teleport(point[0], point[1]);
 }
 game.start();
 
@@ -34,6 +42,8 @@ declare global {
       game: PocketEarthGame;
       teleport: (longitude: number, latitude: number) => void;
       interact: () => void;
+      getLocale: () => string;
+      setLocale: (locale: string) => boolean;
     };
   }
 }
@@ -46,4 +56,6 @@ window.__POCKET_EARTH__ = {
   interact() {
     game.interact();
   },
+  getLocale,
+  setLocale,
 };
