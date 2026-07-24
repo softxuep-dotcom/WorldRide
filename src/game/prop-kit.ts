@@ -24,8 +24,7 @@ export type PropArchetypeId =
   | "chalet"
   | "adobe"
   | "dune"
-  | "rock"
-  | "hill";
+  | "rock";
 
 interface PropPart {
   geometry: THREE.BufferGeometry;
@@ -61,11 +60,15 @@ const PALETTE = {
   roofWood: 0x8a5a3b,
   sand: 0xe4bd7d,
   rock: 0x8a8375,
-  hill: 0x6f8f66,
 } as const;
 
 function bakePart(part: PropPart): THREE.BufferGeometry {
-  const geometry = part.geometry.clone().toNonIndexed();
+  const geometry = part.geometry.index
+    ? part.geometry.toNonIndexed()
+    : part.geometry;
+  if (geometry !== part.geometry) {
+    part.geometry.dispose();
+  }
 
   if (part.scale) {
     geometry.scale(part.scale[0], part.scale[1], part.scale[2]);
@@ -324,15 +327,6 @@ const ARCHETYPE_BUILDERS: Record<PropArchetypeId, () => THREE.BufferGeometry> = 
         geometry: new THREE.DodecahedronGeometry(0.16, 0),
         color: PALETTE.rock,
         position: [0.24, 0.09, 0.1],
-      },
-    ]),
-
-  hill: () =>
-    buildProp([
-      {
-        geometry: new THREE.ConeGeometry(0.62, 0.72, 6),
-        color: PALETTE.hill,
-        position: [0, 0.34, 0],
       },
     ]),
 };
