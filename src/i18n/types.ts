@@ -60,6 +60,7 @@ export interface UiMessages {
   "quiz.perfect": string;
   "quiz.retry": string;
   "quiz.completedToast": string;
+  "sound.toggle": string;
   "language.label": string;
   "country.genericIntro": string;
   "country.regionalIntro": string;

@@ -213,6 +213,7 @@ export const zhCN = {
     "quiz.perfect": "全对！你很了解{subject}。",
     "quiz.retry": "再试一次",
     "quiz.completedToast": "挑战完成：{subject}",
+    "sound.toggle": "开关声音",
     "language.label": "选择语言",
     "country.genericIntro": "来到{name}，探索这里的自然地貌、城市与文化。",
     "country.regionalIntro": "{name}位于{region}，自然地貌、城市与文化传统共同构成了它鲜明的区域面貌。",

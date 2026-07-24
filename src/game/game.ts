@@ -5,6 +5,7 @@ import { GameSimulation } from "./simulation";
 import { GameUI } from "./ui";
 import { WorldView } from "./world";
 import { SaveStore } from "./save-store";
+import { GameAudio } from "./audio";
 import { t } from "../i18n";
 
 const ROUTINE_SAVE_SECONDS = 5;
@@ -26,6 +27,7 @@ export class PocketEarthGame {
   private worldOverview = false;
   private animationFrame?: number;
   private readonly saveStore = new SaveStore();
+  private readonly audio = new GameAudio();
   private restoredFromSave = false;
   private sinceRoutineSave = 0;
 
@@ -67,12 +69,38 @@ export class PocketEarthGame {
     canvas.addEventListener("webglcontextrestored", this.onContextRestored);
     window.addEventListener("pagehide", this.onPageHide);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
+    window.addEventListener("pointerdown", this.onFirstGesture);
+    window.addEventListener("keydown", this.onFirstGesture);
+    this.setupSoundToggle();
     this.onResize();
 
     this.restoreSave();
     this.simulation.update(0, { x: 0, z: 0 });
     this.processEvents();
     this.ui.update(this.simulation.state);
+  }
+
+  private readonly onFirstGesture = (): void => {
+    this.audio.unlock();
+    window.removeEventListener("pointerdown", this.onFirstGesture);
+    window.removeEventListener("keydown", this.onFirstGesture);
+  };
+
+  private setupSoundToggle(): void {
+    const button = document.getElementById("sound-button");
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    const paint = () => {
+      const muted = this.audio.isMuted;
+      button.textContent = muted ? "🔇" : "🔊";
+      button.setAttribute("aria-pressed", String(!muted));
+    };
+    paint();
+    button.addEventListener("click", () => {
+      this.audio.toggleMuted();
+      paint();
+    });
   }
 
   private restoreSave(): void {
@@ -164,6 +192,7 @@ export class PocketEarthGame {
     );
     this.updateCamera(delta);
     this.ui.update(state);
+    this.audio.updateDrive(state);
     this.renderer.render(this.scene, this.camera);
 
     this.sinceRoutineSave += delta;
@@ -187,11 +216,33 @@ export class PocketEarthGame {
       ) {
         reachedMilestone = true;
       }
+      this.emitAudioForEvent(event);
       this.ui.handleEvent(event);
     }
     if (reachedMilestone) {
       this.persist(true);
       this.sinceRoutineSave = 0;
+    }
+  }
+
+  private emitAudioForEvent(
+    event: ReturnType<GameSimulation["consumeEvents"]>[number],
+  ): void {
+    switch (event.type) {
+      case "mode-changed":
+        this.audio.onModeChanged(event.mode);
+        break;
+      case "country-entered":
+        this.audio.onCountryEntered(event.firstVisit);
+        break;
+      case "postcard-collected":
+        this.audio.onPostcardCollected(event.firstCollection);
+        break;
+      case "map-edge":
+        this.audio.onMapEdge();
+        break;
+      case "world-wrapped":
+        break;
     }
   }
 
@@ -324,6 +375,9 @@ export class PocketEarthGame {
     if (document.visibilityState === "hidden") {
       this.persist(true);
       this.saveStore.flush();
+      this.audio.suspend();
+    } else {
+      this.audio.resume();
     }
   };
 

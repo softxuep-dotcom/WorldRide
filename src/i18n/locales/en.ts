@@ -214,6 +214,7 @@ export const en = {
     "quiz.perfect": "Perfect score! You know {subject} well.",
     "quiz.retry": "Try again",
     "quiz.completedToast": "Challenge cleared: {subject}",
+    "sound.toggle": "Toggle sound",
     "language.label": "Choose language",
     "country.genericIntro": "Arrive in {name} and explore its landscapes, cities, and culture.",
     "country.regionalIntro": "{name} lies in {region}, with landscapes, cities, and cultural traditions shaped by its place in the wider region.",

@@ -1161,3 +1161,28 @@ button {
 .quiz-panel__next[hidden] {
   display: none;
 }
+
+/* ---------- Sound toggle ---------- */
+
+.sound-button {
+  position: absolute;
+  left: max(18px, env(safe-area-inset-left));
+  bottom: calc(max(20px, env(safe-area-inset-bottom)) + 46px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 13px;
+  background: var(--paper);
+  box-shadow: 0 8px 20px rgba(27, 70, 93, 0.18);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 150ms ease;
+}
+
+.sound-button:active {
+  transform: translateY(2px) scale(0.97);
+}
