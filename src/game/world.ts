@@ -27,9 +27,23 @@ import {
   updateLandmarkStandeeOverview,
   type LandmarkStandeeView,
 } from "./landmark-standees";
+import {
+  REGIONAL_SPECIALTIES,
+  type RegionalSpecialtyDefinition,
+} from "./regional-specialties";
+import {
+  createRegionalSpecialtyStandee,
+  updateRegionalSpecialtyStandeeOverview,
+  type RegionalSpecialtyStandeeView,
+} from "./regional-specialty-standees";
 
 const landmarkModelLoader = new GLTFLoader();
 landmarkModelLoader.setMeshoptDecoder(MeshoptDecoder);
+
+const RESERVED_MAP_MARKER_POSITIONS = [
+  ...PHOTO_SPOTS.map((spot) => geoToWorld(spot.point)),
+  ...REGIONAL_SPECIALTIES.map((specialty) => geoToWorld(specialty.point)),
+];
 
 interface VehicleView {
   root: THREE.Group;
@@ -92,6 +106,8 @@ export class WorldView {
   private readonly wavelets: THREE.Mesh[] = [];
   private readonly landmarkEffects: LandmarkEffect[] = [];
   private readonly landmarkStandees: LandmarkStandeeView[] = [];
+  private readonly regionalSpecialtyStandees: RegionalSpecialtyStandeeView[] =
+    [];
   private readonly props = new PropBatcher();
   private readonly useLandmarkStandees = true;
   private modeBlend = 0;
@@ -155,7 +171,15 @@ export class WorldView {
     }
 
     for (const standee of this.landmarkStandees) {
-      updateLandmarkStandeeOverview(standee, overviewBlend);
+      updateLandmarkStandeeOverview(standee, overviewBlend, elapsed);
+    }
+
+    for (const standee of this.regionalSpecialtyStandees) {
+      updateRegionalSpecialtyStandeeOverview(
+        standee,
+        overviewBlend,
+        elapsed,
+      );
     }
 
     for (const effect of this.landmarkEffects) {
@@ -272,6 +296,7 @@ export class WorldView {
       color: 0x52704f,
       roughness: 1,
     });
+    const borderPositions: number[] = [];
 
     for (const country of WORLD_COUNTRIES) {
       const shapes = country.renderPolygons
@@ -310,35 +335,56 @@ export class WorldView {
       land.name = `${country.name} natural terrain`;
       this.root.add(land);
 
-      this.addWorldCountryBorder(country);
+      this.appendWorldCountryBorderSegments(country, borderPositions);
     }
+
+    this.addMergedWorldCountryBorders(borderPositions);
   }
 
-  private addWorldCountryBorder(country: WorldCountry): void {
-    const material = new THREE.LineBasicMaterial({
-      color: 0xfff9e8,
-      transparent: true,
-      opacity: 0.72,
-    });
-
+  private appendWorldCountryBorderSegments(
+    country: WorldCountry,
+    positions: number[],
+  ): void {
     for (const polygon of country.renderPolygons) {
       if (polygon.length < 3) {
         continue;
       }
 
-      const positions: number[] = [];
-      for (const point of polygon) {
-        const world = geoToWorld(point);
-        positions.push(world.x, 0.458, world.z);
+      for (let index = 0; index < polygon.length; index += 1) {
+        const start = geoToWorld(polygon[index]);
+        const end = geoToWorld(polygon[(index + 1) % polygon.length]);
+        positions.push(
+          start.x,
+          0.458,
+          start.z,
+          end.x,
+          0.458,
+          end.z,
+        );
       }
-
-      const first = geoToWorld(polygon[0]);
-      positions.push(first.x, 0.458, first.z);
-
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-      this.root.add(new THREE.Line(geometry, material));
     }
+  }
+
+  private addMergedWorldCountryBorders(positions: readonly number[]): void {
+    if (positions.length === 0) {
+      return;
+    }
+
+    const material = new THREE.LineBasicMaterial({
+      color: 0xfff9e8,
+      transparent: true,
+      opacity: 0.72,
+    });
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(positions, 3),
+    );
+    geometry.computeBoundingSphere();
+
+    const borders = new THREE.LineSegments(geometry, material);
+    borders.name = "merged world country borders";
+    this.root.add(borders);
   }
 
   private addCountries(): void {
@@ -348,6 +394,10 @@ export class WorldView {
 
     for (const spot of PHOTO_SPOTS) {
       this.addPhotoSpot(spot);
+    }
+
+    for (const specialty of REGIONAL_SPECIALTIES) {
+      this.addRegionalSpecialty(specialty);
     }
   }
 
@@ -395,6 +445,13 @@ export class WorldView {
       }
 
       const world = geoToWorld(point);
+      const nearMapMarker = RESERVED_MAP_MARKER_POSITIONS.some(
+        (marker) => Math.hypot(marker.x - world.x, marker.z - world.z) < 2.05,
+      );
+      if (nearMapMarker) {
+        continue;
+      }
+
       const size = 0.64 + random() * 0.38;
       const choice = random();
       const desert = isDesertPoint(country, point);
@@ -481,6 +538,20 @@ export class WorldView {
         this.addMountain(world.x, world.z, 1.25, 0x718b77);
       }
     }
+  }
+
+  private addRegionalSpecialty(
+    specialty: RegionalSpecialtyDefinition,
+  ): void {
+    const world = geoToWorld(specialty.point);
+    const group = new THREE.Group();
+    group.position.set(world.x, 0.445, world.z);
+    group.name = `${specialty.name} regional specialty`;
+
+    const standee = createRegionalSpecialtyStandee(specialty);
+    this.regionalSpecialtyStandees.push(standee);
+    group.add(standee.root);
+    this.root.add(group);
   }
 
   private addPhotoSpot(spot: PhotoSpotDefinition): void {

@@ -68,6 +68,8 @@ const textureLoader = new THREE.TextureLoader();
 export interface LandmarkStandeeView {
   readonly root: THREE.Group;
   readonly fadeMaterials: THREE.Material[];
+  readonly swayPhase: number;
+  readonly baseLean: number;
 }
 
 export function createLandmarkStandee(
@@ -75,7 +77,61 @@ export function createLandmarkStandee(
   accent: THREE.ColorRepresentation,
 ): LandmarkStandeeView {
   const root = new THREE.Group();
-  root.name = `${spot.id} illustration standee`;
+  root.name = `${spot.id} rigid illustration placard`;
+
+  const boardSize = 2.9;
+  const boardBottom = 0.65;
+  const boardCenterY = boardBottom + boardSize / 2;
+  const poleX = -boardSize / 2 - 0.11;
+  const poleHeight = boardBottom + boardSize + 0.18;
+
+  const boardMaterial = new THREE.MeshStandardMaterial({
+    color: 0xfff4d8,
+    roughness: 0.86,
+    metalness: 0,
+    transparent: true,
+    opacity: 1,
+    flatShading: true,
+  });
+  boardMaterial.userData.baseOpacity = 1;
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(boardSize, boardSize, 0.1),
+    boardMaterial,
+  );
+  board.name = `${spot.id} rigid square board`;
+  board.position.set(0, boardCenterY, -0.035);
+  root.add(board);
+
+  const frameMaterial = new THREE.MeshStandardMaterial({
+    color: 0x674b36,
+    roughness: 0.72,
+    metalness: 0.02,
+    transparent: true,
+    opacity: 1,
+    flatShading: true,
+  });
+  frameMaterial.userData.baseOpacity = 1;
+
+  const frameOffset = boardSize / 2 - 0.055;
+  const horizontalFrameGeometry = new THREE.BoxGeometry(
+    boardSize + 0.08,
+    0.1,
+    0.09,
+  );
+  const verticalFrameGeometry = new THREE.BoxGeometry(
+    0.1,
+    boardSize + 0.08,
+    0.09,
+  );
+  const topRail = new THREE.Mesh(horizontalFrameGeometry, frameMaterial);
+  const bottomRail = new THREE.Mesh(horizontalFrameGeometry, frameMaterial);
+  const leftRail = new THREE.Mesh(verticalFrameGeometry, frameMaterial);
+  const rightRail = new THREE.Mesh(verticalFrameGeometry, frameMaterial);
+  topRail.position.set(0, boardCenterY + frameOffset, 0.055);
+  bottomRail.position.set(0, boardCenterY - frameOffset, 0.055);
+  leftRail.position.set(-frameOffset, boardCenterY, 0.055);
+  rightRail.position.set(frameOffset, boardCenterY, 0.055);
+  root.add(topRail, bottomRail, leftRail, rightRail);
 
   const fallbackTexture = createFlagCardTexture(spot, accent);
   const artMaterial = new THREE.MeshBasicMaterial({
@@ -94,64 +150,51 @@ export function createLandmarkStandee(
     new THREE.PlaneGeometry(1, 1),
     artMaterial,
   );
-  art.name = `${spot.id} standee artwork`;
-  fitArtworkPlane(art, 0.75, false);
+  art.name = `${spot.id} square placard artwork`;
+  art.scale.set(2.68, 2.68, 1);
+  art.position.set(0, boardCenterY, 0.108);
   art.renderOrder = 2;
   root.add(art);
 
-  const footMaterial = new THREE.MeshBasicMaterial({
-    color: 0x8a6744,
+  const poleMaterial = new THREE.MeshStandardMaterial({
+    color: 0x674b36,
+    roughness: 0.68,
+    metalness: 0.04,
     transparent: true,
     opacity: 1,
-    toneMapped: false,
+    flatShading: true,
   });
-  footMaterial.userData.baseOpacity = 1;
-  const foot = new THREE.Mesh(
-    new THREE.BoxGeometry(0.92, 0.13, 0.24),
-    footMaterial,
+  poleMaterial.userData.baseOpacity = 1;
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.055, 0.065, poleHeight, 10),
+    poleMaterial,
   );
-  foot.name = `${spot.id} standee foot`;
-  foot.position.set(0, 0.25, -0.045);
-  root.add(foot);
+  pole.name = `${spot.id} placard pole`;
+  pole.position.set(poleX, poleHeight / 2, -0.105);
 
-  const shadowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x263832,
-    transparent: true,
-    opacity: 0.14,
-    depthWrite: false,
-    toneMapped: false,
-  });
-  shadowMaterial.userData.baseOpacity = 0.14;
-  const shadow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.88, 28),
-    shadowMaterial,
+  const finial = new THREE.Mesh(
+    new THREE.SphereGeometry(0.1, 12, 8),
+    poleMaterial,
   );
-  shadow.name = `${spot.id} standee shadow`;
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.scale.set(1.3, 0.38, 1);
-  shadow.position.set(0, 0.225, 0.04);
-  shadow.renderOrder = 1;
-  root.add(shadow);
+  finial.name = `${spot.id} placard finial`;
+  finial.position.set(poleX, poleHeight + 0.04, -0.105);
+
+  const bracketGeometry = new THREE.BoxGeometry(0.22, 0.065, 0.085);
+  const upperBracket = new THREE.Mesh(bracketGeometry, poleMaterial);
+  const lowerBracket = new THREE.Mesh(bracketGeometry, poleMaterial);
+  upperBracket.position.set(poleX + 0.09, boardCenterY + 0.86, -0.06);
+  lowerBracket.position.set(poleX + 0.09, boardCenterY - 0.86, -0.06);
+  root.add(pole, finial, upperBracket, lowerBracket);
 
   if (GENERATED_LANDMARK_IDS.has(spot.id)) {
     textureLoader.load(
-      `assets/landmarks/${spot.id}.webp`,
+      `assets/landmarks/placard/${spot.id}.webp`,
       (texture) => {
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.minFilter = THREE.LinearMipmapLinearFilter;
         texture.magFilter = THREE.LinearFilter;
         texture.anisotropy = 4;
         texture.needsUpdate = true;
-
-        const source = texture.image as {
-          naturalWidth?: number;
-          naturalHeight?: number;
-          width: number;
-          height: number;
-        };
-        const width = source.naturalWidth ?? source.width;
-        const height = source.naturalHeight ?? source.height;
-        fitArtworkPlane(art, width / Math.max(1, height), true);
 
         artMaterial.map = texture;
         artMaterial.needsUpdate = true;
@@ -168,14 +211,25 @@ export function createLandmarkStandee(
 
   return {
     root,
-    fadeMaterials: [artMaterial, footMaterial, shadowMaterial],
+    fadeMaterials: [
+      artMaterial,
+      boardMaterial,
+      frameMaterial,
+      poleMaterial,
+    ],
+    swayPhase: createStablePhase(spot.id),
+    baseLean: createStableLean(spot.id),
   };
 }
 
 export function updateLandmarkStandeeOverview(
   standee: LandmarkStandeeView,
   overviewBlend: number,
+  elapsed: number,
 ): void {
+  standee.root.rotation.z =
+    standee.baseLean + Math.sin(elapsed * 0.72 + standee.swayPhase) * 0.008;
+
   const opacity = 1 - THREE.MathUtils.smoothstep(overviewBlend, 0.3, 0.72);
   standee.root.visible = opacity > 0.01;
 
@@ -194,23 +248,20 @@ export function updateLandmarkStandeeOverview(
   }
 }
 
-function fitArtworkPlane(
-  art: THREE.Mesh,
-  aspect: number,
-  illustration: boolean,
-): void {
-  const maxWidth = illustration ? 3.35 : 2.18;
-  const maxHeight = illustration ? 3.2 : 2.9;
-  let width = maxWidth;
-  let height = width / Math.max(0.1, aspect);
+function createStablePhase(id: string): number {
+  return (hashId(id) % 628) / 100;
+}
 
-  if (height > maxHeight) {
-    height = maxHeight;
-    width = height * aspect;
+function createStableLean(id: string): number {
+  return ((hashId(id) % 7) - 3) * 0.004;
+}
+
+function hashId(id: string): number {
+  let hash = 0;
+  for (let index = 0; index < id.length; index += 1) {
+    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
   }
-
-  art.scale.set(width, height, 1);
-  art.position.set(0, 0.28 + height / 2, 0);
+  return hash;
 }
 
 function createFlagCardTexture(
@@ -218,7 +269,7 @@ function createFlagCardTexture(
   accent: THREE.ColorRepresentation,
 ): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
-  canvas.width = 384;
+  canvas.width = 512;
   canvas.height = 512;
   const context = canvas.getContext("2d");
   if (!context) {
@@ -229,38 +280,38 @@ function createFlagCardTexture(
   context.clearRect(0, 0, canvas.width, canvas.height);
 
   context.save();
-  roundedRectPath(context, 16, 16, 352, 480, 32);
+  roundedRectPath(context, 16, 16, 480, 480, 30);
   context.fillStyle = "#fff4d8";
   context.fill();
-  context.lineWidth = 12;
+  context.lineWidth = 10;
   context.strokeStyle = "#5a4637";
   context.stroke();
   context.clip();
 
   context.fillStyle = accentColor;
-  context.fillRect(16, 16, 352, 142);
+  context.fillRect(16, 16, 480, 132);
   context.fillStyle = "rgba(255, 255, 255, 0.18)";
-  context.fillRect(16, 130, 352, 28);
+  context.fillRect(16, 120, 480, 28);
 
   context.textAlign = "center";
   context.textBaseline = "middle";
   context.font =
-    '94px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+    '88px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
   context.fillStyle = "#ffffff";
   context.fillText(
     COUNTRY_FLAGS[spot.atlasCountryName] ?? "🌍",
     canvas.width / 2,
-    98,
+    83,
   );
 
   const nameLines = splitName(spot.name);
-  const fontSize = fitFontSize(context, nameLines, 304, 48, 30);
+  const fontSize = fitFontSize(context, nameLines, 420, 54, 32);
   context.font =
     `700 ${fontSize}px "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif`;
   context.fillStyle = "#3e332b";
   const lineHeight = fontSize * 1.28;
   const blockHeight = lineHeight * nameLines.length;
-  const firstLineY = 302 - blockHeight / 2 + lineHeight / 2;
+  const firstLineY = 292 - blockHeight / 2 + lineHeight / 2;
   nameLines.forEach((line, index) => {
     context.fillText(
       line,
@@ -270,12 +321,12 @@ function createFlagCardTexture(
   });
 
   context.font =
-    '600 23px "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif';
+    '600 24px "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif';
   context.fillStyle = accentColor;
-  context.fillText("插画待补", canvas.width / 2, 430);
+  context.fillText("插画待补", canvas.width / 2, 414);
 
   context.fillStyle = "#5a4637";
-  context.fillRect(82, 462, 220, 9);
+  context.fillRect(116, 456, 280, 8);
   context.restore();
 
   const texture = new THREE.CanvasTexture(canvas);

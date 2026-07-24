@@ -1,4 +1,9 @@
-import type { PhotoSpotId } from "./data";
+import {
+  PHOTO_SPOTS,
+  type PhotoSpotDefinition,
+  type PhotoSpotId,
+} from "./data";
+import { TIER_A_COUNTRY_NAMES } from "./world-map";
 
 /**
  * Knowledge challenges offered on arrival at a tier-A country or a photo spot.
@@ -8,8 +13,8 @@ import type { PhotoSpotId } from "./data";
  * order in one file and the answer index in another, which silently breaks the
  * quiz whenever a translator reorders an option.
  *
- * A subject with no entry here simply never offers a challenge, so the bank can
- * be filled in incrementally.
+ * Every tier-A country and photo spot is covered. The complete typed records
+ * below make new content fail type-checking until its challenge is supplied.
  */
 export type LocalizedText = Readonly<Record<string, string>>;
 
@@ -27,219 +32,444 @@ export interface QuizSet {
 }
 
 const FALLBACK_LOCALE = "en";
+const QUIZ_BANK_VERSION = 2;
 
 export function localizeText(text: LocalizedText, locale: string): string {
   return text[locale] ?? text[FALLBACK_LOCALE] ?? Object.values(text)[0] ?? "";
 }
 
-/** Keyed by the world-atlas country name, matching CountryProfile.atlasName. */
-const COUNTRY_QUIZZES: Readonly<Record<string, QuizSet>> = {
-  France: {
-    id: "country:France",
-    questions: [
-      {
-        id: "france-capital",
-        prompt: {
-          en: "Which city is the capital of France?",
-          "zh-CN": "法国的首都是哪座城市？",
-        },
-        options: [
-          { en: "Paris", "zh-CN": "巴黎" },
-          { en: "Marseille", "zh-CN": "马赛" },
-          { en: "Lyon", "zh-CN": "里昂" },
-        ],
-        answerIndex: 0,
-        explain: {
-          en: "Paris sits on the River Seine and has been the capital for centuries.",
-          "zh-CN": "巴黎坐落在塞纳河畔，长期以来都是法国的首都。",
-        },
-      },
-      {
-        id: "france-sea",
-        prompt: {
-          en: "Southern France faces which sea?",
-          "zh-CN": "法国南部面向哪片海？",
-        },
-        options: [
-          { en: "The Baltic Sea", "zh-CN": "波罗的海" },
-          { en: "The Mediterranean Sea", "zh-CN": "地中海" },
-          { en: "The Black Sea", "zh-CN": "黑海" },
-        ],
-        answerIndex: 1,
-        explain: {
-          en: "The southern coast, including Marseille, opens onto the Mediterranean.",
-          "zh-CN": "包括马赛在内的南部海岸都面向地中海。",
-        },
-      },
-    ],
-  },
+type TierACountryName = (typeof TIER_A_COUNTRY_NAMES)[number];
+type ContinentKey =
+  | "africa"
+  | "asia"
+  | "europe"
+  | "europe-asia"
+  | "north-america"
+  | "oceania"
+  | "south-america";
 
-  China: {
-    id: "country:China",
-    questions: [
-      {
-        id: "china-river",
-        prompt: {
-          en: "Which is the longest river in China?",
-          "zh-CN": "中国最长的河流是哪一条？",
-        },
-        options: [
-          { en: "The Yellow River", "zh-CN": "黄河" },
-          { en: "The Pearl River", "zh-CN": "珠江" },
-          { en: "The Yangtze River", "zh-CN": "长江" },
-        ],
-        answerIndex: 2,
-        explain: {
-          en: "The Yangtze flows from the western highlands east into the sea.",
-          "zh-CN": "长江发源于西部高原，自西向东注入大海。",
-        },
-      },
-      {
-        id: "china-terrain",
-        prompt: {
-          en: "In which direction does China's land generally get lower?",
-          "zh-CN": "中国的地势总体上朝哪个方向降低？",
-        },
-        options: [
-          { en: "Towards the east", "zh-CN": "自西向东降低" },
-          { en: "Towards the west", "zh-CN": "自东向西降低" },
-          { en: "Towards the north", "zh-CN": "自南向北降低" },
-        ],
-        answerIndex: 0,
-        explain: {
-          en: "China is high in the west and low in the east, so most rivers flow east.",
-          "zh-CN": "中国地势西高东低，所以大多数河流向东流入海洋。",
-        },
-      },
-    ],
-  },
+interface CountryQuizSeed {
+  label: BilingualCopy;
+  capital: BilingualCopy;
+  continent: ContinentKey;
+  feature: QuizQuestion;
+}
 
-  Italy: {
-    id: "country:Italy",
-    questions: [
-      {
-        id: "italy-shape",
-        prompt: {
-          en: "The Italian peninsula is often said to look like what?",
-          "zh-CN": "意大利半岛的轮廓常被形容成什么？",
-        },
-        options: [
-          { en: "A boot", "zh-CN": "一只靴子" },
-          { en: "A hat", "zh-CN": "一顶帽子" },
-          { en: "A fish", "zh-CN": "一条鱼" },
-        ],
-        answerIndex: 0,
-        explain: {
-          en: "Italy stretches into the Mediterranean in a shape like a boot.",
-          "zh-CN": "意大利伸入地中海，形状很像一只靴子。",
-        },
-      },
-      {
-        id: "italy-mountains",
-        prompt: {
-          en: "Which mountain range borders northern Italy?",
-          "zh-CN": "意大利北部连接着哪条山脉？",
-        },
-        options: [
-          { en: "The Andes", "zh-CN": "安第斯山脉" },
-          { en: "The Alps", "zh-CN": "阿尔卑斯山脉" },
-          { en: "The Ural Mountains", "zh-CN": "乌拉尔山脉" },
-        ],
-        answerIndex: 1,
-        explain: {
-          en: "The Alps form Italy's northern boundary with its neighbours.",
-          "zh-CN": "阿尔卑斯山脉构成了意大利北部与邻国的分界。",
-        },
-      },
-    ],
-  },
-
-  "United States of America": {
-    id: "country:United States of America",
-    questions: [
-      {
-        id: "usa-oceans",
-        prompt: {
-          en: "The mainland United States lies between which two oceans?",
-          "zh-CN": "美国本土位于哪两大洋之间？",
-        },
-        options: [
-          { en: "The Atlantic and the Pacific", "zh-CN": "大西洋和太平洋" },
-          { en: "The Indian and the Pacific", "zh-CN": "印度洋和太平洋" },
-          { en: "The Atlantic and the Arctic", "zh-CN": "大西洋和北冰洋" },
-        ],
-        answerIndex: 0,
-        explain: {
-          en: "The Atlantic lies to the east and the Pacific to the west.",
-          "zh-CN": "东边是大西洋，西边是太平洋。",
-        },
-      },
-      {
-        id: "usa-canyon",
-        prompt: {
-          en: "Which river carved the Grand Canyon?",
-          "zh-CN": "大峡谷是被哪条河流切割形成的？",
-        },
-        options: [
-          { en: "The Mississippi River", "zh-CN": "密西西比河" },
-          { en: "The Colorado River", "zh-CN": "科罗拉多河" },
-          { en: "The Hudson River", "zh-CN": "哈德逊河" },
-        ],
-        answerIndex: 1,
-        explain: {
-          en: "The Colorado River cut down through the rock over millions of years.",
-          "zh-CN": "科罗拉多河用数百万年的时间切开岩层，形成了大峡谷。",
-        },
-      },
-    ],
-  },
-
-  Japan: {
-    id: "country:Japan",
-    questions: [
-      {
-        id: "japan-islands",
-        prompt: {
-          en: "Japan is made up of what kind of land?",
-          "zh-CN": "日本的国土是由什么构成的？",
-        },
-        options: [
-          { en: "A chain of islands", "zh-CN": "一系列岛屿" },
-          { en: "One single landmass", "zh-CN": "一整块大陆" },
-          { en: "A desert plateau", "zh-CN": "一片沙漠高原" },
-        ],
-        answerIndex: 0,
-        explain: {
-          en: "Japan has four main islands and many smaller ones.",
-          "zh-CN": "日本由四个主要岛屿和许多小岛组成。",
-        },
-      },
-    ],
-  },
-
-  Egypt: {
-    id: "country:Egypt",
-    questions: [
-      {
-        id: "egypt-nile",
-        prompt: {
-          en: "Which direction does the Nile flow in Egypt?",
-          "zh-CN": "尼罗河在埃及境内向哪个方向流？",
-        },
-        options: [
-          { en: "South, into the desert", "zh-CN": "向南流入沙漠" },
-          { en: "North, into the Mediterranean", "zh-CN": "向北流入地中海" },
-          { en: "East, into the Red Sea", "zh-CN": "向东流入红海" },
-        ],
-        answerIndex: 1,
-        explain: {
-          en: "The Nile flows north and reaches the Mediterranean through its delta.",
-          "zh-CN": "尼罗河向北流，经三角洲注入地中海。",
-        },
-      },
-    ],
-  },
+const CONTINENT_LABELS: Readonly<Record<ContinentKey, BilingualCopy>> = {
+  africa: ["Africa", "非洲"],
+  asia: ["Asia", "亚洲"],
+  europe: ["Europe", "欧洲"],
+  "europe-asia": ["Europe and Asia", "欧洲与亚洲"],
+  "north-america": ["North America", "北美洲"],
+  oceania: ["Oceania", "大洋洲"],
+  "south-america": ["South America", "南美洲"],
 };
+
+const CONTINENT_KEYS = Object.keys(CONTINENT_LABELS) as ContinentKey[];
+
+const COUNTRY_QUIZ_SEEDS = {
+  Argentina: {
+    label: ["Argentina", "阿根廷"],
+    capital: ["Buenos Aires", "布宜诺斯艾利斯"],
+    continent: "south-america",
+    feature: quizQuestion(
+      "argentina-andes",
+      ["Which mountain range follows Argentina's western edge?", "哪条山脉沿阿根廷西部边缘延伸？"],
+      [["The Andes", "安第斯山脉"], ["The Alps", "阿尔卑斯山脉"], ["The Himalayas", "喜马拉雅山脉"]],
+      0,
+      ["The Andes form much of Argentina's long border with Chile.", "安第斯山脉构成阿根廷与智利之间很长一段边界。"],
+    ),
+  },
+  Australia: {
+    label: ["Australia", "澳大利亚"],
+    capital: ["Canberra", "堪培拉"],
+    continent: "oceania",
+    feature: quizQuestion(
+      "australia-reef",
+      ["Which great reef system lies off northeastern Australia?", "澳大利亚东北海岸外分布着哪一大型珊瑚礁系统？"],
+      [["The Great Barrier Reef", "大堡礁"], ["The Red Sea Reef", "红海珊瑚礁"], ["The Belize Barrier Reef", "伯利兹堡礁"]],
+      0,
+      ["The Great Barrier Reef extends along the Queensland coast.", "大堡礁沿昆士兰海岸外侧延伸。"],
+    ),
+  },
+  Brazil: {
+    label: ["Brazil", "巴西"],
+    capital: ["Brasília", "巴西利亚"],
+    continent: "south-america",
+    feature: quizQuestion(
+      "brazil-basin",
+      ["Which vast river basin covers much of northern Brazil?", "哪个巨大的河流流域覆盖巴西北部大片地区？"],
+      [["The Amazon Basin", "亚马孙河流域"], ["The Danube Basin", "多瑙河流域"], ["The Nile Basin", "尼罗河流域"]],
+      0,
+      ["Most of the Amazon rainforest and river basin lies within Brazil.", "亚马孙雨林与流域的大部分位于巴西境内。"],
+    ),
+  },
+  Canada: {
+    label: ["Canada", "加拿大"],
+    capital: ["Ottawa", "渥太华"],
+    continent: "north-america",
+    feature: quizQuestion(
+      "canada-rockies",
+      ["Which major mountain range rises in western Canada?", "加拿大西部耸立着哪条主要山脉？"],
+      [["The Rocky Mountains", "落基山脉"], ["The Atlas Mountains", "阿特拉斯山脉"], ["The Urals", "乌拉尔山脉"]],
+      0,
+      ["The Canadian Rockies extend through Alberta and British Columbia.", "加拿大落基山脉延伸经过阿尔伯塔省和不列颠哥伦比亚省。"],
+    ),
+  },
+  China: {
+    label: ["China", "中国"],
+    capital: ["Beijing", "北京"],
+    continent: "asia",
+    feature: quizQuestion(
+      "china-river",
+      ["Which is the longest river in China?", "中国最长的河流是哪一条？"],
+      [["The Yellow River", "黄河"], ["The Pearl River", "珠江"], ["The Yangtze River", "长江"]],
+      2,
+      ["The Yangtze flows from the western highlands east into the sea.", "长江发源于西部高原，自西向东注入大海。"],
+    ),
+  },
+  Egypt: {
+    label: ["Egypt", "埃及"],
+    capital: ["Cairo", "开罗"],
+    continent: "africa",
+    feature: quizQuestion(
+      "egypt-nile",
+      ["Which direction does the Nile flow through Egypt?", "尼罗河在埃及境内向哪个方向流？"],
+      [["North to the Mediterranean", "向北流入地中海"], ["South into the desert", "向南流入沙漠"], ["East into the Red Sea", "向东流入红海"]],
+      0,
+      ["The Nile flows north and reaches the Mediterranean through its delta.", "尼罗河向北流，经三角洲注入地中海。"],
+    ),
+  },
+  France: {
+    label: ["France", "法国"],
+    capital: ["Paris", "巴黎"],
+    continent: "europe",
+    feature: quizQuestion(
+      "france-sea",
+      ["Southern France faces which sea?", "法国南部面向哪片海？"],
+      [["The Baltic Sea", "波罗的海"], ["The Mediterranean Sea", "地中海"], ["The Black Sea", "黑海"]],
+      1,
+      ["The southern coast, including Marseille, opens onto the Mediterranean.", "包括马赛在内的南部海岸都面向地中海。"],
+    ),
+  },
+  Germany: {
+    label: ["Germany", "德国"],
+    capital: ["Berlin", "柏林"],
+    continent: "europe",
+    feature: quizQuestion(
+      "germany-rhine",
+      ["Which major river flows through western Germany?", "哪条重要河流流经德国西部？"],
+      [["The Rhine", "莱茵河"], ["The Amazon", "亚马孙河"], ["The Ganges", "恒河"]],
+      0,
+      ["The Rhine is a major transport and industrial river in western Germany.", "莱茵河是德国西部重要的航运与工业河流。"],
+    ),
+  },
+  India: {
+    label: ["India", "印度"],
+    capital: ["New Delhi", "新德里"],
+    continent: "asia",
+    feature: quizQuestion(
+      "india-monsoon",
+      ["Which seasonal weather system strongly shapes India's rainfall?", "哪种季节性天气系统强烈影响印度降水？"],
+      [["The monsoon", "季风"], ["Polar night", "极夜"], ["Mediterranean mistral", "地中海密史脱拉风"]],
+      0,
+      ["The summer monsoon supplies much of India's annual rain.", "夏季风带来印度全年降水中的很大一部分。"],
+    ),
+  },
+  Indonesia: {
+    label: ["Indonesia", "印度尼西亚"],
+    capital: ["Jakarta", "雅加达"],
+    continent: "asia",
+    feature: quizQuestion(
+      "indonesia-islands",
+      ["What kind of country is Indonesia geographically?", "从地理上看，印度尼西亚属于哪种国家？"],
+      [["A large archipelago", "大型群岛国家"], ["A landlocked plateau", "内陆高原国家"], ["A single desert island", "单一沙漠岛屿"]],
+      0,
+      ["Indonesia is made up of thousands of islands between the Indian and Pacific oceans.", "印度尼西亚由印度洋与太平洋之间的数千座岛屿组成。"],
+    ),
+  },
+  Iran: {
+    label: ["Iran", "伊朗"],
+    capital: ["Tehran", "德黑兰"],
+    continent: "asia",
+    feature: quizQuestion(
+      "iran-zagros",
+      ["Which mountain range runs through western Iran?", "哪条山脉贯穿伊朗西部？"],
+      [["The Zagros Mountains", "扎格罗斯山脉"], ["The Andes", "安第斯山脉"], ["The Appalachians", "阿巴拉契亚山脉"]],
+      0,
+      ["The Zagros Mountains extend along much of western and southwestern Iran.", "扎格罗斯山脉沿伊朗西部和西南部大片地区延伸。"],
+    ),
+  },
+  Italy: {
+    label: ["Italy", "意大利"],
+    capital: ["Rome", "罗马"],
+    continent: "europe",
+    feature: quizQuestion(
+      "italy-shape",
+      ["The Italian peninsula is often said to look like what?", "意大利半岛的轮廓常被形容成什么？"],
+      [["A boot", "一只靴子"], ["A hat", "一顶帽子"], ["A fish", "一条鱼"]],
+      0,
+      ["Italy stretches into the Mediterranean in a shape like a boot.", "意大利伸入地中海，形状很像一只靴子。"],
+    ),
+  },
+  Japan: {
+    label: ["Japan", "日本"],
+    capital: ["Tokyo", "东京"],
+    continent: "asia",
+    feature: quizQuestion(
+      "japan-islands",
+      ["Japan is made up of what kind of land?", "日本的国土主要由什么构成？"],
+      [["A chain of islands", "一系列岛屿"], ["One single landmass", "一整块大陆"], ["A desert plateau", "一片沙漠高原"]],
+      0,
+      ["Japan has four main islands and many smaller ones.", "日本由四个主要岛屿和许多小岛组成。"],
+    ),
+  },
+  Mexico: {
+    label: ["Mexico", "墨西哥"],
+    capital: ["Mexico City", "墨西哥城"],
+    continent: "north-america",
+    feature: quizQuestion(
+      "mexico-yucatan",
+      ["Which peninsula contains the Maya site of Chichén Itzá?", "玛雅遗址奇琴伊察位于哪个半岛？"],
+      [["The Yucatán Peninsula", "尤卡坦半岛"], ["The Iberian Peninsula", "伊比利亚半岛"], ["The Korean Peninsula", "朝鲜半岛"]],
+      0,
+      ["Chichén Itzá stands on the Yucatán Peninsula in southeastern Mexico.", "奇琴伊察位于墨西哥东南部的尤卡坦半岛。"],
+    ),
+  },
+  Netherlands: {
+    label: ["The Netherlands", "荷兰"],
+    capital: ["Amsterdam", "阿姆斯特丹"],
+    continent: "europe",
+    feature: quizQuestion(
+      "netherlands-water",
+      ["What helps protect low-lying land in the Netherlands from water?", "什么设施帮助荷兰保护低洼土地免受水患？"],
+      [["Dikes and polders", "堤坝与圩田"], ["Desert dunes only", "只有沙漠沙丘"], ["Volcanic lava walls", "火山熔岩墙"]],
+      0,
+      ["Dikes, pumps and polders are central to Dutch water management.", "堤坝、排水设施与圩田是荷兰水利管理的重要组成部分。"],
+    ),
+  },
+  Russia: {
+    label: ["Russia", "俄罗斯"],
+    capital: ["Moscow", "莫斯科"],
+    continent: "europe-asia",
+    feature: quizQuestion(
+      "russia-span",
+      ["Russia stretches across which two continents?", "俄罗斯横跨哪两个大洲？"],
+      [["Europe and Asia", "欧洲与亚洲"], ["Africa and Asia", "非洲与亚洲"], ["North and South America", "北美洲与南美洲"]],
+      0,
+      ["The Ural Mountains are commonly used as part of the boundary between European and Asian Russia.", "乌拉尔山脉常被用作俄罗斯欧洲部分与亚洲部分的分界之一。"],
+    ),
+  },
+  "Saudi Arabia": {
+    label: ["Saudi Arabia", "沙特阿拉伯"],
+    capital: ["Riyadh", "利雅得"],
+    continent: "asia",
+    feature: quizQuestion(
+      "saudi-red-sea",
+      ["Which sea borders western Saudi Arabia?", "沙特阿拉伯西部濒临哪片海？"],
+      [["The Red Sea", "红海"], ["The Baltic Sea", "波罗的海"], ["The Caribbean Sea", "加勒比海"]],
+      0,
+      ["Saudi Arabia's western coast runs along the Red Sea.", "沙特阿拉伯西部海岸沿红海延伸。"],
+    ),
+  },
+  Singapore: {
+    label: ["Singapore", "新加坡"],
+    capital: ["Singapore", "新加坡"],
+    continent: "asia",
+    feature: quizQuestion(
+      "singapore-location",
+      ["Singapore lies just south of which peninsula?", "新加坡位于哪个半岛南端附近？"],
+      [["The Malay Peninsula", "马来半岛"], ["The Arabian Peninsula", "阿拉伯半岛"], ["The Scandinavian Peninsula", "斯堪的纳维亚半岛"]],
+      0,
+      ["The city-state sits beside the southern tip of the Malay Peninsula.", "这个城市国家位于马来半岛南端附近。"],
+    ),
+  },
+  "South Africa": {
+    label: ["South Africa", "南非"],
+    capital: ["Pretoria", "比勒陀利亚"],
+    continent: "africa",
+    feature: quizQuestion(
+      "south-africa-oceans",
+      ["Which two oceans meet around South Africa's long coastline?", "南非漫长海岸周围是哪两大洋？"],
+      [["The Atlantic and Indian oceans", "大西洋与印度洋"], ["The Pacific and Arctic oceans", "太平洋与北冰洋"], ["The Indian and Arctic oceans", "印度洋与北冰洋"]],
+      0,
+      ["South Africa faces the Atlantic to the west and the Indian Ocean to the east.", "南非西面面向大西洋，东面面向印度洋。"],
+    ),
+  },
+  "South Korea": {
+    label: ["South Korea", "韩国"],
+    capital: ["Seoul", "首尔"],
+    continent: "asia",
+    feature: quizQuestion(
+      "south-korea-peninsula",
+      ["South Korea occupies the southern part of which peninsula?", "韩国位于哪个半岛的南部？"],
+      [["The Korean Peninsula", "朝鲜半岛"], ["The Arabian Peninsula", "阿拉伯半岛"], ["The Iberian Peninsula", "伊比利亚半岛"]],
+      0,
+      ["South Korea occupies the southern portion of the Korean Peninsula.", "韩国位于朝鲜半岛南部。"],
+    ),
+  },
+  Spain: {
+    label: ["Spain", "西班牙"],
+    capital: ["Madrid", "马德里"],
+    continent: "europe",
+    feature: quizQuestion(
+      "spain-peninsula",
+      ["Spain shares which peninsula mainly with Portugal?", "西班牙与葡萄牙主要共同位于哪个半岛？"],
+      [["The Iberian Peninsula", "伊比利亚半岛"], ["The Balkan Peninsula", "巴尔干半岛"], ["The Kamchatka Peninsula", "堪察加半岛"]],
+      0,
+      ["Spain and Portugal occupy most of the Iberian Peninsula.", "西班牙与葡萄牙占据伊比利亚半岛的大部分地区。"],
+    ),
+  },
+  Switzerland: {
+    label: ["Switzerland", "瑞士"],
+    capital: ["Bern", "伯尔尼"],
+    continent: "europe",
+    feature: quizQuestion(
+      "switzerland-landlocked",
+      ["Which statement about Switzerland is correct?", "关于瑞士，哪项说法正确？"],
+      [["It is landlocked", "它是内陆国家"], ["It is a tropical island", "它是热带岛国"], ["It borders the Atlantic Ocean", "它濒临大西洋"]],
+      0,
+      ["Switzerland has no sea coast and is surrounded by European neighbours.", "瑞士没有海岸线，四周与欧洲邻国接壤。"],
+    ),
+  },
+  Thailand: {
+    label: ["Thailand", "泰国"],
+    capital: ["Bangkok", "曼谷"],
+    continent: "asia",
+    feature: quizQuestion(
+      "thailand-river",
+      ["Which river crosses Thailand's central plain and Bangkok?", "哪条河流经泰国中部平原和曼谷？"],
+      [["The Chao Phraya", "湄南河"], ["The Rhine", "莱茵河"], ["The Colorado", "科罗拉多河"]],
+      0,
+      ["The Chao Phraya and its delta form Thailand's central agricultural heartland.", "湄南河及其三角洲构成泰国中部重要农业区。"],
+    ),
+  },
+  Turkey: {
+    label: ["Turkey", "土耳其"],
+    capital: ["Ankara", "安卡拉"],
+    continent: "europe-asia",
+    feature: quizQuestion(
+      "turkey-bosporus",
+      ["Which strait divides the European and Asian sides of Istanbul?", "哪条海峡分隔伊斯坦布尔的欧洲部分与亚洲部分？"],
+      [["The Bosporus", "博斯普鲁斯海峡"], ["The Strait of Gibraltar", "直布罗陀海峡"], ["The Bering Strait", "白令海峡"]],
+      0,
+      ["The Bosporus links the Black Sea with the Sea of Marmara and divides the city between two continents.", "博斯普鲁斯海峡连接黑海与马尔马拉海，也把城市分处两洲。"],
+    ),
+  },
+  "United Arab Emirates": {
+    label: ["The United Arab Emirates", "阿联酋"],
+    capital: ["Abu Dhabi", "阿布扎比"],
+    continent: "asia",
+    feature: quizQuestion(
+      "uae-emirates",
+      ["How many emirates form the United Arab Emirates?", "阿联酋由多少个酋长国组成？"],
+      [["Five", "五个"], ["Seven", "七个"], ["Twelve", "十二个"]],
+      1,
+      ["The federation consists of seven emirates, including Abu Dhabi and Dubai.", "这个联邦由七个酋长国组成，包括阿布扎比与迪拜。"],
+    ),
+  },
+  "United Kingdom": {
+    label: ["The United Kingdom", "英国"],
+    capital: ["London", "伦敦"],
+    continent: "europe",
+    feature: quizQuestion(
+      "uk-parts",
+      ["Which four parts make up the United Kingdom?", "英国由哪四个部分组成？"],
+      [["England, Scotland, Wales and Northern Ireland", "英格兰、苏格兰、威尔士与北爱尔兰"], ["England, Ireland, France and Wales", "英格兰、爱尔兰、法国与威尔士"], ["Britain, Canada, Australia and India", "英国、加拿大、澳大利亚与印度"]],
+      0,
+      ["The United Kingdom combines England, Scotland, Wales and Northern Ireland.", "英国由英格兰、苏格兰、威尔士与北爱尔兰组成。"],
+    ),
+  },
+  "United States of America": {
+    label: ["The United States", "美国"],
+    capital: ["Washington, D.C.", "华盛顿哥伦比亚特区"],
+    continent: "north-america",
+    feature: quizQuestion(
+      "usa-oceans",
+      ["The mainland United States lies between which two oceans?", "美国本土位于哪两大洋之间？"],
+      [["The Atlantic and the Pacific", "大西洋和太平洋"], ["The Indian and the Pacific", "印度洋和太平洋"], ["The Atlantic and the Arctic", "大西洋和北冰洋"]],
+      0,
+      ["The Atlantic lies to the east and the Pacific to the west.", "东边是大西洋，西边是太平洋。"],
+    ),
+  },
+} satisfies Readonly<Record<TierACountryName, CountryQuizSeed>>;
+
+function insertCorrectOption(
+  correct: BilingualCopy,
+  distractors: readonly BilingualCopy[],
+  answerIndex: number,
+): readonly BilingualCopy[] {
+  const options = [...distractors.slice(0, 2)];
+  options.splice(answerIndex, 0, correct);
+  return options;
+}
+
+function buildCountryQuizBank(): Readonly<Record<TierACountryName, QuizSet>> {
+  const bank = {} as Record<TierACountryName, QuizSet>;
+  TIER_A_COUNTRY_NAMES.forEach((name, index) => {
+    const seed = COUNTRY_QUIZ_SEEDS[name];
+    const slug = name.toLowerCase().replaceAll(/[^a-z]+/g, "-");
+    const answerIndex = index % 3;
+    const capitalDistractors = [
+      COUNTRY_QUIZ_SEEDS[
+        TIER_A_COUNTRY_NAMES[(index + 7) % TIER_A_COUNTRY_NAMES.length]
+      ].capital,
+      COUNTRY_QUIZ_SEEDS[
+        TIER_A_COUNTRY_NAMES[(index + 17) % TIER_A_COUNTRY_NAMES.length]
+      ].capital,
+    ];
+    const otherContinents = CONTINENT_KEYS.filter(
+      (continent) => continent !== seed.continent,
+    );
+    const continentDistractors = [
+      CONTINENT_LABELS[otherContinents[index % otherContinents.length]],
+      CONTINENT_LABELS[
+        otherContinents[(index + 2) % otherContinents.length]
+      ],
+    ];
+    const questions = [
+      quizQuestion(
+        `${slug}-capital`,
+        [
+          `Which city serves as a capital or national seat of government for ${seed.label[0]}?`,
+          `哪座城市是${seed.label[1]}的首都或中央政府所在地？`,
+        ],
+        insertCorrectOption(seed.capital, capitalDistractors, answerIndex),
+        answerIndex,
+        [
+          `${seed.capital[0]} serves as a capital or national seat of government for ${seed.label[0]}.`,
+          `${seed.capital[1]}是${seed.label[1]}的首都或中央政府所在地。`,
+        ],
+      ),
+      quizQuestion(
+        `${slug}-continent`,
+        [
+          `On which continent or continents is ${seed.label[0]} located?`,
+          `${seed.label[1]}位于哪个大洲？`,
+        ],
+        insertCorrectOption(
+          CONTINENT_LABELS[seed.continent],
+          continentDistractors,
+          (answerIndex + 1) % 3,
+        ),
+        (answerIndex + 1) % 3,
+        [
+          `${seed.label[0]} is located in ${CONTINENT_LABELS[seed.continent][0]}.`,
+          `${seed.label[1]}位于${CONTINENT_LABELS[seed.continent][1]}。`,
+        ],
+      ),
+      seed.feature,
+    ];
+    bank[name] = {
+      id: `country:v${QUIZ_BANK_VERSION}:${name}`,
+      questions,
+    };
+  });
+  return bank;
+}
+
+/** Keyed by the world-atlas country name, matching CountryProfile.atlasName. */
+const COUNTRY_QUIZZES = buildCountryQuizBank();
 
 type BilingualCopy = readonly [en: string, zhCn: string];
 
@@ -247,7 +477,7 @@ function bilingual([en, zhCn]: BilingualCopy): LocalizedText {
   return { en, "zh-CN": zhCn };
 }
 
-function spotQuestion(
+function quizQuestion(
   id: string,
   prompt: BilingualCopy,
   options: readonly BilingualCopy[],
@@ -263,11 +493,51 @@ function spotQuestion(
   };
 }
 
+const spotQuestion = quizQuestion;
+
+const SPOT_KIND_LABELS: Readonly<
+  Record<PhotoSpotDefinition["kind"], BilingualCopy>
+> = {
+  wonder: ["World wonder", "世界奇观"],
+  landmark: ["Cultural landmark", "人文地标"],
+  natural: ["Natural sight", "自然名胜"],
+  historical: ["Historical reflection site", "历史反思地点"],
+};
+
 function spotQuiz(
   id: PhotoSpotId,
   questions: readonly QuizQuestion[],
 ): QuizSet {
-  return { id: `spot:${id}`, questions };
+  if (questions.length !== 2) {
+    throw new Error(`Spot quiz "${id}" must define two location questions.`);
+  }
+  const spot = PHOTO_SPOTS.find((candidate) => candidate.id === id);
+  if (!spot) {
+    throw new Error(`Spot quiz "${id}" has no matching photo spot.`);
+  }
+  const kinds = Object.keys(SPOT_KIND_LABELS) as PhotoSpotDefinition["kind"][];
+  const distractors = kinds.filter((kind) => kind !== spot.kind).slice(0, 2);
+  const answerIndex = kinds.indexOf(spot.kind) % 3;
+  const optionKinds = [...distractors];
+  optionKinds.splice(answerIndex, 0, spot.kind);
+  const kindLabel = SPOT_KIND_LABELS[spot.kind];
+  const kindQuestion = quizQuestion(
+    `${id}-kind`,
+    [
+      "How is this place classified in the travel collection?",
+      "这个地点在旅行图鉴中属于哪一类？",
+    ],
+    optionKinds.map((kind) => SPOT_KIND_LABELS[kind]),
+    answerIndex,
+    [
+      `The travel collection groups this place as a ${kindLabel[0].toLowerCase()}.`,
+      `旅行图鉴将这里归为“${kindLabel[1]}”。`,
+    ],
+  );
+  return {
+    id: `spot:v${QUIZ_BANK_VERSION}:${id}`,
+    questions: [...questions, kindQuestion],
+  };
 }
 
 /**
@@ -1227,7 +1497,9 @@ const SPOT_QUIZZES: Readonly<Record<PhotoSpotId, QuizSet>> = {
 };
 
 export function getCountryQuiz(atlasName: string | undefined): QuizSet | undefined {
-  return atlasName ? COUNTRY_QUIZZES[atlasName] : undefined;
+  return atlasName
+    ? COUNTRY_QUIZZES[atlasName as TierACountryName]
+    : undefined;
 }
 
 export function getSpotQuiz(spotId: PhotoSpotId | undefined): QuizSet | undefined {

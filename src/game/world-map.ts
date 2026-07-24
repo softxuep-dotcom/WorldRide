@@ -124,7 +124,7 @@ const contentCountryByAtlasId = new Map<string, CountryDefinition>(
   COUNTRY_ATLAS_BINDINGS.map(({ content, atlas }) => [atlas.id, content]),
 );
 
-const TIER_A_COUNTRIES = new Set([
+export const TIER_A_COUNTRY_NAMES = [
   "Argentina",
   "Australia",
   "Brazil",
@@ -152,7 +152,9 @@ const TIER_A_COUNTRIES = new Set([
   "United Arab Emirates",
   "United Kingdom",
   "United States of America",
-]);
+] as const;
+
+const TIER_A_COUNTRIES = new Set<string>(TIER_A_COUNTRY_NAMES);
 
 const TIER_C_COUNTRIES = new Set([
   "Albania",

@@ -80,7 +80,8 @@ export class GameAudio {
     const normalized = Math.min(1, speed / 6);
     const now = this.context.currentTime;
 
-    // Pitch and loudness rise with speed; idle stays quiet but audible.
+    // Pitch and loudness rise with speed. The car sits lower in the mix than
+    // the boat so its continuous engine does not mask discovery cues.
     const basePitch = state.vehicleMode === "car" ? 62 : 40;
     const pitchSpan = state.vehicleMode === "car" ? 74 : 40;
     this.engineOsc?.frequency.setTargetAtTime(
@@ -93,7 +94,11 @@ export class GameAudio {
       now,
       0.08,
     );
-    this.engineGain.gain.setTargetAtTime(0.05 + normalized * 0.14, now, 0.1);
+    const driveGain =
+      state.vehicleMode === "car"
+        ? 0.025 + normalized * 0.075
+        : 0.05 + normalized * 0.14;
+    this.engineGain.gain.setTargetAtTime(driveGain, now, 0.1);
     this.engineFilter?.frequency.setTargetAtTime(
       380 + normalized * 900,
       now,
@@ -162,7 +167,7 @@ export class GameAudio {
     const ctx = this.context;
 
     const engineGain = ctx.createGain();
-    engineGain.gain.value = 0.05;
+    engineGain.gain.value = 0.025;
     const filter = ctx.createBiquadFilter();
     filter.type = "lowpass";
     filter.frequency.value = 400;
