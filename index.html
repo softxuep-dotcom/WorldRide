@@ -130,6 +130,52 @@
           </footer>
         </article>
       </section>
+
+      <button id="quiz-button" class="quiz-button" type="button" hidden>
+        <span aria-hidden="true">🎯</span>
+        <span>
+          <small id="quiz-button-subject"></small>
+          <strong data-i18n="quiz.challenge">Knowledge challenge</strong>
+        </span>
+      </button>
+
+      <section
+        id="quiz-panel"
+        class="quiz-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quiz-subject"
+        aria-hidden="true"
+      >
+        <button
+          id="quiz-backdrop"
+          class="quiz-panel__backdrop"
+          type="button"
+          aria-label="Close the challenge"
+          data-i18n-attr="aria-label:quiz.close"
+        ></button>
+        <article class="quiz-panel__card">
+          <header>
+            <div>
+              <p id="quiz-progress" class="quiz-panel__progress"></p>
+              <h2 id="quiz-subject"></h2>
+            </div>
+            <button
+              id="quiz-close"
+              type="button"
+              aria-label="Close the challenge"
+              data-i18n-attr="aria-label:quiz.close"
+            >×</button>
+          </header>
+          <p id="quiz-prompt" class="quiz-panel__prompt"></p>
+          <div id="quiz-options" class="quiz-panel__options"></div>
+          <p id="quiz-feedback" class="quiz-panel__feedback" aria-live="polite" hidden></p>
+          <footer>
+            <button id="quiz-skip" type="button" class="quiz-panel__skip" data-i18n="quiz.leave">Leave</button>
+            <button id="quiz-next" type="button" class="quiz-panel__next" hidden></button>
+          </footer>
+        </article>
+      </section>
     </main>
 
     <script type="module" src="/src/main.ts"></script>

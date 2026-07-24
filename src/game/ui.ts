@@ -21,6 +21,17 @@ import {
   setLocale,
   t,
 } from "../i18n";
+import {
+  getCountryQuiz,
+  getSpotQuiz,
+  localizeText,
+  type QuizSet,
+} from "./quiz";
+
+interface QuizSubject {
+  quiz: QuizSet;
+  label: string;
+}
 
 interface UIElements {
   countryReveal: HTMLElement;
@@ -50,6 +61,18 @@ interface UIElements {
   landmarkDetailStatus: HTMLElement;
   landmarkDetailConfirm: HTMLButtonElement;
   languageSelect: HTMLSelectElement;
+  quizButton: HTMLButtonElement;
+  quizButtonSubject: HTMLElement;
+  quizPanel: HTMLElement;
+  quizBackdrop: HTMLButtonElement;
+  quizClose: HTMLButtonElement;
+  quizProgress: HTMLElement;
+  quizSubject: HTMLElement;
+  quizPrompt: HTMLElement;
+  quizOptions: HTMLElement;
+  quizFeedback: HTMLElement;
+  quizSkip: HTMLButtonElement;
+  quizNext: HTMLButtonElement;
 }
 
 export class GameUI {
@@ -65,6 +88,12 @@ export class GameUI {
   private currentNearestPhotoSpot?: PhotoSpotDefinition;
   private selectedPhotoSpotFirstCollection = false;
   private worldOverviewActive = false;
+  private availableQuiz?: QuizSubject;
+  private activeQuiz?: QuizSubject;
+  private quizIndex = 0;
+  private quizCorrect = 0;
+  private quizAnswered = false;
+  private readonly completedQuizzes = new Set<string>();
 
   constructor(onInteract: () => void, onToggleWorldView: () => void) {
     this.elements = {
@@ -95,6 +124,18 @@ export class GameUI {
       landmarkDetailStatus: requireElement("landmark-detail-status"),
       landmarkDetailConfirm: requireButton("landmark-detail-confirm"),
       languageSelect: requireSelect("language-select"),
+      quizButton: requireButton("quiz-button"),
+      quizButtonSubject: requireElement("quiz-button-subject"),
+      quizPanel: requireElement("quiz-panel"),
+      quizBackdrop: requireButton("quiz-backdrop"),
+      quizClose: requireButton("quiz-close"),
+      quizProgress: requireElement("quiz-progress"),
+      quizSubject: requireElement("quiz-subject"),
+      quizPrompt: requireElement("quiz-prompt"),
+      quizOptions: requireElement("quiz-options"),
+      quizFeedback: requireElement("quiz-feedback"),
+      quizSkip: requireButton("quiz-skip"),
+      quizNext: requireButton("quiz-next"),
     };
 
     this.buildLanguageSelector();
@@ -122,10 +163,17 @@ export class GameUI {
     this.elements.landmarkDetailConfirm.addEventListener("click", () =>
       this.toggleLandmarkDetail(false),
     );
+    this.elements.quizButton.addEventListener("click", () => this.openQuiz());
+    this.elements.quizBackdrop.addEventListener("click", () => this.closeQuiz());
+    this.elements.quizClose.addEventListener("click", () => this.closeQuiz());
+    this.elements.quizSkip.addEventListener("click", () => this.closeQuiz());
+    this.elements.quizNext.addEventListener("click", () => this.advanceQuiz());
+
     window.addEventListener("keydown", (event) => {
       if (event.code === "Escape") {
         this.toggleLandmarkDetail(false);
         this.togglePassport(false);
+        this.closeQuiz();
       }
     });
 
@@ -184,13 +232,177 @@ export class GameUI {
     this.elements.interactButton.disabled = !profile && !state.nearestPhotoSpot;
 
     if (nearestId && nearestId !== this.previousNearestPhotoSpot) {
+      const nearestSpot = state.nearestPhotoSpot!;
       this.showToast(
-        t("toast.discoveredSpot", {
-          name: localizePhotoSpot(state.nearestPhotoSpot!).name,
+        t(nearestSpot.visitMode === "reflection"
+          ? "toast.discoveredHistoricalSite"
+          : "toast.discoveredSpot", {
+          name: localizePhotoSpot(nearestSpot).name,
         }),
       );
     }
     this.previousNearestPhotoSpot = nearestId;
+    this.refreshQuizAvailability(profile, state.nearestPhotoSpot);
+  }
+
+  private refreshQuizAvailability(
+    profile: CountryProfile | undefined,
+    spot: PhotoSpotDefinition | undefined,
+  ): void {
+    let subject: QuizSubject | undefined;
+
+    const spotQuiz = getSpotQuiz(spot?.id);
+    if (spot && spotQuiz) {
+      subject = { quiz: spotQuiz, label: localizePhotoSpot(spot).name };
+    } else if (profile?.tier === "A") {
+      const countryQuiz = getCountryQuiz(profile.atlasName);
+      if (countryQuiz) {
+        subject = { quiz: countryQuiz, label: profile.name };
+      }
+    }
+
+    if (subject && this.completedQuizzes.has(subject.quiz.id)) {
+      subject = undefined;
+    }
+
+    this.availableQuiz = subject;
+
+    const hidden =
+      !subject || this.worldOverviewActive || Boolean(this.activeQuiz);
+    this.elements.quizButton.hidden = hidden;
+    if (subject) {
+      this.elements.quizButtonSubject.textContent = subject.label;
+    }
+  }
+
+  private openQuiz(): void {
+    if (!this.availableQuiz) {
+      return;
+    }
+    this.activeQuiz = this.availableQuiz;
+    this.quizIndex = 0;
+    this.quizCorrect = 0;
+    this.elements.quizButton.hidden = true;
+    this.elements.quizPanel.classList.add("is-visible");
+    this.elements.quizPanel.setAttribute("aria-hidden", "false");
+    this.renderQuizQuestion();
+  }
+
+  private closeQuiz(): void {
+    if (!this.activeQuiz) {
+      return;
+    }
+    this.activeQuiz = undefined;
+    this.elements.quizPanel.classList.remove("is-visible");
+    this.elements.quizPanel.setAttribute("aria-hidden", "true");
+  }
+
+  private renderQuizQuestion(): void {
+    const active = this.activeQuiz;
+    if (!active) {
+      return;
+    }
+
+    const locale = getLocale();
+    const question = active.quiz.questions[this.quizIndex];
+    this.quizAnswered = false;
+
+    this.elements.quizSubject.textContent = active.label;
+    this.elements.quizProgress.textContent = t("quiz.progress", {
+      current: this.quizIndex + 1,
+      total: active.quiz.questions.length,
+    });
+    this.elements.quizPrompt.textContent = localizeText(question.prompt, locale);
+    this.elements.quizFeedback.hidden = true;
+    this.elements.quizNext.hidden = true;
+    this.elements.quizSkip.hidden = false;
+
+    this.elements.quizOptions.replaceChildren();
+    question.options.forEach((option, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "quiz-option";
+      button.textContent = localizeText(option, locale);
+      button.addEventListener("click", () => this.answerQuiz(index));
+      this.elements.quizOptions.append(button);
+    });
+  }
+
+  private answerQuiz(index: number): void {
+    const active = this.activeQuiz;
+    if (!active || this.quizAnswered) {
+      return;
+    }
+    this.quizAnswered = true;
+
+    const locale = getLocale();
+    const question = active.quiz.questions[this.quizIndex];
+    const correct = index === question.answerIndex;
+    if (correct) {
+      this.quizCorrect += 1;
+    }
+
+    const buttons = [
+      ...this.elements.quizOptions.querySelectorAll<HTMLButtonElement>("button"),
+    ];
+    buttons.forEach((button, buttonIndex) => {
+      button.disabled = true;
+      if (buttonIndex === question.answerIndex) {
+        button.classList.add("is-correct");
+      } else if (buttonIndex === index) {
+        button.classList.add("is-wrong");
+      }
+    });
+
+    this.elements.quizFeedback.hidden = false;
+    this.elements.quizFeedback.classList.toggle("is-correct", correct);
+    this.elements.quizFeedback.classList.toggle("is-wrong", !correct);
+    this.elements.quizFeedback.textContent = `${
+      correct ? t("quiz.correct") : t("quiz.wrong")
+    } ${localizeText(question.explain, locale)}`;
+
+    const isLast = this.quizIndex >= active.quiz.questions.length - 1;
+    this.elements.quizNext.hidden = false;
+    this.elements.quizNext.textContent = isLast
+      ? t("quiz.finish")
+      : t("quiz.next");
+  }
+
+  private advanceQuiz(): void {
+    const active = this.activeQuiz;
+    if (!active) {
+      return;
+    }
+
+    if (this.quizIndex < active.quiz.questions.length - 1) {
+      this.quizIndex += 1;
+      this.renderQuizQuestion();
+      return;
+    }
+
+    this.finishQuiz(active);
+  }
+
+  private finishQuiz(active: QuizSubject): void {
+    const total = active.quiz.questions.length;
+    const perfect = this.quizCorrect === total;
+    this.completedQuizzes.add(active.quiz.id);
+
+    this.elements.quizOptions.replaceChildren();
+    this.elements.quizPrompt.textContent = perfect
+      ? t("quiz.perfect", { subject: active.label })
+      : t("quiz.result", { correct: this.quizCorrect, total });
+    this.elements.quizProgress.textContent = "";
+    this.elements.quizFeedback.hidden = true;
+    this.elements.quizNext.hidden = true;
+    this.elements.quizSkip.hidden = false;
+    this.elements.quizSkip.textContent = t("action.done");
+
+    this.showToast(t("quiz.completedToast", { subject: active.label }));
+    window.setTimeout(() => {
+      this.elements.quizSkip.textContent = t("quiz.leave");
+      this.closeQuiz();
+    }, 1800);
   }
 
   handleEvent(event: GameEvent): void {
@@ -283,6 +495,7 @@ export class GameUI {
     this.selectedPhotoSpot = undefined;
     this.selectedCountry = country;
     this.elements.landmarkDetail.classList.add("is-country-detail");
+    this.elements.landmarkDetail.classList.remove("is-reflection");
     this.elements.landmarkDetailKind.textContent = "";
     this.elements.landmarkDetailName.textContent = country.name;
     this.elements.landmarkDetailCountry.textContent = "";
@@ -297,9 +510,11 @@ export class GameUI {
   }
 
   private capturePostcard(spot: PhotoSpotDefinition, firstCollection: boolean): void {
-    this.elements.flash.classList.remove("is-active");
-    void this.elements.flash.offsetWidth;
-    this.elements.flash.classList.add("is-active");
+    if (spot.visitMode !== "reflection") {
+      this.elements.flash.classList.remove("is-active");
+      void this.elements.flash.offsetWidth;
+      this.elements.flash.classList.add("is-active");
+    }
 
     this.showLandmarkDetail(spot, firstCollection);
   }
@@ -320,22 +535,27 @@ export class GameUI {
       landmark: t("landmark.kind.landmark"),
       natural: t("landmark.kind.natural"),
       wonder: t("landmark.kind.wonder"),
+      historical: t("landmark.kind.historical"),
     };
+    const isReflection = spot.visitMode === "reflection";
     this.selectedCountry = undefined;
     this.selectedPhotoSpot = spot;
     this.selectedPhotoSpotFirstCollection = firstCollection;
     this.elements.landmarkDetail.classList.remove("is-country-detail");
+    this.elements.landmarkDetail.classList.toggle("is-reflection", isReflection);
     this.elements.landmarkDetailKind.textContent = kindLabels[spot.kind];
     this.elements.landmarkDetailName.textContent = localizedSpot.name;
     this.elements.landmarkDetailCountry.textContent =
-      `${countryFlag} ${countryName} · ${t("landmark.travelSelection")}`;
+      `${countryFlag} ${countryName} · ${t(isReflection
+        ? "landmark.reflectionSelection"
+        : "landmark.travelSelection")}`;
     this.elements.landmarkDetailIntro.textContent = localizedSpot.postcard;
     this.elements.landmarkDetailDescription.textContent =
       localizedSpot.description;
     this.elements.landmarkDetailFact.textContent = localizedSpot.fact;
-    this.elements.landmarkDetailStatus.textContent = firstCollection
-      ? t("landmark.added")
-      : t("landmark.alreadyAdded");
+    this.elements.landmarkDetailStatus.textContent = isReflection
+      ? t(firstCollection ? "landmark.recorded" : "landmark.alreadyRecorded")
+      : t(firstCollection ? "landmark.added" : "landmark.alreadyAdded");
     this.elements.landmarkDetailConfirm.textContent = firstCollection
       ? t("action.done")
       : t("action.backToJourney");

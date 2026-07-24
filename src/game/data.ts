@@ -86,12 +86,25 @@ export type PhotoSpotId =
   | "grand-canyon"
   | "mount-everest"
   | "niagara-falls"
-  | "easter-island-moai";
+  | "easter-island-moai"
+  | "pompeii"
+  | "burj-khalifa"
+  | "sagrada-familia"
+  | "leaning-tower-of-pisa"
+  | "stonehenge"
+  | "golden-gate-bridge"
+  | "uluru"
+  | "grand-prismatic-spring"
+  | "victoria-falls"
+  | "great-barrier-reef"
+  | "pointe-du-hoc"
+  | "hiroshima-peace-memorial";
 
 export interface PhotoSpotDefinition {
   id: PhotoSpotId;
   name: string;
-  kind: "wonder" | "landmark" | "natural";
+  kind: "wonder" | "landmark" | "natural" | "historical";
+  visitMode?: "photo" | "reflection";
   atlasCountryName: string;
   accent?: number;
   point: GeoPoint;
@@ -112,9 +125,20 @@ export const MAP_CENTER = {
   latitude: 0,
 } as const;
 
-export const MAP_SCALE = {
+const BASE_MAP_SCALE = {
   x: 0.84,
   z: 0.62,
+} as const;
+
+/**
+ * Gameplay distance multiplier layered over the geographic projection.
+ * Keep landmark and vehicle model sizes unchanged while giving travel more room.
+ */
+export const WORLD_TRAVEL_SCALE = 2;
+
+export const MAP_SCALE = {
+  x: BASE_MAP_SCALE.x * WORLD_TRAVEL_SCALE,
+  z: BASE_MAP_SCALE.z * WORLD_TRAVEL_SCALE,
 } as const;
 
 export const COUNTRIES: readonly CountryDefinition[] = [
@@ -1001,6 +1025,152 @@ export const PHOTO_SPOTS: readonly PhotoSpotDefinition[] = [
     description:
       "阿胡汤加里基位于复活节岛东南海岸，十五尊摩艾石像在长石台上面向岛内排列。巨大的头部、突出的眉鼻和修长躯干形成统一而各有差异的剪影，背后是火山草地与太平洋。",
     fact: "阿胡汤加里基是复活节岛规模最大的修复石台，现有十五尊重新竖立的摩艾石像。",
+  },
+  {
+    id: "pompeii",
+    name: "庞贝古城",
+    kind: "wonder",
+    atlasCountryName: "Italy",
+    accent: 0x9d664d,
+    point: [14.4849, 40.7497],
+    postcard: "维苏威火山脚下重新显露的古罗马街城",
+    description:
+      "庞贝坐落在意大利坎帕尼亚平原，石铺街道、广场、柱廊和住宅遗迹保留了古罗马城市的空间结构。远处的维苏威火山提醒人们，这座城市曾在公元79年的喷发中被火山物质掩埋，后来又经考古工作逐步重见天日。",
+    fact: "遗址保存了道路、公共建筑与日常生活空间，为认识古罗马城市生活提供了罕见而完整的材料。",
+  },
+  {
+    id: "burj-khalifa",
+    name: "哈利法塔",
+    kind: "landmark",
+    atlasCountryName: "United Arab Emirates",
+    accent: 0x73a9bd,
+    point: [55.2744, 25.1972],
+    postcard: "迪拜天际线中逐级收束的银色高塔",
+    description:
+      "哈利法塔从三翼形基座向上生长，塔身通过一连串退台逐渐收窄，最后连接细长尖塔。周围低矮建筑与水池衬托出它的垂直尺度，也让这座现代工程地标不只是地图上的一根银色针。",
+    fact: "哈利法塔高828米；三翼形平面与逐级退台共同帮助高塔应对结构和风力要求。",
+  },
+  {
+    id: "sagrada-familia",
+    name: "圣家堂",
+    kind: "landmark",
+    atlasCountryName: "Spain",
+    accent: 0xb8885f,
+    point: [2.1744, 41.4036],
+    postcard: "巴塞罗那街区上方成簇升起的有机尖塔",
+    description:
+      "圣家堂以密集的尖塔群、雕塑般的立面和近似自然生长的几何结构构成独特轮廓。低处的教堂主体像山体基座，塔身则由粗到细向天空收束，使它在巴塞罗那规整街区上方格外醒目。",
+    fact: "教堂于1882年奠基，安东尼·高迪此后长期主持设计，把结构、光线与自然形态结合在一起。",
+  },
+  {
+    id: "leaning-tower-of-pisa",
+    name: "比萨斜塔",
+    kind: "landmark",
+    atlasCountryName: "Italy",
+    accent: 0xc8ad79,
+    point: [10.3966, 43.7229],
+    postcard: "奇迹广场草坪上明显倾斜的白色钟塔",
+    description:
+      "比萨斜塔是一座多层圆形钟楼，层层柱廊围绕塔身展开。它与主教座堂、洗礼堂和墓园共同组成奇迹广场；倾斜的塔轴与平直的周边建筑形成一眼可辨的对比。",
+    fact: "钟塔在施工期间就因地基土层承载不均而开始倾斜，后来的工程长期致力于稳定塔体。",
+  },
+  {
+    id: "stonehenge",
+    name: "巨石阵",
+    kind: "wonder",
+    atlasCountryName: "United Kingdom",
+    accent: 0x827c69,
+    point: [-1.8262, 51.1789],
+    postcard: "索尔兹伯里平原上由立石与横梁组成的石环",
+    description:
+      "巨石阵由大小不同的立石、横梁和内外环形结构组成。最具辨识度的三石门由两块竖石承托一块横石，残缺与完整结构交错排列，显示这处史前遗址曾经过多个阶段的建设与改变。",
+    fact: "主体石圈大约在公元前2500年形成，部分巨石从很远的地区运到这里。",
+  },
+  {
+    id: "golden-gate-bridge",
+    name: "金门大桥",
+    kind: "landmark",
+    atlasCountryName: "United States of America",
+    accent: 0xd85b42,
+    point: [-122.4783, 37.8199],
+    postcard: "橙红色悬索桥跨越多雾的金门海峡",
+    description:
+      "金门大桥以两座高耸桥塔支撑主缆和垂直吊索，细长桥面跨过太平洋与旧金山湾之间的海峡。国际橙色涂装在蓝灰色海水、山体和雾气之间保持清晰轮廓。",
+    fact: "大桥于1937年开放，主跨约1280米；国际橙色兼顾周边景观与海雾中的可见度。",
+  },
+  {
+    id: "uluru",
+    name: "乌鲁鲁",
+    kind: "natural",
+    atlasCountryName: "Australia",
+    accent: 0xb95638,
+    point: [131.0369, -25.3444],
+    postcard: "澳大利亚中部荒原上孤立延展的红色巨岩",
+    description:
+      "乌鲁鲁从平坦的红土荒原中整体升起，长而低的岩体、陡峭侧壁和侵蚀形成的沟槽使它不同于普通锥形山峰。这里是阿南古人的重要文化景观，旅行体验以观察地貌、聆听文化故事和尊重当地规则为核心。",
+    fact: "乌鲁鲁—卡塔丘塔国家公园由阿南古人与澳大利亚公园管理机构共同管理，乌鲁鲁的文化意义与自然地貌不可分割。",
+  },
+  {
+    id: "grand-prismatic-spring",
+    name: "黄石·大棱镜温泉",
+    kind: "natural",
+    atlasCountryName: "United States of America",
+    accent: 0x2a9fc0,
+    point: [-110.8382, 44.5251],
+    postcard: "蒸汽中铺开的蓝、黄、橙色同心温泉",
+    description:
+      "大棱镜温泉像一只巨大的彩色眼睛嵌在黄石高原：深蓝色中心向外过渡为黄色与橙色微生物带，热水沿浅色矿物地表流散。俯视时，同心色带与升腾蒸汽构成最清晰的识别特征。",
+    fact: "大棱镜温泉是黄石国家公园最大的温泉，直径约61至91米，颜色变化与水温和微生物群落有关。",
+  },
+  {
+    id: "victoria-falls",
+    name: "维多利亚瀑布",
+    kind: "natural",
+    atlasCountryName: "Zimbabwe",
+    accent: 0x429cb5,
+    point: [25.8572, -17.9243],
+    postcard: "赞比西河从漫长断崖跌入狭窄玄武岩峡谷",
+    description:
+      "宽阔的赞比西河抵达赞比亚与津巴布韦边界后，沿近乎笔直的长断崖同时跌落。水流进入狭窄深槽，巨大水雾从峡谷升起，随后河道在一系列之字形玄武岩峡谷中转向。",
+    fact: "当地名称“莫西奥图尼亚”常被译作“雷鸣之烟”，描述了瀑布的轰鸣与远处可见的水雾。",
+  },
+  {
+    id: "great-barrier-reef",
+    name: "大堡礁",
+    kind: "natural",
+    atlasCountryName: "Australia",
+    accent: 0x28a9aa,
+    point: [148.8708, -20.2078],
+    postcard: "昆士兰近海浅蓝水域中的礁盘、珊瑚与小岛",
+    description:
+      "大堡礁沿澳大利亚东北海岸外侧延伸，由大量珊瑚礁、沙洲、岛屿和深浅不同的海水组成。这个打卡点以圣灵群岛附近浅海为视觉锚点，用青绿礁盘、深蓝水道与局部珊瑚层次表现海洋景观。",
+    fact: "大堡礁是世界上规模最大的珊瑚礁生态系统，由数千处独立礁体和数百座岛屿共同构成。",
+  },
+  {
+    id: "pointe-du-hoc",
+    name: "诺曼底登陆遗址·奥克角",
+    kind: "historical",
+    visitMode: "reflection",
+    atlasCountryName: "France",
+    accent: 0x66756c,
+    point: [-0.9873, 49.3969],
+    postcard: "诺曼底海蚀悬崖上的碉堡、弹坑与纪念碑",
+    description:
+      "奥克角伸入英吉利海峡，陡峭悬崖上仍保留混凝土工事和起伏的弹坑地貌。1944年6月6日，美国陆军游骑兵从崖下登陆并攀上高地；今天这里以遗址、纪念碑和安静的海岸景观讲述诺曼底登陆的历史。",
+    fact: "奥克角游骑兵纪念碑建在一处德军混凝土观察阵地上，纪念参与这次行动的游骑兵。",
+  },
+  {
+    id: "hiroshima-peace-memorial",
+    name: "广岛和平纪念碑",
+    kind: "historical",
+    visitMode: "reflection",
+    atlasCountryName: "Japan",
+    accent: 0x71827a,
+    point: [132.4536, 34.3955],
+    postcard: "元安川畔保留下来的砖墙与钢架圆顶",
+    description:
+      "广岛和平纪念碑又称原爆圆顶馆。1945年8月6日原子弹在附近上空爆炸，建筑中心部分仍以残损砖墙和裸露钢架圆顶留存。今天它与和平纪念公园共同提醒人们认识战争后果，并思考和平的价值。",
+    fact: "这座建筑于1915年建成，爆心约在其东南方160米处；遗址后来被保存为追念遇难者和祈愿和平的象征。",
   },
 ];
 

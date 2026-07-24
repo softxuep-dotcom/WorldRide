@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import {
   MAP_BOUNDS,
   MAP_SCALE,
@@ -18,6 +20,11 @@ import {
   isGeoPointInWorldCountry,
   type WorldCountry,
 } from "./world-map";
+import { PropBatcher, type PropArchetypeId } from "./prop-kit";
+import { createDetailedLandmarkModel } from "./landmark-models";
+
+const landmarkModelLoader = new GLTFLoader();
+landmarkModelLoader.setMeshoptDecoder(MeshoptDecoder);
 
 interface VehicleView {
   root: THREE.Group;
@@ -41,6 +48,7 @@ interface LandmarkEffect {
   anchorZ: number;
   phase: number;
   reveal: number;
+  quiet: boolean;
 }
 
 const shared = {
@@ -78,6 +86,7 @@ export class WorldView {
   readonly vehicle: VehicleView;
   private readonly wavelets: THREE.Mesh[] = [];
   private readonly landmarkEffects: LandmarkEffect[] = [];
+  private readonly props = new PropBatcher();
   private modeBlend = 0;
 
   constructor() {
@@ -87,8 +96,15 @@ export class WorldView {
     this.addCountries();
     this.addGeographyFeatures();
     this.addOceanDetails();
+    this.flushProps();
     this.vehicle = this.createVehicle();
     this.root.add(this.vehicle.root);
+  }
+
+  private flushProps(): void {
+    for (const mesh of this.props.build()) {
+      this.root.add(mesh);
+    }
   }
 
   update(
@@ -140,35 +156,54 @@ export class WorldView {
         (targetReveal - effect.reveal) * (1 - Math.exp(-4.8 * delta));
 
       const visible = acquire > 0.002;
+      const quietFactor = effect.quiet ? 0.34 : 1;
       const pulse = 0.5 + 0.5 * Math.sin(elapsed * 1.35 + effect.phase);
       effect.outerRing.visible = visible;
       effect.innerRing.visible = visible;
-      effect.scanArc.visible = visible;
-      effect.lightField.visible = visible;
+      effect.scanArc.visible = visible && !effect.quiet;
+      effect.lightField.visible = visible && !effect.quiet;
       effect.marker.visible = visible;
 
       effect.outerRing.scale.setScalar(1.08 - effect.reveal * 0.08 + pulse * 0.015);
       effect.outerRing.rotation.z = elapsed * 0.08 + effect.phase;
-      effect.outerRingMaterial.opacity = acquire * (0.1 + focus * 0.16);
+      effect.outerRingMaterial.opacity =
+        acquire * (0.1 + focus * 0.16) * quietFactor;
 
       effect.innerRing.scale.setScalar(0.82 + effect.reveal * 0.18);
       effect.innerRing.rotation.z = -elapsed * 0.16 - effect.phase;
-      effect.innerRingMaterial.opacity = effect.reveal * (0.07 + focus * 0.13);
+      effect.innerRingMaterial.opacity =
+        effect.reveal * (0.07 + focus * 0.13) * quietFactor;
 
       effect.scanArc.rotation.z = -elapsed * (0.54 + focus * 0.24) + effect.phase;
-      effect.scanArcMaterial.opacity = effect.reveal * (0.1 + focus * 0.28);
+      effect.scanArcMaterial.opacity = effect.quiet
+        ? 0
+        : effect.reveal * (0.1 + focus * 0.28);
 
       effect.lightField.scale.y = 0.72 + effect.reveal * 0.28;
-      effect.lightFieldMaterial.opacity = effect.reveal * (0.018 + focus * 0.052);
+      effect.lightFieldMaterial.opacity = effect.quiet
+        ? 0
+        : effect.reveal * (0.018 + focus * 0.052);
 
       effect.marker.position.y =
         2.54 - effect.reveal * 0.24 +
-        Math.sin(elapsed * 1.35 + effect.phase) * (0.045 + acquire * 0.035);
-      effect.marker.rotation.y = elapsed * 0.42 + effect.phase;
-      effect.marker.rotation.z = Math.sin(elapsed * 0.55 + effect.phase) * 0.08;
-      effect.marker.scale.setScalar(0.58 + acquire * 0.24 + focus * 0.14);
-      effect.markerMaterial.emissiveIntensity = 0.12 + focus * 0.5;
-      effect.markerMaterial.opacity = 0.52 + acquire * 0.48;
+        Math.sin(elapsed * (effect.quiet ? 0.55 : 1.35) + effect.phase) *
+          (effect.quiet ? 0.018 : 0.045 + acquire * 0.035);
+      effect.marker.rotation.y =
+        elapsed * (effect.quiet ? 0.08 : 0.42) + effect.phase;
+      effect.marker.rotation.z = effect.quiet
+        ? 0
+        : Math.sin(elapsed * 0.55 + effect.phase) * 0.08;
+      effect.marker.scale.setScalar(
+        effect.quiet
+          ? 0.52 + acquire * 0.12
+          : 0.58 + acquire * 0.24 + focus * 0.14,
+      );
+      effect.markerMaterial.emissiveIntensity = effect.quiet
+        ? 0.05 + focus * 0.08
+        : 0.12 + focus * 0.5;
+      effect.markerMaterial.opacity = effect.quiet
+        ? 0.4 + acquire * 0.32
+        : 0.52 + acquire * 0.48;
     }
   }
 
@@ -405,6 +440,11 @@ export class WorldView {
         this.addTreeCluster(world.x, world.z, size, country, atlas, random);
       } else if (country.scenery === "highland" && choice < 0.82) {
         this.addMeadowPatch(world.x, world.z, size, false);
+      } else if (
+        isEuropeanSceneryPoint(country, point) &&
+        choice < 0.99
+      ) {
+        this.addEuropeanBackgroundDetail(world.x, world.z, size, country);
       } else {
         this.addBuilding(world.x, world.z, size, country);
       }
@@ -452,7 +492,11 @@ export class WorldView {
       flatShading: true,
     });
 
-    if (spot.id === "gibraltar-strait") {
+    const detailedLandmark = createDetailedLandmarkModel(spot.id);
+    if (detailedLandmark) {
+      detailedLandmark.position.y = 0.14;
+      group.add(detailedLandmark);
+    } else if (spot.id === "gibraltar-strait") {
       const europeanCliff = new THREE.Mesh(
         new THREE.DodecahedronGeometry(0.52, 0),
         shared.greenMaterial,
@@ -507,6 +551,9 @@ export class WorldView {
       top.position.y = 1.2;
       group.add(lintel, top);
     } else if (spot.id === "colosseum") {
+      const modelRoot = new THREE.Group();
+      modelRoot.name = "Colosseum model";
+      modelRoot.position.y = 0.14;
       const arena = new THREE.Mesh(
         new THREE.CylinderGeometry(0.7, 0.8, 0.58, 12, 1, true),
         baseMaterial,
@@ -519,7 +566,13 @@ export class WorldView {
       );
       inner.rotation.x = Math.PI / 2;
       inner.position.y = 0.68;
-      group.add(arena, inner);
+      for (const mesh of [arena, inner]) {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+      }
+      modelRoot.add(arena, inner);
+      group.add(modelRoot);
+      this.replaceColosseumFallback(modelRoot);
     } else if (spot.id === "acropolis") {
       for (let index = 0; index < 4; index += 1) {
         const column = new THREE.Mesh(
@@ -659,7 +712,7 @@ export class WorldView {
         accentMaterial,
       )
     ) {
-      // The first expansion batch uses dedicated silhouettes below.
+      // Expansion landmarks use dedicated low-poly silhouettes below.
     } else {
       for (let index = 0; index < 4; index += 1) {
         const block = new THREE.Mesh(
@@ -679,9 +732,75 @@ export class WorldView {
         child.receiveShadow = true;
       }
     }
-    this.addLandmarkPresentation(group, accent, world);
+    this.addLandmarkPresentation(group, spot, accent, world);
     group.scale.setScalar(1.08);
     this.root.add(group);
+  }
+
+  private replaceColosseumFallback(modelRoot: THREE.Group): void {
+    landmarkModelLoader.load(
+      "assets/models/colosseum.glb",
+      ({ scene }) => {
+        scene.name = "Colosseum CC0 model";
+        scene.rotation.y = -0.24;
+
+        const initialBounds = new THREE.Box3().setFromObject(scene);
+        const initialSize = initialBounds.getSize(new THREE.Vector3());
+        const horizontalScale = 1.95 / Math.max(initialSize.x, initialSize.z);
+        scene.scale.set(horizontalScale, horizontalScale * 1.42, horizontalScale);
+        scene.updateMatrixWorld(true);
+
+        const fittedBounds = new THREE.Box3().setFromObject(scene);
+        const fittedCenter = fittedBounds.getCenter(new THREE.Vector3());
+        scene.position.set(
+          -fittedCenter.x,
+          -fittedBounds.min.y,
+          -fittedCenter.z,
+        );
+
+        scene.traverse((child) => {
+          if (!(child instanceof THREE.Mesh)) {
+            return;
+          }
+
+          child.castShadow = true;
+          child.receiveShadow = true;
+          const materials = Array.isArray(child.material)
+            ? child.material
+            : [child.material];
+          child.material = materials.map((material) => {
+            const fittedMaterial = material.clone();
+            if (fittedMaterial instanceof THREE.MeshStandardMaterial) {
+              fittedMaterial.color.set(0xd8bd8d);
+              fittedMaterial.roughness = 0.9;
+            }
+            return fittedMaterial;
+          });
+          if (child.material.length === 1) {
+            child.material = child.material[0];
+          }
+        });
+
+        modelRoot.traverse((child) => {
+          if (!(child instanceof THREE.Mesh)) {
+            return;
+          }
+          child.geometry.dispose();
+          const materials = Array.isArray(child.material)
+            ? child.material
+            : [child.material];
+          for (const material of materials) {
+            material.dispose();
+          }
+        });
+        modelRoot.clear();
+        modelRoot.add(scene);
+      },
+      undefined,
+      (error) => {
+        console.warn("Unable to load the CC0 Colosseum model; keeping fallback.", error);
+      },
+    );
   }
 
   private addWorldLandmarkModel(
@@ -715,6 +834,22 @@ export class WorldView {
     });
     const vegetationMaterial = new THREE.MeshStandardMaterial({
       color: 0x5e8060,
+      roughness: 0.96,
+      flatShading: true,
+    });
+    const paleStoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd8c7a4,
+      roughness: 0.9,
+      flatShading: true,
+    });
+    const silverMaterial = new THREE.MeshStandardMaterial({
+      color: 0x9eb6bf,
+      roughness: 0.38,
+      metalness: 0.34,
+      flatShading: true,
+    });
+    const brickMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8b5949,
       roughness: 0.96,
       flatShading: true,
     });
@@ -1090,6 +1225,628 @@ export class WorldView {
         }
         return true;
       }
+      case "pompeii": {
+        const road = new THREE.Mesh(
+          new THREE.BoxGeometry(0.34, 0.05, 1.65),
+          stoneMaterial,
+        );
+        road.position.set(0, 0.08, -0.12);
+        group.add(road);
+
+        const volcano = new THREE.Mesh(
+          new THREE.ConeGeometry(0.72, 1.28, 7),
+          redRockMaterial,
+        );
+        volcano.position.set(0.82, 0.64, 0.62);
+        volcano.rotation.z = -0.08;
+        const crater = new THREE.Mesh(
+          new THREE.TorusGeometry(0.19, 0.055, 5, 9),
+          darkMaterial,
+        );
+        crater.rotation.x = Math.PI / 2;
+        crater.position.set(0.82, 1.29, 0.62);
+        group.add(volcano, crater);
+
+        for (const side of [-1, 1]) {
+          for (let index = 0; index < 3; index += 1) {
+            const wall = new THREE.Mesh(
+              new THREE.BoxGeometry(0.48, 0.24 + (index % 2) * 0.16, 0.1),
+              index === 1 ? brickMaterial : paleStoneMaterial,
+            );
+            wall.position.set(
+              side * 0.53,
+              0.16 + (index % 2) * 0.08,
+              -0.62 + index * 0.46,
+            );
+            wall.rotation.y = side * 0.12;
+            group.add(wall);
+          }
+        }
+        for (const x of [-0.2, 0.2]) {
+          const column = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.055, 0.07, 0.64, 7),
+            paleStoneMaterial,
+          );
+          column.position.set(x, 0.38, -0.58);
+          group.add(column);
+        }
+        const forumLintel = new THREE.Mesh(
+          new THREE.BoxGeometry(0.58, 0.1, 0.12),
+          paleStoneMaterial,
+        );
+        forumLintel.position.set(0, 0.72, -0.58);
+        group.add(forumLintel);
+        return true;
+      }
+      case "burj-khalifa": {
+        for (let wing = 0; wing < 3; wing += 1) {
+          const baseWing = new THREE.Mesh(
+            new THREE.BoxGeometry(0.92, 0.18, 0.25),
+            silverMaterial,
+          );
+          baseWing.position.y = 0.12;
+          baseWing.rotation.y = wing * (Math.PI * 2) / 3;
+          group.add(baseWing);
+        }
+
+        let lowerY = 0.2;
+        const tierHeights = [0.38, 0.34, 0.3, 0.27, 0.23, 0.2, 0.17];
+        for (const [index, height] of tierHeights.entries()) {
+          const radius = 0.5 - index * 0.055;
+          const tier = new THREE.Mesh(
+            new THREE.CylinderGeometry(radius * 0.7, radius, height, 6),
+            index % 3 === 1 ? accentMaterial : silverMaterial,
+          );
+          tier.position.set(
+            ((index % 3) - 1) * 0.035,
+            lowerY + height / 2,
+            index % 2 === 0 ? 0.02 : -0.02,
+          );
+          tier.rotation.y = Math.PI / 6;
+          group.add(tier);
+          lowerY += height * 0.88;
+        }
+        const spire = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.018, 0.09, 0.74, 6),
+          silverMaterial,
+        );
+        spire.position.y = lowerY + 0.3;
+        group.add(spire);
+        return true;
+      }
+      case "sagrada-familia": {
+        const nave = new THREE.Mesh(
+          new THREE.BoxGeometry(1.32, 0.58, 0.86),
+          paleStoneMaterial,
+        );
+        nave.position.y = 0.32;
+        const roof = new THREE.Mesh(
+          new THREE.ConeGeometry(0.66, 0.44, 4),
+          stoneMaterial,
+        );
+        roof.scale.z = 0.68;
+        roof.rotation.y = Math.PI / 4;
+        roof.position.y = 0.82;
+        group.add(nave, roof);
+
+        const towerSpecs = [
+          [-0.5, -0.32, 1.2],
+          [-0.18, -0.4, 1.54],
+          [0.18, -0.4, 1.54],
+          [0.5, -0.32, 1.2],
+          [-0.31, 0.3, 1.32],
+          [0.31, 0.3, 1.32],
+        ] as const;
+        for (const [index, [x, z, height]] of towerSpecs.entries()) {
+          const tower = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.08, 0.15, height, 8),
+            index % 2 === 0 ? paleStoneMaterial : accentMaterial,
+          );
+          tower.position.set(x, 0.38 + height / 2, z);
+          const finial = new THREE.Mesh(
+            new THREE.ConeGeometry(0.13, 0.34, 8),
+            index % 3 === 0 ? accentMaterial : paleStoneMaterial,
+          );
+          finial.position.set(x, 0.55 + height, z);
+          group.add(tower, finial);
+        }
+        const centralTower = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.08, 0.18, 1.32, 8),
+          paleStoneMaterial,
+        );
+        centralTower.position.set(0, 1.22, 0.08);
+        const centralFinial = new THREE.Mesh(
+          new THREE.ConeGeometry(0.16, 0.42, 8),
+          accentMaterial,
+        );
+        centralFinial.position.set(0, 2.08, 0.08);
+        group.add(centralTower, centralFinial);
+        return true;
+      }
+      case "leaning-tower-of-pisa": {
+        const lawn = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.96, 1.02, 0.06, 12),
+          vegetationMaterial,
+        );
+        lawn.position.y = 0.07;
+        group.add(lawn);
+
+        const cathedral = new THREE.Mesh(
+          new THREE.BoxGeometry(0.9, 0.46, 0.54),
+          paleStoneMaterial,
+        );
+        cathedral.position.set(-0.58, 0.31, 0.3);
+        const cathedralRoof = new THREE.Mesh(
+          new THREE.ConeGeometry(0.43, 0.34, 4),
+          stoneMaterial,
+        );
+        cathedralRoof.scale.z = 0.64;
+        cathedralRoof.rotation.y = Math.PI / 4;
+        cathedralRoof.position.set(-0.58, 0.7, 0.3);
+        group.add(cathedral, cathedralRoof);
+
+        const towerGroup = new THREE.Group();
+        towerGroup.position.set(0.38, 0.16, -0.08);
+        towerGroup.rotation.z = -0.18;
+        const towerBase = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.28, 0.3, 0.22, 14),
+          paleStoneMaterial,
+        );
+        towerBase.position.y = 0.11;
+        towerGroup.add(towerBase);
+        for (let level = 0; level < 6; level += 1) {
+          const drum = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.24, 0.26, 0.19, 14),
+            level % 2 === 0 ? paleStoneMaterial : baseMaterial,
+          );
+          drum.position.y = 0.31 + level * 0.2;
+          const arcade = new THREE.Mesh(
+            new THREE.TorusGeometry(0.25, 0.025, 5, 18),
+            stoneMaterial,
+          );
+          arcade.rotation.x = Math.PI / 2;
+          arcade.position.y = 0.4 + level * 0.2;
+          towerGroup.add(drum, arcade);
+        }
+        const bellCrown = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.2, 0.24, 0.24, 14),
+          accentMaterial,
+        );
+        bellCrown.position.y = 1.49;
+        towerGroup.add(bellCrown);
+        towerGroup.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        group.add(towerGroup);
+        return true;
+      }
+      case "stonehenge": {
+        const earthwork = new THREE.Mesh(
+          new THREE.RingGeometry(0.82, 1.03, 32),
+          vegetationMaterial,
+        );
+        earthwork.rotation.x = -Math.PI / 2;
+        earthwork.position.y = 0.06;
+        group.add(earthwork);
+
+        for (let index = 0; index < 8; index += 1) {
+          const angle = (index / 8) * Math.PI * 2;
+          const centerX = Math.cos(angle) * 0.62;
+          const centerZ = Math.sin(angle) * 0.62;
+          const tangentX = -Math.sin(angle);
+          const tangentZ = Math.cos(angle);
+          const height = 0.56 + (index % 3) * 0.08;
+          for (const side of [-1, 1]) {
+            const upright = new THREE.Mesh(
+              new THREE.BoxGeometry(0.16, height, 0.18),
+              index % 2 === 0 ? stoneMaterial : paleStoneMaterial,
+            );
+            upright.position.set(
+              centerX + tangentX * side * 0.14,
+              height / 2,
+              centerZ + tangentZ * side * 0.14,
+            );
+            upright.rotation.y = -angle;
+            upright.rotation.z = side * 0.025;
+            group.add(upright);
+          }
+          if (index !== 2 && index !== 6) {
+            const lintel = new THREE.Mesh(
+              new THREE.BoxGeometry(0.46, 0.14, 0.2),
+              stoneMaterial,
+            );
+            lintel.position.set(centerX, height + 0.03, centerZ);
+            lintel.rotation.y = -angle;
+            group.add(lintel);
+          }
+        }
+        for (const [x, z, rotation] of [
+          [-0.22, 0.02, -0.12],
+          [0.24, -0.1, 0.08],
+        ] as const) {
+          const innerStone = new THREE.Mesh(
+            new THREE.BoxGeometry(0.2, 0.94, 0.24),
+            darkMaterial,
+          );
+          innerStone.position.set(x, 0.47, z);
+          innerStone.rotation.z = rotation;
+          group.add(innerStone);
+        }
+        return true;
+      }
+      case "golden-gate-bridge": {
+        const strait = new THREE.Mesh(
+          new THREE.BoxGeometry(2.5, 0.06, 0.76),
+          waterMaterial,
+        );
+        strait.position.y = 0.04;
+        const deck = new THREE.Mesh(
+          new THREE.BoxGeometry(2.35, 0.12, 0.38),
+          accentMaterial,
+        );
+        deck.position.y = 0.62;
+        group.add(strait, deck);
+
+        for (const towerX of [-0.68, 0.68]) {
+          for (const towerZ of [-0.22, 0.22]) {
+            const leg = new THREE.Mesh(
+              new THREE.BoxGeometry(0.13, 1.46, 0.13),
+              accentMaterial,
+            );
+            leg.position.set(towerX, 1.04, towerZ);
+            group.add(leg);
+          }
+          for (const y of [0.82, 1.34, 1.68]) {
+            const crossbeam = new THREE.Mesh(
+              new THREE.BoxGeometry(0.18, 0.1, 0.58),
+              accentMaterial,
+            );
+            crossbeam.position.set(towerX, y, 0);
+            group.add(crossbeam);
+          }
+        }
+
+        for (const cableZ of [-0.27, 0.27]) {
+          const cableCurve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(-1.2, 1.36, cableZ),
+            new THREE.Vector3(-0.68, 1.72, cableZ),
+            new THREE.Vector3(0, 0.9, cableZ),
+            new THREE.Vector3(0.68, 1.72, cableZ),
+            new THREE.Vector3(1.2, 1.36, cableZ),
+          ]);
+          const cable = new THREE.Mesh(
+            new THREE.TubeGeometry(cableCurve, 40, 0.025, 5, false),
+            accentMaterial,
+          );
+          group.add(cable);
+          for (const x of [-0.95, -0.42, 0, 0.42, 0.95]) {
+            const cableHeight =
+              Math.abs(x) > 0.68
+                ? 1.42
+                : 0.9 + Math.pow(Math.abs(x) / 0.68, 2) * 0.74;
+            const suspender = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.012, 0.012, cableHeight - 0.67, 5),
+              accentMaterial,
+            );
+            suspender.position.set(x, 0.67 + (cableHeight - 0.67) / 2, cableZ);
+            group.add(suspender);
+          }
+        }
+        return true;
+      }
+      case "uluru": {
+        const desert = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.04, 1.12, 0.08, 12),
+          shared.sandMaterial,
+        );
+        desert.position.y = 0.06;
+        const rock = new THREE.Mesh(
+          new THREE.DodecahedronGeometry(0.78, 1),
+          redRockMaterial,
+        );
+        rock.scale.set(1.28, 0.58, 0.72);
+        rock.position.set(0, 0.54, 0);
+        rock.rotation.y = -0.16;
+        const sunFace = new THREE.Mesh(
+          new THREE.DodecahedronGeometry(0.54, 0),
+          accentMaterial,
+        );
+        sunFace.scale.set(1.35, 0.42, 0.48);
+        sunFace.position.set(-0.2, 0.63, -0.32);
+        sunFace.rotation.y = -0.16;
+        group.add(desert, rock, sunFace);
+        for (const [x, z] of [
+          [-0.78, 0.5],
+          [0.72, -0.42],
+          [0.2, 0.68],
+        ] as const) {
+          const scrub = new THREE.Mesh(shared.grassGeometry, shared.oliveMaterial);
+          scrub.scale.set(1.5, 0.65, 1.5);
+          scrub.position.set(x, 0.16, z);
+          group.add(scrub);
+        }
+        return true;
+      }
+      case "grand-prismatic-spring": {
+        const thermalGround = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.04, 1.1, 0.08, 18),
+          paleStoneMaterial,
+        );
+        thermalGround.position.y = 0.06;
+        group.add(thermalGround);
+        for (const [radius, y, color] of [
+          [0.86, 0.12, 0xd66736],
+          [0.68, 0.15, 0xe7b33f],
+          [0.46, 0.18, 0x35b8cb],
+          [0.27, 0.21, 0x176fa0],
+        ] as const) {
+          const poolBand = new THREE.Mesh(
+            new THREE.CylinderGeometry(radius, radius * 1.02, 0.045, 24),
+            new THREE.MeshStandardMaterial({
+              color,
+              roughness: 0.34,
+              transparent: true,
+              opacity: 0.92,
+              flatShading: true,
+            }),
+          );
+          poolBand.position.y = y;
+          group.add(poolBand);
+        }
+        for (const [x, z, scale] of [
+          [-0.25, 0, 0.28],
+          [0.18, 0.12, 0.34],
+          [0.02, -0.18, 0.24],
+        ] as const) {
+          const steam = new THREE.Mesh(
+            new THREE.SphereGeometry(0.3, 7, 5),
+            new THREE.MeshBasicMaterial({
+              color: 0xf2fbf7,
+              transparent: true,
+              opacity: 0.3,
+              depthWrite: false,
+            }),
+          );
+          steam.scale.set(1.4, 0.65, 1);
+          steam.position.set(x, 0.55 + scale, z);
+          group.add(steam);
+        }
+        return true;
+      }
+      case "victoria-falls": {
+        const upperRiver = new THREE.Mesh(
+          new THREE.BoxGeometry(1.82, 0.08, 0.92),
+          waterMaterial,
+        );
+        upperRiver.position.set(0, 1.05, -0.42);
+        const fallCurtain = new THREE.Mesh(
+          new THREE.BoxGeometry(1.88, 0.92, 0.1),
+          waterMaterial,
+        );
+        fallCurtain.position.set(0, 0.62, 0.02);
+        group.add(upperRiver, fallCurtain);
+
+        for (const side of [-1, 1]) {
+          const basalt = new THREE.Mesh(
+            new THREE.BoxGeometry(0.26, 0.94, 1.26),
+            darkMaterial,
+          );
+          basalt.position.set(side * 1.0, 0.52, 0.02);
+          group.add(basalt);
+        }
+        const gorge = new THREE.Mesh(
+          new THREE.BoxGeometry(0.24, 0.06, 1.22),
+          waterMaterial,
+        );
+        gorge.position.set(0.38, 0.12, 0.52);
+        gorge.rotation.y = -0.52;
+        group.add(gorge);
+        for (const x of [-0.65, -0.2, 0.24, 0.68]) {
+          const mist = new THREE.Mesh(
+            new THREE.SphereGeometry(0.34, 7, 5),
+            new THREE.MeshBasicMaterial({
+              color: 0xf1fdff,
+              transparent: true,
+              opacity: 0.4,
+              depthWrite: false,
+            }),
+          );
+          mist.scale.set(1.2, 0.56, 0.8);
+          mist.position.set(x, 0.28 + (Math.abs(x) % 0.2), 0.25);
+          group.add(mist);
+        }
+        return true;
+      }
+      case "great-barrier-reef": {
+        const deepWater = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.08, 1.14, 0.08, 14),
+          new THREE.MeshStandardMaterial({
+            color: 0x247f9b,
+            roughness: 0.3,
+            transparent: true,
+            opacity: 0.9,
+            flatShading: true,
+          }),
+        );
+        deepWater.position.y = 0.06;
+        group.add(deepWater);
+
+        for (const [x, z, scale, color] of [
+          [-0.5, -0.18, 0.66, 0x4ec8bd],
+          [0.28, 0.24, 0.78, 0x6bd4c0],
+          [0.64, -0.36, 0.4, 0x36b7b4],
+          [-0.08, -0.54, 0.42, 0x7fd7b8],
+        ] as const) {
+          const reefShelf = new THREE.Mesh(
+            new THREE.CylinderGeometry(scale, scale * 1.06, 0.055, 7),
+            new THREE.MeshStandardMaterial({
+              color,
+              roughness: 0.52,
+              transparent: true,
+              opacity: 0.88,
+              flatShading: true,
+            }),
+          );
+          reefShelf.scale.z = 0.52;
+          reefShelf.position.set(x, 0.13, z);
+          reefShelf.rotation.y = x * 0.5;
+          group.add(reefShelf);
+        }
+        const coralColors = [0xf17c68, 0xf1bb5b, 0x8a71b8, 0x3e9d86];
+        for (let index = 0; index < 12; index += 1) {
+          const angle = index * 2.2;
+          const radius = 0.22 + (index % 4) * 0.15;
+          const coral = new THREE.Mesh(
+            index % 3 === 0
+              ? new THREE.DodecahedronGeometry(0.11, 0)
+              : new THREE.ConeGeometry(0.08, 0.26 + (index % 2) * 0.09, 6),
+            new THREE.MeshStandardMaterial({
+              color: coralColors[index % coralColors.length],
+              roughness: 0.82,
+              flatShading: true,
+            }),
+          );
+          coral.position.set(
+            Math.cos(angle) * radius,
+            0.28,
+            Math.sin(angle) * radius * 0.72,
+          );
+          group.add(coral);
+        }
+        const cay = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.24, 0.28, 0.08, 8),
+          shared.sandLightMaterial,
+        );
+        cay.scale.z = 0.58;
+        cay.position.set(-0.66, 0.2, 0.4);
+        group.add(cay);
+        return true;
+      }
+      case "pointe-du-hoc": {
+        const cliff = new THREE.Mesh(
+          new THREE.BoxGeometry(1.9, 0.42, 1.35),
+          darkMaterial,
+        );
+        cliff.position.set(0, 0.22, 0.08);
+        const grassTop = new THREE.Mesh(
+          new THREE.BoxGeometry(1.82, 0.08, 1.23),
+          vegetationMaterial,
+        );
+        grassTop.position.set(0, 0.47, 0.02);
+        group.add(cliff, grassTop);
+
+        for (const [x, z, radius] of [
+          [-0.64, -0.18, 0.2],
+          [-0.2, 0.34, 0.16],
+          [0.34, -0.32, 0.22],
+          [0.72, 0.28, 0.14],
+        ] as const) {
+          const crater = new THREE.Mesh(
+            new THREE.TorusGeometry(radius, 0.045, 5, 12),
+            stoneMaterial,
+          );
+          crater.rotation.x = Math.PI / 2;
+          crater.position.set(x, 0.54, z);
+          group.add(crater);
+        }
+        for (const [x, z, rotation] of [
+          [-0.5, 0.08, 0.2],
+          [0.5, 0.34, -0.32],
+        ] as const) {
+          const bunker = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.32, 0.4, 0.28, 7),
+            stoneMaterial,
+          );
+          bunker.position.set(x, 0.65, z);
+          bunker.rotation.y = rotation;
+          const aperture = new THREE.Mesh(
+            new THREE.BoxGeometry(0.34, 0.1, 0.08),
+            darkMaterial,
+          );
+          aperture.position.set(x, 0.69, z - 0.25);
+          aperture.rotation.y = rotation;
+          group.add(bunker, aperture);
+        }
+        const memorialBase = new THREE.Mesh(
+          new THREE.BoxGeometry(0.32, 0.2, 0.32),
+          paleStoneMaterial,
+        );
+        memorialBase.position.set(0.08, 0.62, -0.02);
+        const memorial = new THREE.Mesh(
+          new THREE.ConeGeometry(0.17, 0.98, 4),
+          paleStoneMaterial,
+        );
+        memorial.position.set(0.08, 1.19, -0.02);
+        memorial.rotation.y = Math.PI / 4;
+        group.add(memorialBase, memorial);
+        return true;
+      }
+      case "hiroshima-peace-memorial": {
+        const river = new THREE.Mesh(
+          new THREE.BoxGeometry(0.36, 0.05, 1.9),
+          waterMaterial,
+        );
+        river.position.set(-0.9, 0.06, 0);
+        river.rotation.y = -0.12;
+        group.add(river);
+
+        const floor = new THREE.Mesh(
+          new THREE.BoxGeometry(1.28, 0.14, 0.82),
+          stoneMaterial,
+        );
+        floor.position.set(0.16, 0.12, 0);
+        group.add(floor);
+        for (const [x, z, width, height] of [
+          [-0.32, 0.26, 0.18, 0.86],
+          [0.48, 0.24, 0.2, 0.68],
+          [0.12, 0.34, 0.72, 0.38],
+          [-0.1, -0.28, 0.86, 0.46],
+        ] as const) {
+          const wall = new THREE.Mesh(
+            new THREE.BoxGeometry(width, height, 0.15),
+            brickMaterial,
+          );
+          wall.position.set(x, 0.2 + height / 2, z);
+          group.add(wall);
+        }
+        const domeDrum = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.34, 0.38, 0.3, 10),
+          brickMaterial,
+        );
+        domeDrum.position.set(0.08, 0.92, 0.02);
+        const domeFrame = new THREE.Mesh(
+          new THREE.SphereGeometry(
+            0.36,
+            10,
+            5,
+            0,
+            Math.PI * 2,
+            0,
+            Math.PI / 2,
+          ),
+          new THREE.MeshStandardMaterial({
+            color: 0x4d5652,
+            roughness: 0.72,
+            metalness: 0.22,
+            wireframe: true,
+          }),
+        );
+        domeFrame.position.set(0.08, 1.07, 0.02);
+        group.add(domeDrum, domeFrame);
+        for (const x of [-0.34, 0.5]) {
+          const brokenColumn = new THREE.Mesh(
+            new THREE.BoxGeometry(0.13, 0.56, 0.13),
+            brickMaterial,
+          );
+          brokenColumn.position.set(x, 0.48, -0.26);
+          brokenColumn.rotation.z = x < 0 ? -0.05 : 0.04;
+          group.add(brokenColumn);
+        }
+        return true;
+      }
       default:
         return false;
     }
@@ -1097,11 +1854,14 @@ export class WorldView {
 
   private addLandmarkPresentation(
     group: THREE.Group,
+    spot: PhotoSpotDefinition,
     accent: THREE.ColorRepresentation,
     world: { x: number; z: number },
   ): void {
+    const quiet = spot.visitMode === "reflection";
+    const reef = spot.id === "great-barrier-reef";
     const platformMaterial = new THREE.MeshStandardMaterial({
-      color: 0x5f796d,
+      color: reef ? 0x2c879a : quiet ? 0x59645f : 0x5f796d,
       roughness: 0.96,
       flatShading: true,
     });
@@ -1116,7 +1876,7 @@ export class WorldView {
     const inset = new THREE.Mesh(
       new THREE.CylinderGeometry(1.02, 1.08, 0.08, 12),
       new THREE.MeshStandardMaterial({
-        color: 0xf0ddae,
+        color: reef ? 0x72d0cb : quiet ? 0xc5c3b7 : 0xf0ddae,
         roughness: 0.9,
         flatShading: true,
       }),
@@ -1221,6 +1981,7 @@ export class WorldView {
       anchorZ: world.z,
       phase: this.landmarkEffects.length * 0.83,
       reveal: 0,
+      quiet,
     });
   }
 
@@ -1616,70 +2377,13 @@ export class WorldView {
   }
 
   private addTree(x: number, z: number, size: number, country: CountryDefinition): void {
-    const group = new THREE.Group();
-    const trunk = new THREE.Mesh(shared.trunkGeometry, shared.trunkMaterial);
-    trunk.position.y = 0.28 * size;
-    trunk.scale.setScalar(size);
-    group.add(trunk);
-
-    if (country.scenery === "sahara" || country.scenery === "atlas") {
-      trunk.position.y = 0.44 * size;
-      trunk.scale.set(size * 0.78, size * 1.55, size * 0.78);
-      for (const [index, offset] of [
-        [0, 0],
-        [-0.23, 0.03],
-        [0.23, -0.03],
-      ].entries()) {
-        const crown = new THREE.Mesh(shared.groundPatchGeometry, shared.darkGreenMaterial);
-        crown.position.set(offset[0] * size, (0.93 + index * 0.04) * size, offset[1] * size);
-        crown.scale.set(size * 1.05, size * 0.38, size * 0.8);
-        group.add(crown);
-      }
-    } else if (country.scenery === "highland") {
-      const lowerCrown = new THREE.Mesh(shared.palmGeometry, shared.darkGreenMaterial);
-      lowerCrown.position.y = 0.72 * size;
-      lowerCrown.scale.set(size * 1.05, size * 1.05, size * 1.05);
-      const upperCrown = new THREE.Mesh(shared.palmGeometry, shared.greenMaterial);
-      upperCrown.position.y = 1.02 * size;
-      upperCrown.scale.set(size * 0.72, size * 0.82, size * 0.72);
-      group.add(lowerCrown, upperCrown);
-    } else if (country.scenery === "tropical" || country.scenery === "monsoon") {
-      const mainCrown = new THREE.Mesh(shared.treeGeometry, shared.jungleMaterial);
-      mainCrown.position.y = 0.8 * size;
-      mainCrown.scale.set(size * 1.1, size * 0.92, size * 1.05);
-      const leftTrunk = new THREE.Mesh(shared.trunkGeometry, shared.trunkMaterial);
-      leftTrunk.position.set(-0.31 * size, 0.22 * size, 0.08 * size);
-      leftTrunk.scale.setScalar(size * 0.72);
-      const rightTrunk = new THREE.Mesh(shared.trunkGeometry, shared.trunkMaterial);
-      rightTrunk.position.set(0.3 * size, 0.23 * size, -0.07 * size);
-      rightTrunk.scale.setScalar(size * 0.76);
-      const leftCrown = new THREE.Mesh(shared.groundPatchGeometry, shared.greenMaterial);
-      leftCrown.position.set(-0.31 * size, 0.62 * size, 0.08 * size);
-      leftCrown.scale.setScalar(size * 1.08);
-      const rightCrown = new THREE.Mesh(shared.groundPatchGeometry, shared.grassLightMaterial);
-      rightCrown.position.set(0.3 * size, 0.65 * size, -0.07 * size);
-      rightCrown.scale.setScalar(size * 0.94);
-      group.add(mainCrown, leftTrunk, rightTrunk, leftCrown, rightCrown);
-    } else {
-      const foliageMaterial =
-        country.scenery === "mediterranean" ? shared.oliveMaterial : shared.greenMaterial;
-      const crown = new THREE.Mesh(shared.treeGeometry, foliageMaterial);
-      crown.position.y = 0.78 * size;
-      crown.scale.set(
-        size * (country.scenery === "mediterranean" ? 1.15 : 1),
-        size * (country.scenery === "mediterranean" ? 0.72 : 1),
-        size,
-      );
-      group.add(crown);
-    }
-
-    for (const child of group.children) {
-      if (child instanceof THREE.Mesh) {
-        child.castShadow = true;
-      }
-    }
-    group.position.set(x, 0.445, z);
-    this.root.add(group);
+    this.props.place(treeArchetypeFor(country.scenery), {
+      x,
+      z,
+      y: 0.445,
+      size,
+      rotationY: propRotation(x, z),
+    });
   }
 
   private addTreeCluster(
@@ -1724,29 +2428,32 @@ export class WorldView {
   }
 
   private addBuilding(x: number, z: number, size: number, country: CountryDefinition): void {
-    const group = new THREE.Group();
-    const building = new THREE.Mesh(
-      shared.buildingGeometry,
-      country.scenery === "sahara" || country.scenery === "atlas"
-        ? shared.whiteMaterial
-        : shared.whiteMaterial,
-    );
-    building.scale.set(size, size * (0.8 + size * 0.45), size);
-    building.position.y = 0.28 * building.scale.y;
-    building.castShadow = true;
-    group.add(building);
+    this.props.place(buildingArchetypeFor(country.scenery), {
+      x,
+      z,
+      y: 0.445,
+      size,
+      rotationY: propRotation(x, z),
+    });
+  }
 
-    if (country.scenery !== "sahara" && country.scenery !== "atlas") {
-      const roof = new THREE.Mesh(shared.roofGeometry, shared.roofMaterial);
-      roof.scale.setScalar(size);
-      roof.rotation.y = Math.PI / 4;
-      roof.position.y = building.position.y * 2 + 0.15 * size;
-      roof.castShadow = true;
-      group.add(roof);
+  private addEuropeanBackgroundDetail(
+    x: number,
+    z: number,
+    size: number,
+    country: CountryDefinition,
+  ): void {
+    if (country.scenery === "highland" || country.scenery === "atlas") {
+      this.addMountain(x, z, size * 0.82, 0x7f806f);
+      return;
     }
 
-    group.position.set(x, 0.445, z);
-    this.root.add(group);
+    this.addMeadowPatch(
+      x,
+      z,
+      size,
+      country.scenery === "green" || country.scenery === "atlantic",
+    );
   }
 
   private addFieldPatch(
@@ -1818,47 +2525,35 @@ export class WorldView {
   }
 
   private addDune(x: number, z: number, size: number): void {
-    const group = new THREE.Group();
+    const baseRotation = x * 0.09 + z * 0.13;
     for (let index = 0; index < 3; index += 1) {
-      const dune = new THREE.Mesh(
-        shared.duneGeometry,
-        index === 1 ? shared.sandLightMaterial : shared.sandMaterial,
-      );
-      dune.scale.set(
-        size * (0.78 + index * 0.18),
-        size * (0.2 + index * 0.035),
-        size * (0.42 + (2 - index) * 0.08),
-      );
-      dune.position.set((index - 1) * 0.38 * size, index * 0.025, (index % 2) * 0.3 * size);
-      dune.castShadow = true;
-      group.add(dune);
+      this.props.place("dune", {
+        x: x + (index - 1) * 0.38 * size,
+        z: z + (index % 2) * 0.3 * size,
+        y: 0.44 + index * 0.025,
+        size: size * (0.82 + index * 0.14),
+        rotationY: baseRotation + index * 0.35,
+      });
     }
-    group.position.set(x, 0.44, z);
-    group.rotation.y = x * 0.09 + z * 0.13;
-    this.root.add(group);
   }
 
   private addDesertRock(x: number, z: number, size: number): void {
-    const group = new THREE.Group();
-    for (let index = 0; index < 2; index += 1) {
-      const rock = new THREE.Mesh(shared.rockGeometry, shared.desertRockMaterial);
-      const rockSize = size * (0.48 + index * 0.2);
-      rock.scale.set(rockSize, rockSize * (0.7 + index * 0.25), rockSize * 0.82);
-      rock.position.set((index - 0.5) * 0.42 * size, 0.16 * size, index * 0.12 * size);
-      rock.rotation.y = index * 0.9 + x;
-      rock.castShadow = true;
-      group.add(rock);
-    }
-    group.position.set(x, 0.445, z);
-    this.root.add(group);
+    this.props.place("rock", {
+      x,
+      z,
+      y: 0.445,
+      size,
+      rotationY: propRotation(x, z),
+    });
   }
 
   private addMountain(x: number, z: number, size: number, color: number): void {
     const mountain = new THREE.Mesh(
-      new THREE.ConeGeometry(0.6 * size, 1.4 * size, 5),
-      new THREE.MeshStandardMaterial({ color, roughness: 1 }),
+      sharedMountainGeometry(),
+      sharedMountainMaterial(color),
     );
     mountain.position.set(x, 0.44 + 0.7 * size, z);
+    mountain.scale.setScalar(size);
     mountain.rotation.y = x + z;
     mountain.castShadow = true;
     this.root.add(mountain);
@@ -1874,6 +2569,62 @@ export class WorldView {
     patch.castShadow = true;
     this.root.add(patch);
   }
+}
+
+type Scenery = CountryDefinition["scenery"];
+
+const TREE_ARCHETYPES: Record<Scenery, PropArchetypeId> = {
+  atlantic: "broadleaf",
+  green: "broadleaf",
+  mediterranean: "cypress",
+  highland: "pine",
+  atlas: "acacia",
+  sahara: "acacia",
+  monsoon: "palm",
+  tropical: "palm",
+};
+
+const BUILDING_ARCHETYPES: Record<Scenery, PropArchetypeId> = {
+  atlantic: "townhouse",
+  green: "townhouse",
+  mediterranean: "villa",
+  highland: "chalet",
+  atlas: "adobe",
+  sahara: "adobe",
+  monsoon: "villa",
+  tropical: "villa",
+};
+
+function treeArchetypeFor(scenery: Scenery): PropArchetypeId {
+  return TREE_ARCHETYPES[scenery];
+}
+
+function buildingArchetypeFor(scenery: Scenery): PropArchetypeId {
+  return BUILDING_ARCHETYPES[scenery];
+}
+
+function propRotation(x: number, z: number): number {
+  const value = Math.sin(x * 91.7 + z * 47.3) * 43758.5453;
+  return (value - Math.floor(value)) * Math.PI * 2;
+}
+
+let mountainGeometry: THREE.ConeGeometry | undefined;
+const mountainMaterials = new Map<number, THREE.MeshStandardMaterial>();
+
+function sharedMountainGeometry(): THREE.ConeGeometry {
+  if (!mountainGeometry) {
+    mountainGeometry = new THREE.ConeGeometry(0.6, 1.4, 5);
+  }
+  return mountainGeometry;
+}
+
+function sharedMountainMaterial(color: number): THREE.MeshStandardMaterial {
+  let material = mountainMaterials.get(color);
+  if (!material) {
+    material = new THREE.MeshStandardMaterial({ color, roughness: 1 });
+    mountainMaterials.set(color, material);
+  }
+  return material;
 }
 
 type Rgb = readonly [red: number, green: number, blue: number];
@@ -2235,6 +2986,41 @@ function isDesertPoint(country: CountryDefinition, point: GeoPoint): boolean {
   const desertLatitude =
     country.id === "morocco" ? 31.7 : country.id === "tunisia" ? 34.0 : 34.5;
   return point[1] < desertLatitude;
+}
+
+const EUROPEAN_SCENERY_COUNTRY_IDS: ReadonlySet<CountryDefinition["id"]> =
+  new Set([
+    "portugal",
+    "spain",
+    "france",
+    "united-kingdom",
+    "germany",
+    "italy",
+    "greece",
+    "netherlands",
+    "switzerland",
+    "austria",
+    "poland",
+    "norway",
+  ]);
+
+function isEuropeanSceneryPoint(
+  country: CountryDefinition,
+  point: GeoPoint,
+): boolean {
+  if (EUROPEAN_SCENERY_COUNTRY_IDS.has(country.id)) {
+    return true;
+  }
+
+  if (country.id === "russia") {
+    return point[0] < 45;
+  }
+
+  if (country.id === "turkey") {
+    return point[0] < 29.8 && point[1] > 40.4;
+  }
+
+  return false;
 }
 
 function hashString(value: string): number {
