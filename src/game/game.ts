@@ -4,7 +4,10 @@ import { InputController } from "./input";
 import { GameSimulation } from "./simulation";
 import { GameUI } from "./ui";
 import { WorldView } from "./world";
+import { SaveStore } from "./save-store";
 import { t } from "../i18n";
+
+const ROUTINE_SAVE_SECONDS = 5;
 
 export class PocketEarthGame {
   readonly simulation = new GameSimulation();
@@ -22,6 +25,9 @@ export class PocketEarthGame {
   private hasSizedCamera = false;
   private worldOverview = false;
   private animationFrame?: number;
+  private readonly saveStore = new SaveStore();
+  private restoredFromSave = false;
+  private sinceRoutineSave = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -59,11 +65,49 @@ export class PocketEarthGame {
     canvas.addEventListener("wheel", this.onWheel, { passive: false });
     canvas.addEventListener("webglcontextlost", this.onContextLost);
     canvas.addEventListener("webglcontextrestored", this.onContextRestored);
+    window.addEventListener("pagehide", this.onPageHide);
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
     this.onResize();
 
+    this.restoreSave();
     this.simulation.update(0, { x: 0, z: 0 });
     this.processEvents();
     this.ui.update(this.simulation.state);
+  }
+
+  private restoreSave(): void {
+    const snapshot = this.saveStore.load();
+    if (!snapshot) {
+      return;
+    }
+    this.simulation.restore(snapshot);
+    this.ui.restoreCompletedQuizzes(snapshot.completedQuizzes);
+    this.restoredFromSave = true;
+  }
+
+  /** `immediate` is used for milestones so progress survives an instant close. */
+  private persist(immediate = false): void {
+    const { state } = this.simulation;
+    this.saveStore.save(
+      {
+        position: { x: state.position.x, z: state.position.z },
+        heading: state.heading,
+        elapsed: state.elapsed,
+        visitedCountries: [...state.visitedCountries],
+        collectedPostcards: [...state.collectedPostcards],
+        completedQuizzes: this.ui.getCompletedQuizzes(),
+      },
+      immediate,
+    );
+  }
+
+  hasRestoredProgress(): boolean {
+    return this.restoredFromSave;
+  }
+
+  resetProgress(): void {
+    this.saveStore.clear();
+    this.restoredFromSave = false;
   }
 
   start(): void {
@@ -121,15 +165,33 @@ export class PocketEarthGame {
     this.updateCamera(delta);
     this.ui.update(state);
     this.renderer.render(this.scene, this.camera);
+
+    this.sinceRoutineSave += delta;
+    if (this.sinceRoutineSave >= ROUTINE_SAVE_SECONDS) {
+      this.sinceRoutineSave = 0;
+      this.persist();
+    }
+
     this.animationFrame = requestAnimationFrame(this.tick);
   };
 
   private processEvents(): void {
+    let reachedMilestone = false;
     for (const event of this.simulation.consumeEvents()) {
       if (event.type === "world-wrapped") {
         this.camera.position.x += event.deltaX;
       }
+      if (
+        (event.type === "country-entered" && event.firstVisit) ||
+        (event.type === "postcard-collected" && event.firstCollection)
+      ) {
+        reachedMilestone = true;
+      }
       this.ui.handleEvent(event);
+    }
+    if (reachedMilestone) {
+      this.persist(true);
+      this.sinceRoutineSave = 0;
     }
   }
 
@@ -252,6 +314,18 @@ export class PocketEarthGame {
     this.camera.bottom = -viewSize / 2;
     this.camera.updateProjectionMatrix();
   }
+
+  private readonly onPageHide = (): void => {
+    this.persist(true);
+    this.saveStore.flush();
+  };
+
+  private readonly onVisibilityChange = (): void => {
+    if (document.visibilityState === "hidden") {
+      this.persist(true);
+      this.saveStore.flush();
+    }
+  };
 
   private readonly onContextLost = (event: Event): void => {
     event.preventDefault();

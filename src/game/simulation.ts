@@ -139,6 +139,48 @@ export class GameSimulation {
     this.events.push({ type: "postcard-collected", spot, firstCollection });
   }
 
+  /**
+   * Applies a loaded save. Unknown postcard ids are dropped so a save written
+   * by an older content set cannot resurrect spots that no longer exist.
+   */
+  restore(snapshot: {
+    position: { x: number; z: number };
+    heading: number;
+    elapsed: number;
+    visitedCountries: readonly string[];
+    collectedPostcards: readonly string[];
+  }): void {
+    const knownSpotIds = new Set<string>(PHOTO_SPOTS.map((spot) => spot.id));
+
+    this.state.position.x = clamp(
+      snapshot.position.x,
+      minimumWorld.x,
+      maximumWorld.x,
+    );
+    this.state.position.z = clamp(
+      snapshot.position.z,
+      minimumWorld.z + 0.8,
+      maximumWorld.z - 0.8,
+    );
+    this.state.velocity.x = 0;
+    this.state.velocity.z = 0;
+    this.state.heading = snapshot.heading;
+    this.state.elapsed = snapshot.elapsed;
+
+    this.state.visitedCountries = new Set(snapshot.visitedCountries);
+    this.state.collectedPostcards = new Set(
+      snapshot.collectedPostcards.filter((id): id is PhotoSpotId =>
+        knownSpotIds.has(id),
+      ),
+    );
+
+    this.updateLocation();
+    this.updateNearestPhotoSpot();
+    // Restoring is not an arrival: drop the events it just produced so the
+    // player is not greeted by a country reveal for where they already were.
+    this.events.length = 0;
+  }
+
   teleport(longitude: number, latitude: number): void {
     const world = geoToWorld([longitude, latitude]);
     this.state.position.x = world.x;
@@ -205,6 +247,10 @@ export class GameSimulation {
 
     this.state.nearestPhotoSpot = nearest;
   }
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
 }
 
 function dampAngle(current: number, target: number, amount: number): number {

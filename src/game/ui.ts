@@ -245,6 +245,17 @@ export class GameUI {
     this.refreshQuizAvailability(profile, state.nearestPhotoSpot);
   }
 
+  getCompletedQuizzes(): string[] {
+    return [...this.completedQuizzes];
+  }
+
+  restoreCompletedQuizzes(ids: readonly string[]): void {
+    this.completedQuizzes.clear();
+    for (const id of ids) {
+      this.completedQuizzes.add(id);
+    }
+  }
+
   private refreshQuizAvailability(
     profile: CountryProfile | undefined,
     spot: PhotoSpotDefinition | undefined,
