@@ -22,6 +22,11 @@ import {
 } from "./world-map";
 import { PropBatcher, type PropArchetypeId } from "./prop-kit";
 import { createDetailedLandmarkModel } from "./landmark-models";
+import {
+  createLandmarkStandee,
+  updateLandmarkStandeeOverview,
+  type LandmarkStandeeView,
+} from "./landmark-standees";
 
 const landmarkModelLoader = new GLTFLoader();
 landmarkModelLoader.setMeshoptDecoder(MeshoptDecoder);
@@ -86,7 +91,9 @@ export class WorldView {
   readonly vehicle: VehicleView;
   private readonly wavelets: THREE.Mesh[] = [];
   private readonly landmarkEffects: LandmarkEffect[] = [];
+  private readonly landmarkStandees: LandmarkStandeeView[] = [];
   private readonly props = new PropBatcher();
+  private readonly useLandmarkStandees = true;
   private modeBlend = 0;
 
   constructor() {
@@ -113,6 +120,7 @@ export class WorldView {
     position: { x: number; z: number },
     heading: number,
     boatMode: boolean,
+    overviewBlend = 0,
   ): void {
     this.modeBlend += ((boatMode ? 1 : 0) - this.modeBlend) * (1 - Math.exp(-7 * delta));
     this.vehicle.root.position.x = position.x;
@@ -144,6 +152,10 @@ export class WorldView {
     for (const [index, wavelet] of this.wavelets.entries()) {
       wavelet.position.y = 0.09 + Math.sin(elapsed * 1.2 + index) * 0.025;
       wavelet.rotation.z = Math.sin(elapsed * 0.3 + index) * 0.12;
+    }
+
+    for (const standee of this.landmarkStandees) {
+      updateLandmarkStandeeOverview(standee, overviewBlend);
     }
 
     for (const effect of this.landmarkEffects) {
@@ -491,6 +503,16 @@ export class WorldView {
       roughness: 0.88,
       flatShading: true,
     });
+
+    if (this.useLandmarkStandees) {
+      const standee = createLandmarkStandee(spot, accent);
+      this.landmarkStandees.push(standee);
+      group.add(standee.root);
+      this.addLandmarkPresentation(group, spot, accent, world);
+      group.scale.setScalar(1.08);
+      this.root.add(group);
+      return;
+    }
 
     const detailedLandmark = createDetailedLandmarkModel(spot.id);
     if (detailedLandmark) {
@@ -2311,38 +2333,153 @@ export class WorldView {
       color: 0x243847,
       roughness: 0.92,
     });
+    const trimMaterial = new THREE.MeshStandardMaterial({
+      color: 0x314b57,
+      roughness: 0.72,
+      metalness: 0.12,
+    });
+    const metalMaterial = new THREE.MeshStandardMaterial({
+      color: 0xc9d1cb,
+      roughness: 0.45,
+      metalness: 0.48,
+    });
+    const headlightMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffe99b,
+      emissive: 0xd28a22,
+      emissiveIntensity: 0.45,
+      roughness: 0.36,
+    });
+    const tailLightMaterial = new THREE.MeshStandardMaterial({
+      color: 0xb93832,
+      emissive: 0x6d120f,
+      emissiveIntensity: 0.4,
+      roughness: 0.4,
+    });
+    const luggageMaterial = new THREE.MeshStandardMaterial({
+      color: 0x397d68,
+      roughness: 0.84,
+    });
 
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.48, 1.55), bodyMaterial);
-    body.position.y = 0.58;
-    body.castShadow = true;
-    root.add(body);
+    const addPart = (
+      geometry: THREE.BufferGeometry,
+      material: THREE.Material,
+      position: readonly [number, number, number],
+      rotation?: readonly [number, number, number],
+    ): THREE.Mesh => {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(...position);
+      if (rotation) {
+        mesh.rotation.set(...rotation);
+      }
+      mesh.castShadow = true;
+      root.add(mesh);
+      return mesh;
+    };
 
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.42, 0.78), creamMaterial);
-    cabin.position.set(0, 0.98, 0.05);
-    cabin.castShadow = true;
-    root.add(cabin);
+    // A dark chassis and inset body give the small vehicle a readable layered
+    // silhouette without increasing its footprint on the world map.
+    addPart(new THREE.BoxGeometry(1.28, 0.16, 1.48), trimMaterial, [0, 0.41, 0.02]);
+    addPart(new THREE.BoxGeometry(1.18, 0.42, 1.42), bodyMaterial, [0, 0.64, 0.02]);
+    addPart(new THREE.BoxGeometry(1.02, 0.22, 0.46), bodyMaterial, [0, 0.82, -0.82]);
 
-    const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.25, 0.06), glassMaterial);
-    windshield.position.set(0, 1.0, -0.37);
-    windshield.rotation.x = -0.12;
-    root.add(windshield);
+    addPart(new THREE.BoxGeometry(0.96, 0.46, 0.78), creamMaterial, [0, 1.04, 0.12]);
+    addPart(new THREE.BoxGeometry(1.02, 0.12, 0.86), creamMaterial, [0, 1.31, 0.12]);
 
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.38, 6), creamMaterial);
-    nose.rotation.x = -Math.PI / 2;
-    nose.position.set(0, 0.55, -0.92);
-    root.add(nose);
+    // Glazing on all four sides keeps the cabin legible from the chase camera
+    // as the car turns, rather than reading as a plain cream cube.
+    addPart(
+      new THREE.BoxGeometry(0.76, 0.25, 0.045),
+      glassMaterial,
+      [0, 1.08, -0.29],
+      [-0.08, 0, 0],
+    );
+    addPart(
+      new THREE.BoxGeometry(0.7, 0.22, 0.04),
+      glassMaterial,
+      [0, 1.07, 0.525],
+      [0.04, 0, 0],
+    );
+    for (const x of [-0.492, 0.492]) {
+      addPart(new THREE.BoxGeometry(0.035, 0.22, 0.48), glassMaterial, [x, 1.07, 0.12]);
+    }
+
+    // Bumpers, running boards, lights, and grille supply strong small-scale
+    // landmarks at the normal orthographic gameplay zoom.
+    addPart(new THREE.BoxGeometry(1.12, 0.1, 0.11), metalMaterial, [0, 0.46, -1.08]);
+    addPart(new THREE.BoxGeometry(1.12, 0.1, 0.11), metalMaterial, [0, 0.46, 0.79]);
+    addPart(new THREE.BoxGeometry(0.62, 0.12, 0.035), trimMaterial, [0, 0.64, -1.065]);
+    for (const x of [-0.39, 0.39]) {
+      addPart(new THREE.BoxGeometry(0.17, 0.13, 0.045), headlightMaterial, [
+        x,
+        0.78,
+        -1.065,
+      ]);
+      addPart(new THREE.BoxGeometry(0.14, 0.14, 0.04), tailLightMaterial, [x, 0.7, 0.745]);
+      addPart(new THREE.BoxGeometry(0.13, 0.09, 0.62), bodyMaterial, [
+        Math.sign(x) * 0.61,
+        0.65,
+        0.08,
+      ]);
+    }
+    for (const x of [-0.7, 0.7]) {
+      addPart(new THREE.BoxGeometry(0.12, 0.08, 0.86), trimMaterial, [x, 0.43, 0.09]);
+    }
 
     const wheels: THREE.Mesh[] = [];
     for (const x of [-0.68, 0.68]) {
       for (const z of [-0.48, 0.5]) {
-        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.18, 10), wheelMaterial);
+        const wheel = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.24, 0.24, 0.18, 12),
+          wheelMaterial,
+        );
         wheel.rotation.z = Math.PI / 2;
         wheel.position.set(x, 0.31, z);
         wheel.castShadow = true;
+
+        const hubcap = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.11, 0.11, 0.195, 12),
+          metalMaterial,
+        );
+        hubcap.castShadow = true;
+        wheel.add(hubcap);
+
         wheels.push(wheel);
         root.add(wheel);
       }
     }
+
+    // Roof rack, travel case, aerial, and rear spare make the car feel like a
+    // purpose-built world traveller and are visible from the default high view.
+    for (const x of [-0.37, 0.37]) {
+      addPart(new THREE.BoxGeometry(0.055, 0.055, 0.72), trimMaterial, [x, 1.41, 0.12]);
+    }
+    for (const z of [-0.18, 0.4]) {
+      addPart(new THREE.BoxGeometry(0.82, 0.045, 0.055), trimMaterial, [0, 1.42, z]);
+    }
+    addPart(new THREE.BoxGeometry(0.46, 0.17, 0.36), luggageMaterial, [
+      -0.04,
+      1.52,
+      0.12,
+    ]);
+    addPart(new THREE.BoxGeometry(0.18, 0.04, 0.08), trimMaterial, [-0.04, 1.63, 0.12]);
+
+    addPart(
+      new THREE.TorusGeometry(0.19, 0.065, 7, 14),
+      wheelMaterial,
+      [0, 0.76, 0.82],
+    );
+    addPart(
+      new THREE.CylinderGeometry(0.08, 0.08, 0.045, 12),
+      creamMaterial,
+      [0, 0.76, 0.825],
+      [Math.PI / 2, 0, 0],
+    );
+    addPart(new THREE.CylinderGeometry(0.014, 0.014, 0.42, 6), trimMaterial, [
+      0.4,
+      1.56,
+      0.36,
+    ]);
+    addPart(new THREE.SphereGeometry(0.035, 7, 5), bodyMaterial, [0.4, 1.78, 0.36]);
 
     const pontoons: THREE.Mesh[] = [];
     for (const x of [-0.76, 0.76]) {

@@ -189,6 +189,7 @@ export class PocketEarthGame {
       state.position,
       state.heading,
       state.vehicleMode === "boat",
+      this.overviewBlend,
     );
     this.updateCamera(delta);
     this.ui.update(state);

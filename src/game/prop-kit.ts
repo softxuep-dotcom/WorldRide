@@ -56,7 +56,7 @@ const PALETTE = {
   wallWhite: 0xfaf3e2,
   wallSand: 0xe2c290,
   wallOchre: 0xcfa671,
-  roofTerracotta: 0xc4643f,
+  roofCoastalBlue: 0x486b7b,
   roofSlate: 0x5b6470,
   roofWood: 0x8a5a3b,
   sand: 0xe4bd7d,
@@ -251,7 +251,7 @@ const ARCHETYPE_BUILDERS: Record<PropArchetypeId, () => THREE.BufferGeometry> = 
       },
       {
         geometry: new THREE.ConeGeometry(0.52, 0.24, 4),
-        color: PALETTE.roofTerracotta,
+        color: PALETTE.roofCoastalBlue,
         position: [0, 0.55, 0],
         rotation: [0, Math.PI / 4, 0],
         scale: [1, 1, 0.78],
