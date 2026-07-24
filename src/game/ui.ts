@@ -1,5 +1,6 @@
 import {
   MAP_BOUNDS,
+  PHOTO_SPOTS,
   type PhotoSpotDefinition,
   geoToWorld,
 } from "./data";
@@ -27,6 +28,11 @@ import {
   localizeText,
   type QuizSet,
 } from "./quiz";
+import {
+  REGIONAL_SPECIALTIES,
+  type RegionalSpecialtyDefinition,
+} from "./regional-specialties";
+import { getSpecialtyCopy } from "./regional-specialty-copy";
 
 interface QuizSubject {
   quiz: QuizSet;
@@ -73,6 +79,8 @@ interface UIElements {
   quizFeedback: HTMLElement;
   quizSkip: HTMLButtonElement;
   quizNext: HTMLButtonElement;
+  progressTotals: HTMLElement;
+  progressRegions: HTMLElement;
 }
 
 export class GameUI {
@@ -86,6 +94,9 @@ export class GameUI {
   private selectedCountry?: CountryProfile;
   private currentCountry?: CountryProfile;
   private currentNearestPhotoSpot?: PhotoSpotDefinition;
+  private currentNearestSpecialty?: RegionalSpecialtyDefinition;
+  private renderedTotalsKey?: string;
+  private renderedRegionKey?: string;
   private selectedPhotoSpotFirstCollection = false;
   private worldOverviewActive = false;
   private availableQuiz?: QuizSubject;
@@ -136,6 +147,8 @@ export class GameUI {
       quizFeedback: requireElement("quiz-feedback"),
       quizSkip: requireButton("quiz-skip"),
       quizNext: requireButton("quiz-next"),
+      progressTotals: requireElement("progress-totals"),
+      progressRegions: requireElement("progress-regions"),
     };
 
     this.buildLanguageSelector();
@@ -147,6 +160,8 @@ export class GameUI {
     this.elements.interactButton.addEventListener("click", () => {
       if (this.currentNearestPhotoSpot) {
         onInteract();
+      } else if (this.currentNearestSpecialty) {
+        this.showSpecialtyDetail(this.currentNearestSpecialty);
       } else if (this.currentCountry) {
         this.showCountryDetail(this.currentCountry);
       }
@@ -199,7 +214,9 @@ export class GameUI {
       : undefined;
     this.currentCountry = profile;
     this.currentNearestPhotoSpot = state.nearestPhotoSpot;
+    this.currentNearestSpecialty = state.nearestSpecialty;
     this.updateTravelInfo(profile, localizedSpot);
+    this.updateProgress(state);
     const passportCountries = getPassportCountryProfiles();
     this.elements.visitedCount.textContent =
       `${state.visitedCountries.size} / ${passportCountries.length}`;
@@ -243,6 +260,90 @@ export class GameUI {
     }
     this.previousNearestPhotoSpot = nearestId;
     this.refreshQuizAvailability(profile, state.nearestPhotoSpot);
+  }
+
+  /**
+   * A specialty is spotted by driving past, so the announcement stays as a
+   * toast: it must never interrupt steering the way a landmark card does.
+   */
+  private announceSpecialty(
+    specialty: RegionalSpecialtyDefinition,
+    firstDiscovery: boolean,
+  ): void {
+    const copy = getSpecialtyCopy(specialty.id, getLocale(), specialty.name);
+    this.showToast(
+      t(firstDiscovery ? "specialty.discovered" : "specialty.seenAgain", {
+        name: copy.name,
+      }),
+    );
+  }
+
+  private showSpecialtyDetail(specialty: RegionalSpecialtyDefinition): void {
+    const copy = getSpecialtyCopy(specialty.id, getLocale(), specialty.name);
+    const categoryKey = `specialty.category.${specialty.category}` as const;
+    this.selectedCountry = undefined;
+    this.selectedPhotoSpot = undefined;
+    this.elements.landmarkDetail.classList.add("is-country-detail");
+    this.elements.landmarkDetail.classList.remove("is-reflection");
+    this.elements.landmarkDetailKind.textContent = t("specialty.kind");
+    this.elements.landmarkDetailName.textContent = copy.name;
+    this.elements.landmarkDetailCountry.textContent = `${t(
+      `region.name.${specialty.region}` as never,
+    )} · ${t(categoryKey as never)}`;
+    this.elements.landmarkDetailIntro.textContent = copy.blurb;
+    this.elements.landmarkDetailDescription.textContent = "";
+    this.elements.landmarkDetailFact.textContent = "";
+    this.elements.landmarkDetailStatus.textContent = "";
+    this.elements.landmarkDetailConfirm.textContent = t("action.backToJourney");
+    this.togglePassport(false);
+    this.toggleLandmarkDetail(true);
+  }
+
+  /**
+   * Region progress turns the existing content into self-set goals: seeing
+   * "Africa 3/9" is what makes a player decide to go finish Africa.
+   */
+  private updateProgress(state: GameState): void {
+    const totals: readonly [string, number, number][] = [
+      ["progress.countries", state.visitedCountries.size, getPassportCountryProfiles().length],
+      ["progress.landmarks", state.collectedPostcards.size, PHOTO_SPOTS.length],
+      ["progress.specialties", state.discoveredSpecialties.size, REGIONAL_SPECIALTIES.length],
+    ];
+    const totalsKey = totals.map(([, done]) => done).join(",");
+    if (totalsKey !== this.renderedTotalsKey) {
+      this.renderedTotalsKey = totalsKey;
+      this.elements.progressTotals.replaceChildren(
+        ...totals.map(([labelKey, done, total]) =>
+          buildProgressRow(t(labelKey as never), done, total),
+        ),
+      );
+    }
+
+    const byRegion = new Map<string, { done: number; total: number }>();
+    for (const specialty of REGIONAL_SPECIALTIES) {
+      const bucket = byRegion.get(specialty.region) ?? { done: 0, total: 0 };
+      bucket.total += 1;
+      if (state.discoveredSpecialties.has(specialty.id)) {
+        bucket.done += 1;
+      }
+      byRegion.set(specialty.region, bucket);
+    }
+    const regionKey = [...byRegion.entries()]
+      .map(([region, value]) => `${region}:${value.done}`)
+      .join(",");
+    if (regionKey === this.renderedRegionKey) {
+      return;
+    }
+    this.renderedRegionKey = regionKey;
+    this.elements.progressRegions.replaceChildren(
+      ...[...byRegion.entries()].map(([region, value]) =>
+        buildProgressRow(
+          t(`region.name.${region}` as never),
+          value.done,
+          value.total,
+        ),
+      ),
+    );
   }
 
   getCompletedQuizzes(): string[] {
@@ -433,6 +534,9 @@ export class GameUI {
         break;
       case "postcard-collected":
         this.capturePostcard(event.spot, event.firstCollection);
+        break;
+      case "specialty-discovered":
+        this.announceSpecialty(event.specialty, event.firstDiscovery);
         break;
     }
   }
@@ -710,6 +814,36 @@ export class GameUI {
       }
     }
   }
+}
+
+function buildProgressRow(
+  label: string,
+  done: number,
+  total: number,
+): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "progress-row";
+  if (done >= total) {
+    row.classList.add("is-complete");
+  }
+
+  const name = document.createElement("span");
+  name.className = "progress-row__label";
+  name.textContent = label;
+
+  const bar = document.createElement("span");
+  bar.className = "progress-row__bar";
+  const fill = document.createElement("span");
+  fill.className = "progress-row__fill";
+  fill.style.width = `${total > 0 ? (done / total) * 100 : 0}%`;
+  bar.append(fill);
+
+  const count = document.createElement("span");
+  count.className = "progress-row__count";
+  count.textContent = `${done}/${total}`;
+
+  row.append(name, bar, count);
+  return row;
 }
 
 function geoToMiniMap(point: readonly [number, number]): { x: number; y: number } {

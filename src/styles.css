@@ -1186,3 +1186,79 @@ button {
 .sound-button:active {
   transform: translateY(2px) scale(0.97);
 }
+
+/* ---------- Collection progress ---------- */
+
+.progress-panel {
+  margin: 14px 0 16px;
+  padding: 13px 14px;
+  border-radius: 15px;
+  background: rgba(23, 49, 71, 0.05);
+}
+
+.progress-panel h3 {
+  margin: 0 0 10px;
+  color: var(--coral);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.progress-totals {
+  display: grid;
+  gap: 7px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px dashed rgba(23, 49, 71, 0.16);
+}
+
+.progress-regions {
+  display: grid;
+  gap: 7px;
+}
+
+.progress-row {
+  display: grid;
+  grid-template-columns: 4.6em 1fr auto;
+  align-items: center;
+  gap: 9px;
+}
+
+.progress-row__label {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.progress-row__bar {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(23, 49, 71, 0.12);
+  overflow: hidden;
+}
+
+.progress-row__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--coral);
+  transition: width 420ms cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.progress-row.is-complete .progress-row__fill {
+  background: #37a06a;
+}
+
+.progress-row__count {
+  min-width: 3.1em;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 900;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-row.is-complete .progress-row__count {
+  color: #256d48;
+}

@@ -17,6 +17,8 @@ export class PocketEarthGame {
   private readonly camera = new THREE.OrthographicCamera();
   private readonly world = new WorldView();
   private readonly localFog = new THREE.Fog(0x9fe4ef, 32, 62);
+  private readonly sun = new THREE.DirectionalLight(0xfff3cf, 3.4);
+  private readonly sunTarget = new THREE.Object3D();
   private readonly clock = new THREE.Clock();
   private readonly input: InputController;
   private readonly ui: GameUI;
@@ -124,6 +126,7 @@ export class PocketEarthGame {
         visitedCountries: [...state.visitedCountries],
         collectedPostcards: [...state.collectedPostcards],
         completedQuizzes: this.ui.getCompletedQuizzes(),
+        discoveredSpecialties: [...state.discoveredSpecialties],
       },
       immediate,
     );
@@ -213,7 +216,8 @@ export class PocketEarthGame {
       }
       if (
         (event.type === "country-entered" && event.firstVisit) ||
-        (event.type === "postcard-collected" && event.firstCollection)
+        (event.type === "postcard-collected" && event.firstCollection) ||
+        (event.type === "specialty-discovered" && event.firstDiscovery)
       ) {
         reachedMilestone = true;
       }
@@ -241,6 +245,9 @@ export class PocketEarthGame {
         break;
       case "map-edge":
         this.audio.onMapEdge();
+        break;
+      case "specialty-discovered":
+        this.audio.onSpecialtyDiscovered(event.firstDiscovery);
         break;
       case "world-wrapped":
         break;
@@ -271,6 +278,18 @@ export class PocketEarthGame {
       position.z - 2.4,
     ).lerp(new THREE.Vector3(0, 0, 0), easedOverviewBlend);
     this.camera.lookAt(lookAtTarget);
+    const lightingCenter = new THREE.Vector3(
+      position.x,
+      0,
+      position.z,
+    ).lerp(new THREE.Vector3(0, 0, 0), easedOverviewBlend);
+    this.sun.position.set(
+      lightingCenter.x - 16,
+      28,
+      lightingCenter.z + 18,
+    );
+    this.sunTarget.position.copy(lightingCenter);
+    this.sun.castShadow = easedOverviewBlend < 0.35;
 
     const targetViewSize = this.getTargetViewSize();
     this.projectionViewSize +=
@@ -293,19 +312,18 @@ export class PocketEarthGame {
     const hemisphere = new THREE.HemisphereLight(0xfffae8, 0x3f7c88, 2.1);
     this.scene.add(hemisphere);
 
-    const sun = new THREE.DirectionalLight(0xfff3cf, 3.4);
-    sun.position.set(-16, 28, 18);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -25;
-    sun.shadow.camera.right = 25;
-    sun.shadow.camera.top = 25;
-    sun.shadow.camera.bottom = -25;
-    sun.shadow.camera.near = 1;
-    sun.shadow.camera.far = 70;
-    sun.shadow.bias = -0.00035;
-    sun.target.position.set(0, 0, 0);
-    this.scene.add(sun, sun.target);
+    this.sun.position.set(-16, 28, 18);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.camera.left = -25;
+    this.sun.shadow.camera.right = 25;
+    this.sun.shadow.camera.top = 25;
+    this.sun.shadow.camera.bottom = -25;
+    this.sun.shadow.camera.near = 1;
+    this.sun.shadow.camera.far = 70;
+    this.sun.shadow.bias = -0.00035;
+    this.sun.target = this.sunTarget;
+    this.scene.add(this.sun, this.sunTarget);
   }
 
   private readonly onResize = (): void => {

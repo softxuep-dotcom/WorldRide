@@ -18,6 +18,7 @@ export interface SaveSnapshot {
   visitedCountries: string[];
   collectedPostcards: string[];
   completedQuizzes: string[];
+  discoveredSpecialties: string[];
 }
 
 function probeStorage(): Storage | undefined {
@@ -82,6 +83,7 @@ function parseSnapshot(raw: string): SaveSnapshot | undefined {
     visitedCountries: toStringArray(candidate.visitedCountries),
     collectedPostcards: toStringArray(candidate.collectedPostcards),
     completedQuizzes: toStringArray(candidate.completedQuizzes),
+    discoveredSpecialties: toStringArray(candidate.discoveredSpecialties),
   };
 }
 

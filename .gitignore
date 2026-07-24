@@ -35,3 +35,6 @@ coverage/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Source art intermediates (large; final assets live in public/)
+assets-source/

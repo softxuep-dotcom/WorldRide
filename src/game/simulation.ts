@@ -14,6 +14,10 @@ import {
   getCountryContentForAtlas,
   getWorldCountryAtGeo,
 } from "./world-map";
+import {
+  REGIONAL_SPECIALTIES,
+  type RegionalSpecialtyDefinition,
+} from "./regional-specialties";
 
 export interface MovementInput {
   x: number;
@@ -27,7 +31,12 @@ export type GameEvent =
   | { type: "mode-changed"; mode: VehicleMode }
   | { type: "map-edge" }
   | { type: "world-wrapped"; deltaX: number }
-  | { type: "postcard-collected"; spot: PhotoSpotDefinition; firstCollection: boolean };
+  | { type: "postcard-collected"; spot: PhotoSpotDefinition; firstCollection: boolean }
+  | {
+      type: "specialty-discovered";
+      specialty: RegionalSpecialtyDefinition;
+      firstDiscovery: boolean;
+    };
 
 export interface GameState {
   position: { x: number; z: number };
@@ -38,8 +47,10 @@ export interface GameState {
   currentCountryProfile?: CountryProfile;
   currentWorldCountryName?: string;
   nearestPhotoSpot?: PhotoSpotDefinition;
+  nearestSpecialty?: RegionalSpecialtyDefinition;
   visitedCountries: Set<string>;
   collectedPostcards: Set<PhotoSpotId>;
+  discoveredSpecialties: Set<string>;
   elapsed: number;
 }
 
@@ -57,8 +68,10 @@ export class GameSimulation {
     currentCountryProfile: undefined,
     currentWorldCountryName: undefined,
     nearestPhotoSpot: undefined,
+    nearestSpecialty: undefined,
     visitedCountries: new Set<string>(),
     collectedPostcards: new Set<PhotoSpotId>(),
+    discoveredSpecialties: new Set<string>(),
     elapsed: 0,
   };
 
@@ -126,6 +139,7 @@ export class GameSimulation {
 
     this.updateLocation();
     this.updateNearestPhotoSpot();
+    this.updateNearestSpecialty();
   }
 
   interact(): void {
@@ -149,6 +163,7 @@ export class GameSimulation {
     elapsed: number;
     visitedCountries: readonly string[];
     collectedPostcards: readonly string[];
+    discoveredSpecialties?: readonly string[];
   }): void {
     const knownSpotIds = new Set<string>(PHOTO_SPOTS.map((spot) => spot.id));
 
@@ -174,8 +189,18 @@ export class GameSimulation {
       ),
     );
 
+    const knownSpecialtyIds = new Set(
+      REGIONAL_SPECIALTIES.map((specialty) => specialty.id),
+    );
+    this.state.discoveredSpecialties = new Set(
+      (snapshot.discoveredSpecialties ?? []).filter((id) =>
+        knownSpecialtyIds.has(id),
+      ),
+    );
+
     this.updateLocation();
     this.updateNearestPhotoSpot();
+    this.updateNearestSpecialty();
     // Restoring is not an arrival: drop the events it just produced so the
     // player is not greeted by a country reveal for where they already were.
     this.events.length = 0;
@@ -247,7 +272,45 @@ export class GameSimulation {
 
     this.state.nearestPhotoSpot = nearest;
   }
+
+  /**
+   * Specialties are incidental roadside sightings: driving close enough is
+   * itself the discovery, so no button press is required. Landmarks still need
+   * a deliberate interaction, which keeps the two tiers feeling different.
+   */
+  private updateNearestSpecialty(): void {
+    let nearest: RegionalSpecialtyDefinition | undefined;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    for (const specialty of REGIONAL_SPECIALTIES) {
+      const world = geoToWorld(specialty.point);
+      const distance = Math.hypot(
+        world.x - this.state.position.x,
+        world.z - this.state.position.z,
+      );
+
+      if (distance < SPECIALTY_DISCOVERY_RADIUS && distance < nearestDistance) {
+        nearest = specialty;
+        nearestDistance = distance;
+      }
+    }
+
+    const previousId = this.state.nearestSpecialty?.id;
+    this.state.nearestSpecialty = nearest;
+
+    if (nearest && nearest.id !== previousId) {
+      const firstDiscovery = !this.state.discoveredSpecialties.has(nearest.id);
+      this.state.discoveredSpecialties.add(nearest.id);
+      this.events.push({
+        type: "specialty-discovered",
+        specialty: nearest,
+        firstDiscovery,
+      });
+    }
+  }
 }
+
+const SPECIALTY_DISCOVERY_RADIUS = 1.9;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));

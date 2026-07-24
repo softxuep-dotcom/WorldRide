@@ -134,6 +134,14 @@ export class GameAudio {
     }
   }
 
+  /** Lighter than a landmark: a soft two-note lift, not a fanfare. */
+  onSpecialtyDiscovered(firstDiscovery: boolean): void {
+    if (!firstDiscovery) {
+      return;
+    }
+    this.playArpeggio([659.25, 880], 0.085, "sine", 0.1);
+  }
+
   onMapEdge(): void {
     this.playTone(150, 0.18, "sine", 0.1);
   }
