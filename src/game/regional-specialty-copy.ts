@@ -8,6 +8,8 @@
  * A specialty with no entry falls back to its Chinese `name` and shows no
  * blurb, so the roadside discovery still works while copy is being written.
  */
+import { localizeAuthoredText } from "../i18n/content";
+
 export interface SpecialtyCopy {
   readonly name: string;
   /** One short sentence shown when the player stops to look. */
@@ -205,5 +207,18 @@ export function getSpecialtyCopy(
   if (!entry) {
     return { name: fallbackName, blurb: "" };
   }
-  return entry[locale] ?? entry[FALLBACK_LOCALE] ?? { name: fallbackName, blurb: "" };
+  const copy =
+    entry[locale] ??
+    entry[FALLBACK_LOCALE] ?? { name: fallbackName, blurb: "" };
+  return {
+    name: localizeAuthoredText(copy.name, locale),
+    blurb: localizeAuthoredText(copy.blurb, locale),
+  };
+}
+
+export function getAllSpecialtyCopies(): readonly SpecialtyCopy[] {
+  return Object.values(COPY).flatMap((entry) => {
+    const copy = entry[FALLBACK_LOCALE];
+    return copy ? [copy] : [];
+  });
 }

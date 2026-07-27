@@ -3,6 +3,7 @@ import {
   type PhotoSpotDefinition,
   type PhotoSpotId,
 } from "./data";
+import { localizeAuthoredText } from "../i18n/content";
 import { TIER_A_COUNTRY_NAMES } from "./world-map";
 
 /**
@@ -35,7 +36,8 @@ const FALLBACK_LOCALE = "en";
 const QUIZ_BANK_VERSION = 2;
 
 export function localizeText(text: LocalizedText, locale: string): string {
-  return text[locale] ?? text[FALLBACK_LOCALE] ?? Object.values(text)[0] ?? "";
+  const fallback = text[FALLBACK_LOCALE] ?? Object.values(text)[0] ?? "";
+  return text[locale] ?? localizeAuthoredText(fallback, locale);
 }
 
 type TierACountryName = (typeof TIER_A_COUNTRY_NAMES)[number];
@@ -1857,6 +1859,10 @@ const WORLD_QUIZ_POOL: readonly QuizSet[] = [
   ...Object.values(COUNTRY_QUIZZES),
   ...Object.values(SPOT_QUIZZES),
 ];
+
+export function getAllQuizSets(): readonly QuizSet[] {
+  return WORLD_QUIZ_POOL;
+}
 
 /**
  * Keeps the persistent challenge entry useful away from authored locations.

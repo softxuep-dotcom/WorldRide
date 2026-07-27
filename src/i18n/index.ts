@@ -2,6 +2,7 @@ import type {
   CountryDefinition,
   PhotoSpotDefinition,
 } from "../game/data";
+import { localizeAuthoredText } from "./content";
 import { en } from "./locales/en";
 import { es } from "./locales/es";
 import { fr } from "./locales/fr";
@@ -112,16 +113,18 @@ export function localizeCountry(
 
   return {
     ...country,
-    name: translation.name,
-    intro: translation.intro,
+    name: localizeAuthoredText(translation.name, activeLocale),
+    intro: localizeAuthoredText(translation.intro, activeLocale),
     facts:
-      translation.facts ??
+      translation.facts?.map((fact) =>
+        localizeAuthoredText(fact, activeLocale),
+      ) ??
       (activeLocale === SOURCE_LOCALE
         ? country.facts
         : []),
     city: {
       ...country.city,
-      name: translation.cityName,
+      name: localizeAuthoredText(translation.cityName, activeLocale),
     },
   };
 }
@@ -134,19 +137,43 @@ export function localizePhotoSpot(
     (activeLocale === SOURCE_LOCALE
       ? undefined
       : localeRegistry[DEFAULT_LOCALE].photoSpots[spot.id]);
-  return translation ? { ...spot, ...translation } : spot;
+  return translation
+    ? {
+        ...spot,
+        name: localizeAuthoredText(translation.name, activeLocale),
+        postcard: localizeAuthoredText(translation.postcard, activeLocale),
+        description: localizeAuthoredText(
+          translation.description,
+          activeLocale,
+        ),
+        fact: localizeAuthoredText(translation.fact, activeLocale),
+      }
+    : spot;
 }
 
 export function getWorldCountryTranslation(
   atlasName: string,
 ): WorldCountryTranslation {
-  return (
+  const translation =
     localeRegistry[activeLocale].worldCountries[atlasName] ??
     (activeLocale === SOURCE_LOCALE
       ? {}
-      : localeRegistry[DEFAULT_LOCALE].worldCountries[atlasName]) ??
-    {}
-  );
+      : localeRegistry[DEFAULT_LOCALE].worldCountries[atlasName]);
+  if (activeLocale === SOURCE_LOCALE) {
+    return translation ?? {};
+  }
+  return {
+    name: localizeAuthoredText(
+      translation?.name ?? atlasName,
+      activeLocale,
+    ),
+    intro: translation?.intro
+      ? localizeAuthoredText(translation.intro, activeLocale)
+      : undefined,
+    details: translation?.details?.map((detail) =>
+      localizeAuthoredText(detail, activeLocale),
+    ),
+  };
 }
 
 function applyDocumentLanguage(): void {
