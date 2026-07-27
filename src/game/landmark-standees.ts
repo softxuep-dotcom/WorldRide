@@ -113,17 +113,25 @@ const COUNTRY_FLAGS: Readonly<Record<string, string>> = {
 };
 
 const textureLoader = new THREE.TextureLoader();
+const LANDMARK_TEXTURE_LOAD_RADIUS = 18;
 
 export interface LandmarkStandeeView {
   readonly root: THREE.Group;
   readonly fadeMaterials: THREE.Material[];
   readonly swayPhase: number;
   readonly baseLean: number;
+  readonly anchorX: number;
+  readonly anchorZ: number;
+  readonly spot: PhotoSpotDefinition;
+  readonly artMaterial: THREE.MeshBasicMaterial;
+  readonly fallbackTexture: THREE.CanvasTexture;
+  textureRequested: boolean;
 }
 
 export function createLandmarkStandee(
   spot: PhotoSpotDefinition,
   accent: THREE.ColorRepresentation,
+  anchor: { x: number; z: number },
 ): LandmarkStandeeView {
   const root = new THREE.Group();
   root.name = `${spot.id} rigid illustration placard`;
@@ -241,29 +249,6 @@ export function createLandmarkStandee(
   supportRail.position.set(0, boardBottom - 0.055, -0.075);
   root.add(leftSupport, rightSupport, supportRail);
 
-  if (GENERATED_LANDMARK_IDS.has(spot.id)) {
-    textureLoader.load(
-      `assets/landmarks/placard/${spot.id}.webp`,
-      (texture) => {
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.minFilter = THREE.LinearMipmapLinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        texture.anisotropy = 4;
-        texture.needsUpdate = true;
-
-        artMaterial.map = texture;
-        artMaterial.needsUpdate = true;
-        fallbackTexture.dispose();
-      },
-      undefined,
-      () => {
-        console.warn(
-          `Unable to load illustration for ${spot.id}; keeping the flag card.`,
-        );
-      },
-    );
-  }
-
   return {
     root,
     fadeMaterials: [
@@ -274,6 +259,12 @@ export function createLandmarkStandee(
     ],
     swayPhase: createStablePhase(spot.id),
     baseLean: createStableLean(spot.id),
+    anchorX: anchor.x,
+    anchorZ: anchor.z,
+    spot,
+    artMaterial,
+    fallbackTexture,
+    textureRequested: false,
   };
 }
 
@@ -281,7 +272,15 @@ export function updateLandmarkStandeeOverview(
   standee: LandmarkStandeeView,
   overviewBlend: number,
   elapsed: number,
+  distanceToPlayer: number,
 ): void {
+  if (
+    !standee.textureRequested &&
+    distanceToPlayer <= LANDMARK_TEXTURE_LOAD_RADIUS
+  ) {
+    requestLandmarkTexture(standee);
+  }
+
   standee.root.rotation.z =
     standee.baseLean + Math.sin(elapsed * 0.72 + standee.swayPhase) * 0.008;
 
@@ -301,6 +300,34 @@ export function updateLandmarkStandeeOverview(
       material.transparent = true;
     }
   }
+}
+
+function requestLandmarkTexture(standee: LandmarkStandeeView): void {
+  standee.textureRequested = true;
+  if (!GENERATED_LANDMARK_IDS.has(standee.spot.id)) {
+    return;
+  }
+
+  textureLoader.load(
+    landmarkIllustrationUrl(standee.spot.id),
+    (texture) => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.anisotropy = 4;
+      texture.needsUpdate = true;
+
+      standee.artMaterial.map = texture;
+      standee.artMaterial.needsUpdate = true;
+      standee.fallbackTexture.dispose();
+    },
+    undefined,
+    () => {
+      console.warn(
+        `Unable to load illustration for ${standee.spot.id}; keeping the flag card.`,
+      );
+    },
+  );
 }
 
 function createStablePhase(id: string): number {

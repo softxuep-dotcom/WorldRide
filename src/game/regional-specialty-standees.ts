@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { RegionalSpecialtyDefinition } from "./regional-specialties";
 
 const textureLoader = new THREE.TextureLoader();
+const SPECIALTY_TEXTURE_LOAD_RADIUS = 14;
 
 const boardGeometry = new THREE.BoxGeometry(1.58, 1.58, 0.085);
 const backplateGeometry = new THREE.BoxGeometry(1.72, 1.72, 0.1);
@@ -14,10 +15,16 @@ export interface RegionalSpecialtyStandeeView {
   readonly fadeMaterials: THREE.Material[];
   readonly swayPhase: number;
   readonly baseLean: number;
+  readonly anchorX: number;
+  readonly anchorZ: number;
+  readonly specialty: RegionalSpecialtyDefinition;
+  readonly artMaterial: THREE.MeshBasicMaterial;
+  textureRequested: boolean;
 }
 
 export function createRegionalSpecialtyStandee(
   specialty: RegionalSpecialtyDefinition,
+  anchor: { x: number; z: number },
 ): RegionalSpecialtyStandeeView {
   const root = new THREE.Group();
   root.name = `${specialty.id} regional specialty placard`;
@@ -74,23 +81,6 @@ export function createRegionalSpecialtyStandee(
     supportRail,
   );
 
-  textureLoader.load(
-    `assets/regional-specialties/${specialty.id}.png`,
-    (texture) => {
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.minFilter = THREE.LinearMipmapLinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      texture.anisotropy = 2;
-      texture.needsUpdate = true;
-      artMaterial.map = texture;
-      artMaterial.needsUpdate = true;
-    },
-    undefined,
-    () => {
-      console.warn(`Unable to load regional specialty art for ${specialty.id}.`);
-    },
-  );
-
   return {
     root,
     fadeMaterials: [
@@ -101,6 +91,11 @@ export function createRegionalSpecialtyStandee(
     ],
     swayPhase: createStablePhase(specialty.id),
     baseLean: createStableLean(specialty.id),
+    anchorX: anchor.x,
+    anchorZ: anchor.z,
+    specialty,
+    artMaterial,
+    textureRequested: false,
   };
 }
 
@@ -108,7 +103,15 @@ export function updateRegionalSpecialtyStandeeOverview(
   standee: RegionalSpecialtyStandeeView,
   overviewBlend: number,
   elapsed: number,
+  distanceToPlayer: number,
 ): void {
+  if (
+    !standee.textureRequested &&
+    distanceToPlayer <= SPECIALTY_TEXTURE_LOAD_RADIUS
+  ) {
+    requestSpecialtyTexture(standee);
+  }
+
   standee.root.rotation.z =
     standee.baseLean + Math.sin(elapsed * 0.66 + standee.swayPhase) * 0.006;
 
@@ -128,6 +131,30 @@ export function updateRegionalSpecialtyStandeeOverview(
       material.transparent = true;
     }
   }
+}
+
+function requestSpecialtyTexture(
+  standee: RegionalSpecialtyStandeeView,
+): void {
+  standee.textureRequested = true;
+  textureLoader.load(
+    `${import.meta.env.BASE_URL}assets/regional-specialties/${standee.specialty.id}.png`,
+    (texture) => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.anisotropy = 2;
+      texture.needsUpdate = true;
+      standee.artMaterial.map = texture;
+      standee.artMaterial.needsUpdate = true;
+    },
+    undefined,
+    () => {
+      console.warn(
+        `Unable to load regional specialty art for ${standee.specialty.id}.`,
+      );
+    },
+  );
 }
 
 function createStandardMaterial(

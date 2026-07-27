@@ -38,6 +38,7 @@ import {
   OceanLife,
   createOceanSurfaceMaterial,
 } from "./ocean-life";
+import { wrappedDeltaX } from "./progression";
 
 const RESERVED_MAP_MARKER_POSITIONS = [
   ...PHOTO_SPOTS.map((spot) => geoToWorld(spot.point)),
@@ -213,19 +214,36 @@ export class WorldView {
     }
 
     for (const standee of this.landmarkStandees) {
-      updateLandmarkStandeeOverview(standee, overviewBlend, elapsed);
+      const distance = Math.hypot(
+        wrappedDeltaX(standee.anchorX, position.x),
+        standee.anchorZ - position.z,
+      );
+      updateLandmarkStandeeOverview(
+        standee,
+        overviewBlend,
+        elapsed,
+        distance,
+      );
     }
 
     for (const standee of this.regionalSpecialtyStandees) {
+      const distance = Math.hypot(
+        wrappedDeltaX(standee.anchorX, position.x),
+        standee.anchorZ - position.z,
+      );
       updateRegionalSpecialtyStandeeOverview(
         standee,
         overviewBlend,
         elapsed,
+        distance,
       );
     }
 
     for (const effect of this.landmarkEffects) {
-      const distance = Math.hypot(effect.anchorX - position.x, effect.anchorZ - position.z);
+      const distance = Math.hypot(
+        wrappedDeltaX(effect.anchorX, position.x),
+        effect.anchorZ - position.z,
+      );
       const strength = THREE.MathUtils.clamp((18 - distance) / 13, 0, 1);
       const acquire = THREE.MathUtils.smoothstep(strength, 0.03, 0.4);
       const focus = THREE.MathUtils.smoothstep(strength, 0.38, 0.9);
@@ -439,7 +457,7 @@ export class WorldView {
     group.position.set(world.x, 0.445, world.z);
     group.name = `${specialty.name} regional specialty`;
 
-    const standee = createRegionalSpecialtyStandee(specialty);
+    const standee = createRegionalSpecialtyStandee(specialty, world);
     this.regionalSpecialtyStandees.push(standee);
     group.add(standee.root);
     this.root.add(group);
@@ -455,7 +473,7 @@ export class WorldView {
     group.position.set(world.x, 0.445, world.z);
     group.name = `${spot.name} photo spot`;
 
-    const standee = createLandmarkStandee(spot, accent);
+    const standee = createLandmarkStandee(spot, accent, world);
     this.landmarkStandees.push(standee);
     group.add(standee.root);
     this.addLandmarkPresentation(group, spot, accent, world);
