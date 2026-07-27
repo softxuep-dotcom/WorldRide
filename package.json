@@ -7,6 +7,10 @@
     "dev": "vite",
     "generate:ecology": "node scripts/generate-world-ecology.mjs",
     "build": "tsc && vite build",
+    "build:poki": "tsc && vite build --mode poki",
+    "build:crazygames": "tsc && vite build --mode crazygames",
+    "package:poki": "npm run build:poki && node scripts/package-platform.mjs poki",
+    "package:crazygames": "npm run build:crazygames && node scripts/package-platform.mjs crazygames",
     "preview": "vite preview"
   },
   "dependencies": {

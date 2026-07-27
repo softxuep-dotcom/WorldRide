@@ -37,6 +37,34 @@ npm run build
 npm run preview
 ```
 
+## 平台构建
+
+平台 SDK 通过 `src/platform/` 的统一适配层接入，游戏逻辑只调用加载、
+游玩和广告生命周期，不直接依赖 Poki 或 CrazyGames 的全局对象。普通 Web
+构建不加载任何平台 SDK。
+
+```bash
+# GitHub Pages / 普通 Web
+npm run build
+
+# Poki：生成相对路径构建并导出 exports/pocket-earth-poki.zip
+npm run package:poki
+
+# CrazyGames：生成相对路径构建并导出 ZIP
+npm run package:crazygames
+```
+
+Poki 构建会在首次游玩前提供商业广告机会；两个游戏平台都会在知识挑战
+完成这一自然停顿点提供商业广告机会。广告真正开始时，游戏会暂停渲染、
+输入和声音，并在广告结束或无填充时恢复。未来需要设计明确的奖励内容时，
+可调用 `window.__POCKET_EARTH__.rewardedBreak()`，仅在返回 `true` 时发放奖励。
+
+各构建输出目录：
+
+- Pages / Web：`dist/`
+- Poki：`dist-poki/`
+- CrazyGames：`dist-crazygames/`
+
 ## 多语言
 
 当前内置简体中文（`zh-CN`）和英文（`en`），按以下顺序选择初始语言：
@@ -65,7 +93,7 @@ npm run preview
 - 底部操作坞持续提供设置、知识挑战和护照；挑战按附近名胜、当前国家、世界题库三级回退，完成后仍可再次挑战。
 - 点击顶部地图按钮，可以在局部旅行和全球俯视之间切换。
 
-默认从法国马赛出发。出生时不会播放“抵达法国”，之后跨入其他国家会显示非阻断提示。
+默认从巴黎埃菲尔铁塔旁出发，首帧即可发现并打卡，完成一次零成本首胜。出生时不会播放“抵达法国”，之后跨入其他国家会显示非阻断提示。
 
 内容原则：国家负责抵达，奇观负责打卡，照片负责收藏。地理负责好玩，名胜负责吸引。
 

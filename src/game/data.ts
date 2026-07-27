@@ -1424,8 +1424,8 @@ export const PHOTO_SPOTS: readonly PhotoSpotDefinition[] = [
   },
 ];
 
-/** New journeys begin at the existing Marseille city anchor in southern France. */
-export const START_POINT: GeoPoint = [5.35, 43.35];
+/** New journeys begin directly at the Eiffel Tower for an immediate first win. */
+export const START_POINT: GeoPoint = [2.2945, 48.8584];
 
 export function geoToWorld(point: GeoPoint): { x: number; z: number } {
   const mercatorLatitude = latitudeToMercator(point[1]);

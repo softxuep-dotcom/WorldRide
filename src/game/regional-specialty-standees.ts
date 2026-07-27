@@ -138,7 +138,7 @@ function requestSpecialtyTexture(
 ): void {
   standee.textureRequested = true;
   textureLoader.load(
-    `${import.meta.env.BASE_URL}assets/regional-specialties/${standee.specialty.id}.png`,
+    `${import.meta.env.BASE_URL}assets/regional-specialties/${standee.specialty.id}.webp`,
     (texture) => {
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.minFilter = THREE.LinearMipmapLinearFilter;

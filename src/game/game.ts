@@ -35,8 +35,13 @@ export class PocketEarthGame {
   private sinceRoutineSave = 0;
   private compassAvailable = false;
   private compassMovementSeconds = 0;
+  private platformSuspended = false;
+  private contextLost = false;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    onCommercialBreak: () => void = () => {},
+  ) {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -57,11 +62,12 @@ export class PocketEarthGame {
 
     this.input = new InputController(canvas);
     this.ui = new GameUI(
-      () => this.simulation.interact(),
+      () => this.interact(),
       () => this.toggleWorldOverview(),
       () => this.audio.onMilestone(),
       (color) => this.world.setVehiclePaint(color),
       () => this.persist(true),
+      onCommercialBreak,
     );
 
     this.camera.near = 0.1;
@@ -86,7 +92,7 @@ export class PocketEarthGame {
     this.compassAvailable = this.restoredFromSave;
     this.ui.setCompassAvailable(this.compassAvailable);
     this.simulation.update(0, { x: 0, z: 0 });
-    // Establish Marseille as the starting context without pretending that the
+    // Establish Paris as the starting context without pretending that the
     // player has just crossed a border into France.
     this.processEvents(true);
     this.ui.update(this.simulation.state);
@@ -160,7 +166,12 @@ export class PocketEarthGame {
   }
 
   start(): void {
-    if (this.animationFrame !== undefined) {
+    if (
+      this.animationFrame !== undefined ||
+      this.platformSuspended ||
+      this.contextLost ||
+      document.visibilityState === "hidden"
+    ) {
       return;
     }
     this.clock.start();
@@ -175,17 +186,42 @@ export class PocketEarthGame {
   }
 
   interact(): void {
+    if (this.platformSuspended) {
+      return;
+    }
     this.simulation.interact();
     this.processEvents();
   }
 
   toggleWorldOverview(): void {
-    if (this.ui.isInputBlocked()) {
+    if (this.platformSuspended || this.ui.isInputBlocked()) {
       return;
     }
     this.worldOverview = !this.worldOverview;
     this.ui.setWorldOverview(this.worldOverview);
     this.onResize();
+  }
+
+  pauseForPlatform(): void {
+    if (this.platformSuspended) {
+      return;
+    }
+    this.platformSuspended = true;
+    this.persist(true);
+    this.saveStore.flush();
+    this.input.setEnabled(false);
+    this.audio.suspend();
+    this.stop();
+  }
+
+  resumeFromPlatform(): void {
+    if (!this.platformSuspended) {
+      return;
+    }
+    this.platformSuspended = false;
+    this.input.setEnabled(true);
+    this.audio.resume();
+    this.start();
   }
 
   private readonly tick = (): void => {
@@ -389,7 +425,7 @@ export class PocketEarthGame {
 
   private readonly onWheel = (event: WheelEvent): void => {
     event.preventDefault();
-    if (this.worldOverview) {
+    if (this.platformSuspended || this.worldOverview) {
       return;
     }
     this.cameraViewSize = THREE.MathUtils.clamp(
@@ -443,18 +479,22 @@ export class PocketEarthGame {
       this.persist(true);
       this.saveStore.flush();
       this.audio.suspend();
+      this.stop();
     } else {
       this.audio.resume();
+      this.start();
     }
   };
 
   private readonly onContextLost = (event: Event): void => {
     event.preventDefault();
+    this.contextLost = true;
     this.stop();
     this.ui.showToast(t("toast.contextLost"));
   };
 
   private readonly onContextRestored = (): void => {
+    this.contextLost = false;
     this.ui.showToast(t("toast.contextRestored"));
     this.start();
   };
@@ -463,6 +503,7 @@ export class PocketEarthGame {
     if (
       event.code === "KeyM" &&
       !event.repeat &&
+      !this.platformSuspended &&
       !this.ui.isInputBlocked()
     ) {
       this.toggleWorldOverview();

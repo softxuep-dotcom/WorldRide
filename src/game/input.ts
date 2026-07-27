@@ -2,6 +2,7 @@ import type { MovementInput } from "./simulation";
 
 export class InputController {
   readonly movement: MovementInput = { x: 0, z: 0 };
+  private enabled = true;
   private readonly pressedKeys = new Set<string>();
   private dragPointerId?: number;
   private dragOrigin = { x: 0, y: 0 };
@@ -21,6 +22,11 @@ export class InputController {
   }
 
   update(): MovementInput {
+    if (!this.enabled) {
+      this.movement.x = 0;
+      this.movement.z = 0;
+      return this.movement;
+    }
     const keyboardX =
       Number(this.pressedKeys.has("ArrowRight") || this.pressedKeys.has("KeyD")) -
       Number(this.pressedKeys.has("ArrowLeft") || this.pressedKeys.has("KeyA"));
@@ -34,6 +40,9 @@ export class InputController {
   }
 
   consumeInteractRequest(): boolean {
+    if (!this.enabled) {
+      return false;
+    }
     const requested = this.interactRequested;
     this.interactRequested = false;
     return requested;
@@ -50,6 +59,18 @@ export class InputController {
     this.surface.removeEventListener("lostpointercapture", this.onDragEnd);
   }
 
+  setEnabled(enabled: boolean): void {
+    if (this.enabled === enabled) {
+      return;
+    }
+    this.enabled = enabled;
+    if (!enabled) {
+      this.pressedKeys.clear();
+      this.interactRequested = false;
+      this.resetDrag();
+    }
+  }
+
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (
       ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "KeyW", "KeyA", "KeyS", "KeyD"].includes(
@@ -59,6 +80,9 @@ export class InputController {
       event.preventDefault();
     }
 
+    if (!this.enabled) {
+      return;
+    }
     this.pressedKeys.add(event.code);
     if (event.code === "Space" || event.code === "KeyE") {
       this.interactRequested = true;
@@ -76,6 +100,7 @@ export class InputController {
 
   private readonly onDragStart = (event: PointerEvent): void => {
     if (
+      !this.enabled ||
       this.dragPointerId !== undefined ||
       !event.isPrimary ||
       (event.pointerType === "mouse" && event.button !== 0)
@@ -93,7 +118,7 @@ export class InputController {
   };
 
   private readonly onDragMove = (event: PointerEvent): void => {
-    if (event.pointerId !== this.dragPointerId) {
+    if (!this.enabled || event.pointerId !== this.dragPointerId) {
       return;
     }
 

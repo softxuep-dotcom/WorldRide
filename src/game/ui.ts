@@ -196,6 +196,7 @@ export class GameUI {
   private readonly onCelebrate: () => void;
   private readonly onPaintChange: (color: number) => void;
   private readonly onProgressionChanged: () => void;
+  private readonly onCommercialBreak: () => void;
   private trip: PhotoSpotId[] = [];
   private completedTrips = 0;
   private readonly unlockedPaints = new Set<string>([DEFAULT_PAINT_ID]);
@@ -209,10 +210,12 @@ export class GameUI {
     onCelebrate: () => void = () => {},
     onPaintChange: (color: number) => void = () => {},
     onProgressionChanged: () => void = () => {},
+    onCommercialBreak: () => void = () => {},
   ) {
     this.onCelebrate = onCelebrate;
     this.onPaintChange = onPaintChange;
     this.onProgressionChanged = onProgressionChanged;
+    this.onCommercialBreak = onCommercialBreak;
     this.elements = {
       countryReveal: requireElement("country-reveal"),
       countryKicker: requireElement("context-kicker"),
@@ -1229,6 +1232,7 @@ export class GameUI {
     window.setTimeout(() => {
       this.elements.quizSkip.textContent = t("quiz.leave");
       this.closeQuiz();
+      this.onCommercialBreak();
     }, 1800);
   }
 
