@@ -26,6 +26,11 @@ declare global {
 }
 
 async function bootstrap(): Promise<void> {
+  const pageParams = new URLSearchParams(window.location.search);
+  if (pageParams.get("capture") === "cover") {
+    document.documentElement.dataset.coverCapture = "true";
+  }
+
   let game: PocketEarthGame | undefined;
   const platform = createGamePlatform({
     pause: () => game?.pauseForPlatform(),
@@ -46,7 +51,15 @@ async function bootstrap(): Promise<void> {
     },
     platform.id === "web" ? undefined : () => platform.rewardedBreak(),
   );
-  const requestedStart = new URLSearchParams(window.location.search).get("start");
+  const requestedStart = pageParams.get("start");
+  const requestedLongitude = Number(pageParams.get("longitude"));
+  const requestedLatitude = Number(pageParams.get("latitude"));
+  const requestedPoint =
+    pageParams.get("capture") === "cover" &&
+    Number.isFinite(requestedLongitude) &&
+    Number.isFinite(requestedLatitude)
+      ? ([requestedLongitude, requestedLatitude] as const)
+      : undefined;
   const requestedCountry = requestedStart
     ? COUNTRIES.find(
         (country) =>
@@ -58,11 +71,14 @@ async function bootstrap(): Promise<void> {
     ? PHOTO_SPOTS.find((spot) => spot.id === requestedStart)
     : undefined;
 
-  if (requestedCountry || requestedPhotoSpot) {
+  if (requestedPoint || requestedCountry || requestedPhotoSpot) {
     game.simulation.state.visitedCountries.clear();
     game.simulation.state.collectedPostcards.clear();
     game.simulation.state.currentCountry = undefined;
-    const point = requestedPhotoSpot?.point ?? requestedCountry!.city.point;
+    const point =
+      requestedPoint ??
+      requestedPhotoSpot?.point ??
+      requestedCountry!.city.point;
     game.simulation.teleport(point[0], point[1]);
   }
 

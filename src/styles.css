@@ -52,6 +52,10 @@ button {
   touch-action: none;
 }
 
+html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
+  display: none !important;
+}
+
 .mini-map,
 .controls-hint,
 .passport-panel {

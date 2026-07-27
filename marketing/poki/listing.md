@@ -52,14 +52,19 @@ world your roadtrip.
 
 ## Thumbnail delivery
 
-- File: `tiny-world-roadtrip-thumbnail.png`
-- Dimensions: 1254 × 1254 px
+- Recommended gameplay file: `tiny-world-roadtrip-thumbnail.png`
+- Gameplay dimensions: 720 × 720 px
+- Uncropped gameplay source: `tiny-world-roadtrip-gameplay-source.jpg`
+- Alternate concept-art file: `tiny-world-roadtrip-thumbnail-concept.png`
+- Concept-art dimensions: 1254 × 1254 px
 - Format: full-bleed RGB PNG
 - No pre-cut rounded corners, title, logo, border, or watermark
-- Main focal point: the coral travel car at the road-to-water transition
-- Background blue is deliberately distinct from Poki Playground `#83FFE7`
+- Main focal point: the actual in-game coral travel car approaching the coast
+- Capture URL: `?capture=cover&longitude=-5&latitude=43`
 
-The image follows Poki's current guidance: square and at least 628 × 628 px,
-simple foreground focus, recognizable gameplay, strong contrast, and legibility
-at small tile sizes.
-
+The recommended image is an unaltered in-engine render with the HUD hidden. It
+follows Poki's current guidance: square and at least 628 × 628 px, simple
+foreground focus, recognizable gameplay, strong contrast, and legibility at
+small tile sizes. The concept-art version is retained only as an alternate
+marketing direction because its rendering fidelity is higher than the shipped
+game.

@@ -23,7 +23,8 @@ export class PocketEarthGame {
   private readonly clock = new THREE.Clock();
   private readonly input: InputController;
   private readonly ui: GameUI;
-  private cameraViewSize = 17;
+  private cameraViewSize =
+    document.documentElement.dataset.coverCapture === "true" ? 5.5 : 17;
   private projectionViewSize = 17;
   private overviewBlend = 0;
   private hasSizedCamera = false;
