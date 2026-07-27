@@ -3,9 +3,9 @@ import { en } from "./en";
 
 const messages = {
   ...en.messages,
-  "meta.title": "Tiny World Roadtrip",
-  "meta.description": "Guida, naviga e scopri il mondo in Tiny World Roadtrip, una vivace avventura di viaggio in 3D.",
-  "canvas.label": "Vista di gioco 3D di Tiny World Roadtrip",
+  "meta.title": "Pocket Planet",
+  "meta.description": "Guida, naviga e scopri il mondo in Pocket Planet, una vivace avventura di viaggio in 3D.",
+  "canvas.label": "Vista di gioco 3D di Pocket Planet",
   "worldMap.toggle": "Mostra o nascondi la mappa del mondo",
   "worldMap.playerPosition": "Posizione del giocatore sulla mappa del mondo",
   "worldMap.label": "Mappa del mondo",

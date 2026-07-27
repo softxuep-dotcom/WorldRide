@@ -1,4 +1,4 @@
-# Tiny World Roadtrip · 小小世界环游记
+# Pocket Planet · 口袋星球
 
 一款可直接游玩的 Three.js 世界旅行游戏。世界采用真实国家轮廓打底、连续程序化地表覆盖的玩具地图风格。
 
@@ -47,7 +47,7 @@ npm run preview
 # GitHub Pages / 普通 Web
 npm run build
 
-# Poki：生成相对路径构建并导出 exports/tiny-world-roadtrip-poki.zip
+# Poki：生成相对路径构建并导出 exports/pocket-planet-poki.zip
 npm run package:poki
 
 # CrazyGames：生成相对路径构建并导出 ZIP

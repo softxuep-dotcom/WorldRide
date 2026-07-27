@@ -157,9 +157,9 @@ export const zhCN = {
   htmlLang: "zh-CN",
   label: "中文",
   messages: {
-    "meta.title": "Tiny World Roadtrip · 小小世界环游记",
-    "meta.description": "驾驶会变成小船的旅行车，在 Tiny World Roadtrip 中探索世界、收集明信片并挑战地理知识。",
-    "canvas.label": "Tiny World Roadtrip 3D 游戏画面",
+    "meta.title": "Pocket Planet · 口袋星球",
+    "meta.description": "驾驶会变成小船的旅行车，在 Pocket Planet 中探索世界、收集明信片并挑战地理知识。",
+    "canvas.label": "Pocket Planet 3D 游戏画面",
     "worldMap.toggle": "切换全球地图视角",
     "worldMap.playerPosition": "玩家在世界地图中的位置",
     "worldMap.label": "世界地图",

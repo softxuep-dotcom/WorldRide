@@ -102,5 +102,5 @@ async function bootstrap(): Promise<void> {
 }
 
 void bootstrap().catch((error: unknown) => {
-  console.error("Tiny World Roadtrip failed to start.", error);
+  console.error("Pocket Planet failed to start.", error);
 });

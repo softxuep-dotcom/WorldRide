@@ -9,7 +9,7 @@ if (platform !== "poki" && platform !== "crazygames") {
 
 const source = resolve(`dist-${platform}`);
 const exportsDirectory = resolve("exports");
-const archive = resolve(exportsDirectory, `tiny-world-roadtrip-${platform}.zip`);
+const archive = resolve(exportsDirectory, `pocket-planet-${platform}.zip`);
 
 mkdirSync(exportsDirectory, { recursive: true });
 rmSync(archive, { force: true });

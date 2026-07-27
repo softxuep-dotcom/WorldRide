@@ -1,10 +1,10 @@
-# Tiny World Roadtrip — Poki listing
+# Pocket Planet — Poki listing
 
 ## Final title
 
-**Tiny World Roadtrip**
+**Pocket Planet**
 
-中文工作名：**小小世界环游记**
+中文工作名：**口袋星球**
 
 ## Short description
 
@@ -13,7 +13,7 @@ postcards, and test your geography knowledge.
 
 ## Full description
 
-Pack your bags for **Tiny World Roadtrip**! Drive a cheerful little travel car
+Pack your bags for **Pocket Planet**! Drive a cheerful little travel car
 across a colorful miniature world—and watch it turn into a boat when the road
 meets the sea.
 
@@ -26,7 +26,7 @@ world your roadtrip.
 
 ## 项目简介
 
-《Tiny World Roadtrip（小小世界环游记）》是一款轻松明快的 3D 世界旅行探索
+《Pocket Planet（口袋星球）》是一款轻松明快的 3D 世界旅行探索
 游戏。玩家驾驶一辆遇水会自动变成小船的旅行车，在玩具模型般的世界地图上
 自由穿行，造访 33 个重点国家、打卡 54 处世界名胜与自然奇观、发现 43 种
 地域特色，并通过护照、明信片、三站式行程和地理知识挑战持续收集与成长。

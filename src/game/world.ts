@@ -102,7 +102,7 @@ export class WorldView {
   private vehicleTrailCursor = 0;
 
   constructor() {
-    this.root.name = "Tiny World Roadtrip world";
+    this.root.name = "Pocket Planet world";
     this.addBoard();
     this.addWorldCountries();
     this.addCountries();

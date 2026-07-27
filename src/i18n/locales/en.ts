@@ -178,9 +178,9 @@ export const en = {
   htmlLang: "en",
   label: "English",
   messages: {
-    "meta.title": "Tiny World Roadtrip",
-    "meta.description": "Drive, sail, and discover the world in Tiny World Roadtrip, a playful 3D travel adventure.",
-    "canvas.label": "Tiny World Roadtrip 3D game view",
+    "meta.title": "Pocket Planet",
+    "meta.description": "Drive, sail, and discover the world in Pocket Planet, a playful 3D travel adventure.",
+    "canvas.label": "Pocket Planet 3D game view",
     "worldMap.toggle": "Toggle the world map view",
     "worldMap.playerPosition": "Player position on the world map",
     "worldMap.label": "World map",
