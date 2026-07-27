@@ -4,6 +4,10 @@ export type CountryId =
   | "portugal"
   | "spain"
   | "france"
+  | "united-states"
+  | "canada"
+  | "mexico"
+  | "brazil"
   | "united-kingdom"
   | "germany"
   | "italy"
@@ -201,6 +205,86 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       point: [5.35, 43.35],
     },
     scenery: "green",
+  },
+  {
+    id: "united-states",
+    name: "美国",
+    englishName: "UNITED STATES OF AMERICA",
+    flag: "🇺🇸",
+    color: "#79ad77",
+    darkColor: "#526f55",
+    accent: "#cf604f",
+    intro: "横跨北美大陆中部，山脉、平原、森林、荒漠与两洋海岸形成巨大的地貌跨度。",
+    facts: [
+      "落基山脉沿美国西部南北延伸，是北美洲主要山系的一部分。",
+      "美国中部以大平原和密西西比河流域为主，东西两侧分别面向太平洋与大西洋。",
+      "美国西南部分布着高原、峡谷和干旱荒漠，大峡谷是其中最具代表性的地貌之一。",
+    ],
+    city: {
+      name: "华盛顿",
+      point: [-77.04, 38.91],
+    },
+    scenery: "highland",
+  },
+  {
+    id: "canada",
+    name: "加拿大",
+    englishName: "CANADA",
+    flag: "🇨🇦",
+    color: "#6fa589",
+    darkColor: "#4b7162",
+    accent: "#d45b52",
+    intro: "横跨北美洲北部，太平洋山地、辽阔森林、湖泊、草原与北极地貌共同构成广阔国土。",
+    facts: [
+      "加拿大西部连接落基山脉和太平洋沿岸山地。",
+      "加拿大拥有数量众多的湖泊，并与美国共享五大湖水系。",
+      "加拿大北部延伸至北极群岛，人口主要集中在国土南部。",
+    ],
+    city: {
+      name: "渥太华",
+      point: [-75.7, 45.42],
+    },
+    scenery: "highland",
+  },
+  {
+    id: "mexico",
+    name: "墨西哥",
+    englishName: "MEXICO",
+    flag: "🇲🇽",
+    color: "#b89b63",
+    darkColor: "#7c6b4d",
+    accent: "#c95b4d",
+    intro: "连接北美洲与中美洲，高原、山脉、北部荒漠、热带森林和两侧海岸在这里交汇。",
+    facts: [
+      "墨西哥高原位于东西两列马德雷山脉之间。",
+      "墨西哥北部较为干旱，南部和尤卡坦半岛拥有更温暖湿润的环境。",
+      "墨西哥城位于中部高原盆地，是全国最大的城市。",
+    ],
+    city: {
+      name: "墨西哥城",
+      point: [-99.13, 19.43],
+    },
+    scenery: "atlas",
+  },
+  {
+    id: "brazil",
+    name: "巴西",
+    englishName: "BRAZIL",
+    flag: "🇧🇷",
+    color: "#55a96d",
+    darkColor: "#397650",
+    accent: "#e2b746",
+    intro: "占据南美洲东部广大区域，亚马孙雨林、巴西高原、漫长河流与大西洋海岸形成多样景观。",
+    facts: [
+      "亚马孙河及其支流覆盖巴西北部广阔的热带雨林区域。",
+      "巴西高原分布在国土中部和东南部，许多大城市靠近大西洋海岸。",
+      "巴西是南美洲面积最大的国家，跨越赤道和南回归线。",
+    ],
+    city: {
+      name: "巴西利亚",
+      point: [-47.88, -15.79],
+    },
+    scenery: "tropical",
   },
   {
     id: "united-kingdom",

@@ -264,27 +264,68 @@ export class WorldLife {
   }
 
   private buildBirds(): void {
-    const birdMaterial = new THREE.MeshBasicMaterial({
-      color: 0x37434d,
+    const wingMaterial = new THREE.MeshStandardMaterial({
+      color: 0x557885,
+      roughness: 0.86,
+      flatShading: true,
       transparent: true,
-      opacity: 0.82,
+      opacity: 0.9,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
-    this.fadeables.push({ material: birdMaterial, baseOpacity: 0.82 });
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+      color: 0x294550,
+      roughness: 0.9,
+      flatShading: true,
+      transparent: true,
+      opacity: 0.94,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const beakMaterial = new THREE.MeshStandardMaterial({
+      color: 0xdba34c,
+      roughness: 0.82,
+      flatShading: true,
+      transparent: true,
+      opacity: 0.94,
+      depthWrite: false,
+    });
+    this.fadeables.push(
+      { material: wingMaterial, baseOpacity: 0.9 },
+      { material: bodyMaterial, baseOpacity: 0.94 },
+      { material: beakMaterial, baseOpacity: 0.94 },
+    );
 
-    const wingGeometry = new THREE.BoxGeometry(0.62, 0.03, 0.2);
-    // Nudge the pivot to the inner edge so the wing hinges from the body.
-    wingGeometry.translate(0.31, 0, 0);
+    const wingGeometry = createBirdWingGeometry();
+    const bodyGeometry = new THREE.DodecahedronGeometry(0.17, 0);
+    const headGeometry = new THREE.DodecahedronGeometry(0.105, 0);
+    const tailGeometry = createBirdTailGeometry();
+    const beakGeometry = new THREE.ConeGeometry(0.045, 0.14, 3);
+    beakGeometry.rotateX(Math.PI / 2);
 
     for (let index = 0; index < 8; index += 1) {
       const group = new THREE.Group();
       group.name = `bird ${index}`;
 
-      const leftWing = new THREE.Mesh(wingGeometry, birdMaterial);
-      const rightWing = new THREE.Mesh(wingGeometry, birdMaterial);
+      const leftWing = new THREE.Mesh(wingGeometry, wingMaterial);
+      const rightWing = new THREE.Mesh(wingGeometry, wingMaterial);
       rightWing.scale.x = -1;
-      group.add(leftWing, rightWing);
+
+      const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+      body.position.set(0, 0.025, 0.015);
+      body.scale.set(0.7, 0.58, 1.55);
+
+      const head = new THREE.Mesh(headGeometry, bodyMaterial);
+      head.position.set(0, 0.035, 0.25);
+      head.scale.set(0.92, 0.82, 1);
+
+      const tail = new THREE.Mesh(tailGeometry, bodyMaterial);
+      tail.position.set(0, 0.01, -0.22);
+
+      const beak = new THREE.Mesh(beakGeometry, beakMaterial);
+      beak.position.set(0, 0.025, 0.38);
+
+      group.add(tail, body, head, beak, leftWing, rightWing);
 
       // Two loose flocks travelling in slightly different directions.
       const flock = index % 2;
@@ -412,6 +453,46 @@ export class WorldLife {
     this.petalMesh = mesh;
     this.root.add(mesh);
   }
+}
+
+/**
+ * A tapered wing with a notched trailing edge. It stays a single flat mesh so
+ * all birds can flap cheaply, while the outline reads as feathers instead of
+ * the two rectangular bars used by the first version.
+ */
+function createBirdWingGeometry(): THREE.ShapeGeometry {
+  const shape = new THREE.Shape();
+  shape.moveTo(0.015, 0.08);
+  shape.lineTo(0.16, 0.17);
+  shape.lineTo(0.48, 0.15);
+  shape.lineTo(0.74, 0.035);
+  shape.lineTo(0.56, -0.025);
+  shape.lineTo(0.7, -0.13);
+  shape.lineTo(0.44, -0.085);
+  shape.lineTo(0.5, -0.215);
+  shape.lineTo(0.27, -0.12);
+  shape.lineTo(0.13, -0.205);
+  shape.lineTo(0.035, -0.075);
+  shape.closePath();
+
+  const geometry = new THREE.ShapeGeometry(shape, 4);
+  geometry.rotateX(Math.PI / 2);
+  return geometry;
+}
+
+/** A small forked tail that makes the travel direction legible from above. */
+function createBirdTailGeometry(): THREE.ShapeGeometry {
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.115, 0.035);
+  shape.lineTo(0.115, 0.035);
+  shape.lineTo(0.18, -0.27);
+  shape.lineTo(0, -0.17);
+  shape.lineTo(-0.18, -0.27);
+  shape.closePath();
+
+  const geometry = new THREE.ShapeGeometry(shape, 3);
+  geometry.rotateX(Math.PI / 2);
+  return geometry;
 }
 
 function createSoftSpriteTexture(): THREE.Texture {

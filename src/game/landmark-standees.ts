@@ -31,6 +31,18 @@ const GENERATED_LANDMARK_IDS = new Set<PhotoSpotId>([
   "mount-everest",
   "niagara-falls",
   "easter-island-moai",
+  "pompeii",
+  "burj-khalifa",
+  "sagrada-familia",
+  "leaning-tower-of-pisa",
+  "stonehenge",
+  "golden-gate-bridge",
+  "uluru",
+  "grand-prismatic-spring",
+  "victoria-falls",
+  "great-barrier-reef",
+  "pointe-du-hoc",
+  "hiroshima-peace-memorial",
 ]);
 
 /** True when the landmark ships a hand-drawn WebP placard illustration. */
@@ -92,8 +104,8 @@ export function createLandmarkStandee(
   const boardSize = 2.9;
   const boardBottom = 0.65;
   const boardCenterY = boardBottom + boardSize / 2;
-  const poleX = -boardSize / 2 - 0.11;
-  const poleHeight = boardBottom + boardSize + 0.18;
+  const supportOffset = 0.72;
+  const supportHeight = boardBottom + 0.28;
 
   const boardMaterial = new THREE.MeshStandardMaterial({
     color: 0xfff4d8,
@@ -175,26 +187,32 @@ export function createLandmarkStandee(
     flatShading: true,
   });
   poleMaterial.userData.baseOpacity = 1;
-  const pole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.055, 0.065, poleHeight, 10),
+  const supportGeometry = new THREE.CylinderGeometry(
+    0.055,
+    0.065,
+    supportHeight,
+    10,
+  );
+  const leftSupport = new THREE.Mesh(
+    supportGeometry,
     poleMaterial,
   );
-  pole.name = `${spot.id} placard pole`;
-  pole.position.set(poleX, poleHeight / 2, -0.105);
-
-  const finial = new THREE.Mesh(
-    new THREE.SphereGeometry(0.1, 12, 8),
+  leftSupport.name = `${spot.id} left centered support`;
+  leftSupport.position.set(-supportOffset, supportHeight / 2, -0.105);
+  const rightSupport = new THREE.Mesh(
+    supportGeometry,
     poleMaterial,
   );
-  finial.name = `${spot.id} placard finial`;
-  finial.position.set(poleX, poleHeight + 0.04, -0.105);
+  rightSupport.name = `${spot.id} right centered support`;
+  rightSupport.position.set(supportOffset, supportHeight / 2, -0.105);
 
-  const bracketGeometry = new THREE.BoxGeometry(0.22, 0.065, 0.085);
-  const upperBracket = new THREE.Mesh(bracketGeometry, poleMaterial);
-  const lowerBracket = new THREE.Mesh(bracketGeometry, poleMaterial);
-  upperBracket.position.set(poleX + 0.09, boardCenterY + 0.86, -0.06);
-  lowerBracket.position.set(poleX + 0.09, boardCenterY - 0.86, -0.06);
-  root.add(pole, finial, upperBracket, lowerBracket);
+  const supportRail = new THREE.Mesh(
+    new THREE.BoxGeometry(supportOffset * 2 + 0.18, 0.075, 0.09),
+    poleMaterial,
+  );
+  supportRail.name = `${spot.id} centered support rail`;
+  supportRail.position.set(0, boardBottom - 0.055, -0.075);
+  root.add(leftSupport, rightSupport, supportRail);
 
   if (GENERATED_LANDMARK_IDS.has(spot.id)) {
     textureLoader.load(

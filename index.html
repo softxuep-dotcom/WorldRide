@@ -18,73 +18,83 @@
         data-i18n-attr="aria-label:canvas.label"
       ></canvas>
 
-      <button
-        id="world-map-button"
-        class="mini-map"
-        type="button"
-        aria-label="Toggle the world map view"
-        data-i18n-attr="aria-label:worldMap.toggle"
-        aria-pressed="false"
-      >
-        <div class="mini-map__title">
-          <span id="map-view-label" data-i18n="worldMap.label">World map</span>
-          <span id="visited-count">1 / 29</span>
-        </div>
-        <svg
-          id="mini-map-svg"
-          viewBox="0 0 360 180"
-          role="img"
-          aria-label="Player position on the world map"
-          data-i18n-attr="aria-label:worldMap.playerPosition"
-        ></svg>
-      </button>
-
-      <section id="country-reveal" class="country-reveal" aria-live="polite">
-        <button id="interact-button" class="travel-info" type="button">
-          <span class="travel-info__copy">
-            <span class="travel-info__title">
-              <strong id="country-name">France</strong>
-              <span class="travel-info__action" aria-hidden="true">›</span>
+      <div id="travel-hud" class="travel-hud">
+        <section id="country-reveal" class="country-reveal" aria-live="polite">
+          <button id="interact-button" class="travel-info" type="button">
+            <span id="context-kicker" class="travel-info__kicker">🇫🇷 Country</span>
+            <span class="travel-info__copy">
+              <span class="travel-info__title">
+                <strong id="country-name">France</strong>
+                <span class="travel-info__action" aria-hidden="true">›</span>
+              </span>
+              <span id="country-intro" class="travel-info__intro">Southern ports, fields, and Mediterranean landscapes open the journey from Marseille.</span>
             </span>
-            <span id="country-intro" class="travel-info__intro">Southern ports, fields, and Mediterranean landscapes open the journey from Marseille.</span>
-          </span>
-        </button>
-      </section>
+            <span
+              id="country-arrival"
+              class="country-arrival"
+              role="status"
+              aria-live="polite"
+              aria-hidden="true"
+            ></span>
+          </button>
+        </section>
 
-      <div id="compass-dock" class="compass-dock" hidden>
         <button
-          id="compass"
-          class="compass"
+          id="world-map-button"
+          class="mini-map"
           type="button"
-          aria-haspopup="true"
-          aria-expanded="false"
-          aria-label="Places to go"
-          data-i18n-attr="aria-label:wishlist.title"
+          aria-label="Toggle the world map view"
+          data-i18n-attr="aria-label:worldMap.toggle"
+          aria-pressed="false"
         >
-          <span class="compass__rose" aria-hidden="true">
-            <span id="compass-arrow" class="compass__arrow"></span>
+          <span class="mini-map__title">
+            <span class="mini-map__icon" aria-hidden="true">🗺️</span>
+            <span id="map-view-label" data-i18n="worldMap.label">World map</span>
+            <span id="visited-count">1 / 29</span>
           </span>
-          <span class="compass__copy">
-            <small class="compass__eyebrow" data-i18n="compass.heading">Heading to</small>
-            <strong id="compass-target" class="compass__target"></strong>
-            <span id="compass-distance" class="compass__distance"></span>
-          </span>
+          <svg
+            id="mini-map-svg"
+            viewBox="0 0 360 180"
+            role="img"
+            aria-label="Player position on the world map"
+            data-i18n-attr="aria-label:worldMap.playerPosition"
+          ></svg>
         </button>
-        <div id="wishlist" class="wishlist" hidden>
-          <h3 class="wishlist__title" data-i18n="wishlist.title">Places to go</h3>
-          <p class="wishlist__hint" data-i18n="wishlist.hint">Pick a destination and follow the compass.</p>
-          <ul id="wishlist-items" class="wishlist__items"></ul>
+
+        <div id="compass-dock" class="compass-dock" hidden>
+          <button
+            id="compass"
+            class="compass"
+            type="button"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-label="Places to go"
+            data-i18n-attr="aria-label:wishlist.title"
+          >
+            <span class="compass__rose" aria-hidden="true">
+              <span id="compass-arrow" class="compass__arrow"></span>
+            </span>
+            <span class="compass__copy">
+              <small class="compass__eyebrow" data-i18n="compass.heading">Heading to</small>
+              <strong id="compass-target" class="compass__target"></strong>
+              <span id="compass-distance" class="compass__distance"></span>
+            </span>
+          </button>
+          <div id="wishlist" class="wishlist" hidden>
+            <h3 class="wishlist__title" data-i18n="wishlist.title">Places to go</h3>
+            <p class="wishlist__hint" data-i18n="wishlist.hint">Pick a destination and follow the compass.</p>
+            <ul id="wishlist-items" class="wishlist__items"></ul>
+          </div>
         </div>
       </div>
 
-      <div id="toast" class="toast" role="status" aria-live="polite"></div>
-      <div
-        id="country-arrival"
-        class="country-arrival"
-        role="status"
-        aria-live="polite"
-        aria-hidden="true"
-      ></div>
+      <div class="feedback-zone">
+        <div id="toast" class="toast" role="status" aria-live="polite"></div>
+        <section id="controls-hint" class="controls-hint">
+          <span class="desktop-hint" data-i18n="controls.desktop">Move with WASD / arrow keys · M opens the world map · Space explores nearby landmarks</span>
+          <span class="touch-hint" data-i18n="controls.touch">Hold and drag anywhere to travel · Approach a diamond marker to explore a landmark</span>
+        </section>
+      </div>
       <div id="flash" class="camera-flash" aria-hidden="true"></div>
 
       <div
@@ -102,34 +112,75 @@
         </div>
       </div>
 
-      <section id="controls-hint" class="controls-hint">
-        <span class="desktop-hint" data-i18n="controls.desktop">Move with WASD / arrow keys · M opens the world map · Space explores nearby landmarks</span>
-        <span class="touch-hint" data-i18n="controls.touch">Hold and drag anywhere to travel · Approach a diamond marker to explore a landmark</span>
-      </section>
+      <nav class="action-dock" aria-label="Travel actions" data-i18n-attr="aria-label:actions.label">
+        <div class="settings-control">
+          <button
+            id="settings-button"
+            class="action-dock__button action-dock__button--compact"
+            type="button"
+            aria-expanded="false"
+            aria-controls="settings-popover"
+          >
+            <span class="action-dock__icon" aria-hidden="true">⚙️</span>
+            <span data-i18n="settings.open">Settings</span>
+          </button>
+          <section
+            id="settings-popover"
+            class="settings-popover"
+            aria-hidden="true"
+            hidden
+          >
+            <strong data-i18n="settings.title">Settings</strong>
+            <div class="settings-popover__row">
+              <span data-i18n="settings.sound">Sound</span>
+              <button
+                id="sound-button"
+                class="sound-button"
+                type="button"
+                aria-label="Toggle sound"
+                data-i18n-attr="aria-label:sound.toggle"
+                aria-pressed="true"
+              >🔊</button>
+            </div>
+            <label class="language-picker">
+              <span data-i18n="settings.language">Language</span>
+              <select
+                id="language-select"
+                aria-label="Choose language"
+                data-i18n-attr="aria-label:language.label"
+              ></select>
+            </label>
+          </section>
+        </div>
 
-      <button id="passport-button" class="passport-button" type="button" aria-expanded="false">
-        <span aria-hidden="true">📘</span>
-        <span data-i18n="passport.open">Passport</span>
-      </button>
+        <button id="quiz-button" class="quiz-button" type="button" disabled>
+          <span class="action-dock__icon" aria-hidden="true">🎯</span>
+          <span>
+            <small id="quiz-button-subject" data-i18n="quiz.unavailable">No local challenge</small>
+            <strong data-i18n="quiz.challenge">Knowledge challenge</strong>
+          </span>
+        </button>
+
+        <button
+          id="passport-button"
+          class="passport-button action-dock__button action-dock__button--compact"
+          type="button"
+          aria-expanded="false"
+        >
+          <span class="action-dock__icon" aria-hidden="true">📘</span>
+          <span data-i18n="passport.open">Passport</span>
+        </button>
+      </nav>
 
       <button
-        id="sound-button"
-        class="sound-button"
+        id="passport-backdrop"
+        class="passport-backdrop"
         type="button"
-        aria-label="Toggle sound"
-        data-i18n-attr="aria-label:sound.toggle"
-        aria-pressed="true"
-      >🔊</button>
-
-      <label class="language-picker">
-        <span aria-hidden="true">🌐</span>
-        <select
-          id="language-select"
-          aria-label="Choose language"
-          data-i18n-attr="aria-label:language.label"
-        ></select>
-      </label>
-
+        aria-label="Close passport"
+        data-i18n-attr="aria-label:passport.close"
+        aria-hidden="true"
+        tabindex="-1"
+      ></button>
       <aside id="passport-panel" class="passport-panel" aria-hidden="true">
         <header>
           <div>
@@ -233,14 +284,6 @@
           </footer>
         </article>
       </section>
-
-      <button id="quiz-button" class="quiz-button" type="button" hidden>
-        <span aria-hidden="true">🎯</span>
-        <span>
-          <small id="quiz-button-subject"></small>
-          <strong data-i18n="quiz.challenge">Knowledge challenge</strong>
-        </span>
-      </button>
 
       <section
         id="quiz-panel"

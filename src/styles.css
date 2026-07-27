@@ -1953,3 +1953,511 @@ button {
     border-radius: 22px;
   }
 }
+
+/* ---------- Mobile-first travel HUD ---------- */
+
+.travel-hud {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  right: max(8px, env(safe-area-inset-right));
+  left: max(8px, env(safe-area-inset-left));
+  z-index: 10;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  grid-template-rows: auto auto;
+  gap: 7px;
+  pointer-events: none;
+}
+
+.travel-hud .country-reveal {
+  position: static;
+  grid-column: 1;
+  grid-row: 1;
+  width: auto;
+  min-width: 0;
+}
+
+.travel-hud .travel-info {
+  position: relative;
+  min-height: 48px;
+  padding: 7px 11px 8px;
+  border-radius: 16px;
+}
+
+.travel-info__kicker {
+  display: block;
+  min-height: 12px;
+  overflow: hidden;
+  color: var(--coral);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: opacity 160ms ease;
+}
+
+.travel-hud .country-reveal strong {
+  font-size: 16px;
+}
+
+.travel-hud .travel-info__intro {
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.25;
+  -webkit-line-clamp: 1;
+}
+
+.travel-hud .mini-map {
+  position: static;
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  place-items: center;
+  border-radius: 16px;
+}
+
+.travel-hud .mini-map:hover {
+  transform: none;
+}
+
+.travel-hud .mini-map__title {
+  display: grid;
+  margin: 0;
+  place-items: center;
+}
+
+.mini-map__icon {
+  display: block;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.travel-hud #map-view-label,
+.travel-hud #visited-count,
+.travel-hud #mini-map-svg {
+  display: none;
+}
+
+.travel-hud .compass-dock {
+  position: static;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  align-items: stretch;
+  transform: none;
+}
+
+.travel-hud .compass {
+  width: 100%;
+  max-width: none;
+  min-height: 44px;
+  padding: 5px 12px 5px 7px;
+  border-radius: 15px;
+}
+
+.travel-hud .compass__rose {
+  width: 30px;
+  height: 30px;
+}
+
+.travel-hud .compass__copy {
+  flex: 1;
+}
+
+.travel-hud .compass__target {
+  font-size: 13px;
+}
+
+.travel-hud .compass__distance {
+  font-size: 10px;
+}
+
+.country-arrival {
+  position: absolute;
+  top: 7px;
+  right: 34px;
+  left: 11px;
+  z-index: 1;
+  max-width: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--coral);
+  font-size: 9px;
+  line-height: 1.2;
+  text-align: left;
+  opacity: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: none;
+}
+
+.country-arrival.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.country-reveal.is-arriving .travel-info {
+  border-color: rgba(255, 112, 88, 0.8);
+  box-shadow:
+    0 10px 28px rgba(17, 48, 65, 0.14),
+    0 0 0 3px rgba(255, 112, 88, 0.14);
+}
+
+.country-reveal.is-arriving .travel-info__kicker {
+  opacity: 0;
+}
+
+.feedback-zone {
+  position: absolute;
+  right: max(8px, env(safe-area-inset-right));
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 66px);
+  left: max(8px, env(safe-area-inset-left));
+  z-index: 14;
+  height: 44px;
+  pointer-events: none;
+}
+
+.feedback-zone .toast,
+.feedback-zone .controls-hint {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  max-width: 100%;
+  transform: translate(-50%, 8px);
+}
+
+.feedback-zone .toast.is-visible {
+  transform: translate(-50%, 0);
+}
+
+.feedback-zone .controls-hint {
+  padding: 7px 10px;
+  overflow: hidden;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.feedback-zone .toast.is-visible + .controls-hint {
+  opacity: 0;
+}
+
+.action-dock {
+  position: absolute;
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  left: max(8px, env(safe-area-inset-left));
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 64px;
+  gap: 4px;
+  height: 58px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 19px;
+  background: rgba(245, 248, 243, 0.9);
+  box-shadow: 0 12px 32px rgba(17, 48, 65, 0.2);
+  backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  transition: opacity 180ms ease, transform 220ms ease;
+}
+
+.settings-control {
+  position: relative;
+  min-width: 0;
+}
+
+.action-dock__button,
+.action-dock .passport-button,
+.action-dock .quiz-button {
+  position: static;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.action-dock__button--compact {
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.action-dock__icon {
+  flex: 0 0 auto;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.action-dock .quiz-button {
+  gap: 8px;
+  padding: 4px 12px;
+  background: var(--coral);
+  color: white;
+  animation: none;
+}
+
+.action-dock .quiz-button small,
+.action-dock .quiz-button strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-dock .quiz-button small {
+  font-size: 9px;
+}
+
+.action-dock .quiz-button strong {
+  font-size: 12px;
+}
+
+.action-dock .quiz-button:disabled {
+  background: rgba(23, 49, 71, 0.13);
+  color: var(--ink-soft);
+  cursor: default;
+  opacity: 1;
+}
+
+.action-dock .quiz-button.is-completed {
+  background: #318d62;
+}
+
+.settings-popover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  z-index: 36;
+  width: min(260px, calc(100vw - 16px));
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 18px;
+  background: rgba(255, 251, 236, 0.97);
+  box-shadow: 0 18px 54px rgba(23, 57, 77, 0.3);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.settings-popover[hidden] {
+  display: none;
+}
+
+.settings-popover > strong {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--coral);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.settings-popover__row,
+.settings-popover .language-picker {
+  position: static;
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px 0 10px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(23, 49, 71, 0.06);
+  box-shadow: none;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.settings-popover .language-picker {
+  margin-top: 8px;
+  padding-right: 10px;
+}
+
+.settings-popover .sound-button {
+  position: static;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-popover .language-picker select {
+  min-height: 36px;
+  text-align: right;
+}
+
+.wishlist {
+  position: fixed;
+  right: max(8px, env(safe-area-inset-right));
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 68px);
+  left: max(8px, env(safe-area-inset-left));
+  z-index: 36;
+  width: auto;
+  max-height: min(52dvh, 360px);
+  overflow-y: auto;
+}
+
+.passport-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 37;
+  border: 0;
+  background: rgba(15, 20, 24, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: opacity 180ms ease;
+}
+
+.passport-backdrop.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.passport-panel {
+  right: max(8px, env(safe-area-inset-right));
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 66px);
+  left: max(8px, env(safe-area-inset-left));
+  z-index: 38;
+  width: auto;
+  max-height: min(72dvh, 650px);
+  padding: 18px;
+  border-radius: 24px 24px 18px 18px;
+  transform-origin: bottom center;
+}
+
+#game-shell.is-world-overview .action-dock,
+#game-shell.is-world-overview .feedback-zone {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+}
+
+@media (min-width: 900px) {
+  .travel-hud {
+    top: max(14px, env(safe-area-inset-top));
+    right: max(14px, env(safe-area-inset-right));
+    left: max(14px, env(safe-area-inset-left));
+    grid-template-columns: minmax(260px, 320px) minmax(240px, 1fr) 184px;
+    grid-template-rows: auto;
+    gap: 16px;
+  }
+
+  .travel-hud .country-reveal {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .travel-hud .travel-info {
+    min-height: 60px;
+    padding: 9px 14px 10px;
+    border-radius: 19px;
+  }
+
+  .travel-hud .country-reveal strong {
+    font-size: 19px;
+  }
+
+  .travel-hud .travel-info__intro {
+    font-size: 11px;
+    -webkit-line-clamp: 2;
+  }
+
+  .travel-hud .mini-map {
+    grid-column: 3;
+    grid-row: 1;
+    display: block;
+    width: 184px;
+    height: auto;
+    padding: 9px;
+    border-radius: 18px;
+  }
+
+  .travel-hud .mini-map__title {
+    display: flex;
+    margin: 0 2px 6px;
+  }
+
+  .mini-map__icon {
+    display: none;
+  }
+
+  .travel-hud #map-view-label,
+  .travel-hud #visited-count {
+    display: inline;
+  }
+
+  .travel-hud #mini-map-svg {
+    display: block;
+  }
+
+  .travel-hud .compass-dock {
+    grid-column: 2;
+    grid-row: 1;
+    align-items: center;
+  }
+
+  .travel-hud .compass {
+    width: auto;
+    max-width: min(100%, 300px);
+    border-radius: 999px;
+  }
+
+  .wishlist {
+    position: static;
+    width: min(280px, 78vw);
+    max-height: none;
+    overflow: visible;
+  }
+
+  .feedback-zone {
+    bottom: calc(max(18px, env(safe-area-inset-bottom)) + 66px);
+  }
+
+  .action-dock {
+    right: auto;
+    left: 50%;
+    width: min(440px, calc(100vw - 32px));
+    transform: translateX(-50%);
+  }
+
+  #game-shell.is-world-overview .action-dock {
+    transform: translate(-50%, 8px);
+  }
+
+  .passport-panel {
+    right: max(16px, env(safe-area-inset-right));
+    bottom: calc(max(18px, env(safe-area-inset-bottom)) + 66px);
+    left: auto;
+    width: min(340px, calc(100vw - 32px));
+    border-radius: 24px;
+    transform-origin: bottom right;
+  }
+}

@@ -46,6 +46,7 @@ interface QuizSubject {
 
 interface UIElements {
   countryReveal: HTMLElement;
+  countryKicker: HTMLElement;
   countryName: HTMLElement;
   countryIntro: HTMLElement;
   toast: HTMLElement;
@@ -54,6 +55,7 @@ interface UIElements {
   miniMapSvg: SVGSVGElement;
   interactButton: HTMLButtonElement;
   passportButton: HTMLButtonElement;
+  passportBackdrop: HTMLButtonElement;
   passportPanel: HTMLElement;
   passportClose: HTMLButtonElement;
   stampGrid: HTMLElement;
@@ -73,6 +75,8 @@ interface UIElements {
   landmarkDetailStatus: HTMLElement;
   landmarkDetailConfirm: HTMLButtonElement;
   languageSelect: HTMLSelectElement;
+  settingsButton: HTMLButtonElement;
+  settingsPopover: HTMLElement;
   quizButton: HTMLButtonElement;
   quizButtonSubject: HTMLElement;
   quizPanel: HTMLElement;
@@ -146,6 +150,7 @@ export class GameUI {
   private latestState?: GameState;
   private selectedTargetId?: PhotoSpotId;
   private wishlistOpen = false;
+  private settingsOpen = false;
   private wishlistStructureSig?: string;
   private wishlistRows: WishlistRow[] = [];
   private compassSignature?: string;
@@ -168,6 +173,7 @@ export class GameUI {
     this.onCelebrate = onCelebrate;
     this.elements = {
       countryReveal: requireElement("country-reveal"),
+      countryKicker: requireElement("context-kicker"),
       countryName: requireElement("country-name"),
       countryIntro: requireElement("country-intro"),
       toast: requireElement("toast"),
@@ -176,6 +182,7 @@ export class GameUI {
       miniMapSvg: requireSvgElement("mini-map-svg"),
       interactButton: requireButton("interact-button"),
       passportButton: requireButton("passport-button"),
+      passportBackdrop: requireButton("passport-backdrop"),
       passportPanel: requireElement("passport-panel"),
       passportClose: requireButton("passport-close"),
       stampGrid: requireElement("stamp-grid"),
@@ -195,6 +202,8 @@ export class GameUI {
       landmarkDetailStatus: requireElement("landmark-detail-status"),
       landmarkDetailConfirm: requireButton("landmark-detail-confirm"),
       languageSelect: requireSelect("language-select"),
+      settingsButton: requireButton("settings-button"),
+      settingsPopover: requireElement("settings-popover"),
       quizButton: requireButton("quiz-button"),
       quizButtonSubject: requireElement("quiz-button-subject"),
       quizPanel: requireElement("quiz-panel"),
@@ -245,7 +254,13 @@ export class GameUI {
       }
     });
     this.elements.worldMapButton.addEventListener("click", onToggleWorldView);
+    this.elements.settingsButton.addEventListener("click", () =>
+      this.setSettingsOpen(!this.settingsOpen),
+    );
     this.elements.passportButton.addEventListener("click", () => this.togglePassport());
+    this.elements.passportBackdrop.addEventListener("click", () =>
+      this.togglePassport(false),
+    );
     this.elements.passportClose.addEventListener("click", () => this.togglePassport(false));
     this.elements.landmarkDetailBackdrop.addEventListener("click", () =>
       this.toggleLandmarkDetail(false),
@@ -272,11 +287,19 @@ export class GameUI {
       this.toggleAlbum(false),
     );
     document.addEventListener("pointerdown", (event) => {
+      const target = event.target as Node;
       if (
         this.wishlistOpen &&
-        !this.elements.compassDock.contains(event.target as Node)
+        !this.elements.compassDock.contains(target)
       ) {
         this.setWishlistOpen(false);
+      }
+      if (
+        this.settingsOpen &&
+        !this.elements.settingsButton.contains(target) &&
+        !this.elements.settingsPopover.contains(target)
+      ) {
+        this.setSettingsOpen(false);
       }
     });
 
@@ -286,6 +309,7 @@ export class GameUI {
         this.togglePassport(false);
         this.closeQuiz();
         this.setWishlistOpen(false);
+        this.setSettingsOpen(false);
         this.toggleAlbum(false);
       }
     });
@@ -374,6 +398,7 @@ export class GameUI {
     }
     this.compassAvailable = available;
     if (available) {
+      this.elements.controlsHint.classList.add("is-faded");
       this.elements.compassDock.classList.add("is-introducing");
       window.setTimeout(
         () => this.elements.compassDock.classList.remove("is-introducing"),
@@ -397,8 +422,7 @@ export class GameUI {
     const blocked =
       !this.compassAvailable ||
       this.worldOverviewActive ||
-      this.isInputBlocked() ||
-      Boolean(this.activeQuiz);
+      this.hasPrimarySurface();
     const targets = blocked ? [] : this.uncollectedByDistance(state);
 
     if (targets.length === 0) {
@@ -467,6 +491,13 @@ export class GameUI {
 
   private setWishlistOpen(open: boolean): void {
     const next = open && !this.elements.compassDock.hidden;
+    if (next) {
+      this.setSettingsOpen(false);
+      this.togglePassport(false);
+      this.toggleLandmarkDetail(false);
+      this.closeQuiz();
+      this.toggleAlbum(false);
+    }
     this.wishlistOpen = next;
     this.elements.wishlist.hidden = !next;
     this.elements.compass.setAttribute("aria-expanded", String(next));
@@ -482,6 +513,23 @@ export class GameUI {
         }
       }
     }
+    this.syncSurfaceState();
+  }
+
+  private setSettingsOpen(open: boolean): void {
+    const next = open && !this.worldOverviewActive;
+    if (next) {
+      this.setWishlistOpen(false);
+      this.togglePassport(false);
+      this.toggleLandmarkDetail(false);
+      this.closeQuiz();
+      this.toggleAlbum(false);
+    }
+    this.settingsOpen = next;
+    this.elements.settingsPopover.hidden = !next;
+    this.elements.settingsPopover.setAttribute("aria-hidden", String(!next));
+    this.elements.settingsButton.setAttribute("aria-expanded", String(next));
+    this.syncSurfaceState();
   }
 
   private renderWishlist(
@@ -771,30 +819,35 @@ export class GameUI {
       }
     }
 
-    if (subject && this.completedQuizzes.has(subject.quiz.id)) {
-      subject = undefined;
-    }
-
     this.availableQuiz = subject;
 
-    const hidden =
-      !subject || this.worldOverviewActive || Boolean(this.activeQuiz);
-    this.elements.quizButton.hidden = hidden;
-    if (subject) {
-      this.elements.quizButtonSubject.textContent = subject.label;
-    }
+    const completed = Boolean(
+      subject && this.completedQuizzes.has(subject.quiz.id),
+    );
+    this.elements.quizButton.hidden = false;
+    this.elements.quizButton.disabled =
+      !subject || this.worldOverviewActive || this.hasPrimarySurface();
+    this.elements.quizButton.classList.toggle("is-completed", completed);
+    this.elements.quizButtonSubject.textContent = subject
+      ? `${subject.label}${completed ? " · ✓" : ""}`
+      : t("quiz.unavailable");
   }
 
   private openQuiz(): void {
-    if (!this.availableQuiz) {
+    if (!this.availableQuiz || this.worldOverviewActive) {
       return;
     }
+    this.setSettingsOpen(false);
+    this.setWishlistOpen(false);
+    this.togglePassport(false);
+    this.toggleLandmarkDetail(false);
+    this.toggleAlbum(false);
     this.activeQuiz = this.availableQuiz;
     this.quizIndex = 0;
     this.quizCorrect = 0;
-    this.elements.quizButton.hidden = true;
     this.elements.quizPanel.classList.add("is-visible");
     this.elements.quizPanel.setAttribute("aria-hidden", "false");
+    this.syncSurfaceState();
     this.renderQuizQuestion();
   }
 
@@ -805,6 +858,11 @@ export class GameUI {
     this.activeQuiz = undefined;
     this.elements.quizPanel.classList.remove("is-visible");
     this.elements.quizPanel.setAttribute("aria-hidden", "true");
+    this.syncSurfaceState();
+    this.refreshQuizAvailability(
+      this.currentCountry,
+      this.currentNearestPhotoSpot,
+    );
   }
 
   private renderQuizQuestion(): void {
@@ -963,9 +1021,11 @@ export class GameUI {
     window.clearTimeout(this.countryArrivalTimer);
     this.elements.countryArrival.textContent = message;
     this.elements.countryArrival.classList.add("is-visible");
+    this.elements.countryReveal.classList.add("is-arriving");
     this.elements.countryArrival.setAttribute("aria-hidden", "false");
     this.countryArrivalTimer = window.setTimeout(() => {
       this.elements.countryArrival.classList.remove("is-visible");
+      this.elements.countryReveal.classList.remove("is-arriving");
       this.elements.countryArrival.setAttribute("aria-hidden", "true");
     }, 2400);
   }
@@ -974,6 +1034,7 @@ export class GameUI {
     this.worldOverviewActive = active;
     if (active) {
       this.setWishlistOpen(false);
+      this.setSettingsOpen(false);
     }
     document.getElementById("game-shell")?.classList.toggle("is-world-overview", active);
     this.elements.worldMapButton.classList.toggle("is-overview", active);
@@ -984,13 +1045,35 @@ export class GameUI {
     this.showToast(
       active ? t("worldMap.openToast") : t("worldMap.closeToast"),
     );
+    this.refreshQuizAvailability(
+      this.currentCountry,
+      this.currentNearestPhotoSpot,
+    );
   }
 
   isInputBlocked(): boolean {
     return (
+      this.hasPrimarySurface() ||
+      this.wishlistOpen ||
+      this.settingsOpen
+    );
+  }
+
+  private hasPrimarySurface(): boolean {
+    return (
       this.elements.landmarkDetail.classList.contains("is-visible") ||
       this.elements.passportPanel.classList.contains("is-visible") ||
-      this.elements.postcardAlbum.classList.contains("is-visible")
+      this.elements.postcardAlbum.classList.contains("is-visible") ||
+      Boolean(this.activeQuiz)
+    );
+  }
+
+  private syncSurfaceState(): void {
+    const shell = document.getElementById("game-shell");
+    shell?.classList.toggle("has-primary-surface", this.hasPrimarySurface());
+    shell?.classList.toggle(
+      "has-secondary-surface",
+      this.wishlistOpen || this.settingsOpen,
     );
   }
 
@@ -1013,6 +1096,12 @@ export class GameUI {
     this.displayedContextId = contextId;
     this.elements.countryReveal.classList.toggle("has-landmark", Boolean(spot));
     if (spot) {
+      const atlasCountry = getWorldCountryByName(spot.atlasCountryName);
+      const spotCountry = country ?? (
+        atlasCountry ? getCountryProfile(atlasCountry) : undefined
+      );
+      this.elements.countryKicker.textContent =
+        `${spotCountry?.flag ?? "◆"} ${spotCountry?.name ?? spot.atlasCountryName} · ${t("context.landmark")}`;
       this.elements.countryName.textContent = spot.name;
       this.elements.countryIntro.textContent = spot.postcard;
       this.elements.interactButton.setAttribute(
@@ -1022,6 +1111,8 @@ export class GameUI {
       return;
     }
 
+    this.elements.countryKicker.textContent =
+      `${country!.flag} ${t("context.country")}`;
     this.elements.countryName.textContent = country!.name;
     this.elements.countryIntro.textContent = country!.intro;
     this.elements.interactButton.setAttribute(
@@ -1113,19 +1204,41 @@ export class GameUI {
     if (shouldOpen && !this.selectedPhotoSpot && !this.selectedCountry) {
       return;
     }
+    if (shouldOpen) {
+      this.setSettingsOpen(false);
+      this.setWishlistOpen(false);
+      this.togglePassport(false);
+      this.closeQuiz();
+      this.toggleAlbum(false);
+    }
     this.elements.landmarkDetail.classList.toggle("is-visible", shouldOpen);
     this.elements.landmarkDetail.setAttribute(
       "aria-hidden",
       String(!shouldOpen),
     );
+    this.syncSurfaceState();
   }
 
   private togglePassport(force?: boolean): void {
     const shouldOpen =
       force ?? !this.elements.passportPanel.classList.contains("is-visible");
+    if (shouldOpen) {
+      this.setSettingsOpen(false);
+      this.setWishlistOpen(false);
+      this.toggleLandmarkDetail(false);
+      this.closeQuiz();
+      this.toggleAlbum(false);
+    }
     this.elements.passportPanel.classList.toggle("is-visible", shouldOpen);
     this.elements.passportPanel.setAttribute("aria-hidden", String(!shouldOpen));
     this.elements.passportButton.setAttribute("aria-expanded", String(shouldOpen));
+    this.elements.passportBackdrop.classList.toggle("is-visible", shouldOpen);
+    this.elements.passportBackdrop.setAttribute(
+      "aria-hidden",
+      String(!shouldOpen),
+    );
+    this.elements.passportBackdrop.tabIndex = shouldOpen ? 0 : -1;
+    this.syncSurfaceState();
   }
 
   /**
@@ -1142,8 +1255,16 @@ export class GameUI {
   private toggleAlbum(force?: boolean): void {
     const shouldOpen =
       force ?? !this.elements.postcardAlbum.classList.contains("is-visible");
+    if (shouldOpen) {
+      this.setSettingsOpen(false);
+      this.setWishlistOpen(false);
+      this.toggleLandmarkDetail(false);
+      this.togglePassport(false);
+      this.closeQuiz();
+    }
     this.elements.postcardAlbum.classList.toggle("is-visible", shouldOpen);
     this.elements.postcardAlbum.setAttribute("aria-hidden", String(!shouldOpen));
+    this.syncSurfaceState();
   }
 
   private buildAlbumGrid(): void {

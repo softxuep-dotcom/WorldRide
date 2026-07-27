@@ -170,6 +170,9 @@ export class PocketEarthGame {
   }
 
   toggleWorldOverview(): void {
+    if (this.ui.isInputBlocked()) {
+      return;
+    }
     this.worldOverview = !this.worldOverview;
     this.ui.setWorldOverview(this.worldOverview);
     this.onResize();
@@ -436,7 +439,11 @@ export class PocketEarthGame {
   };
 
   private readonly onGlobalKeyDown = (event: KeyboardEvent): void => {
-    if (event.code === "KeyM" && !event.repeat) {
+    if (
+      event.code === "KeyM" &&
+      !event.repeat &&
+      !this.ui.isInputBlocked()
+    ) {
       this.toggleWorldOverview();
     }
   };

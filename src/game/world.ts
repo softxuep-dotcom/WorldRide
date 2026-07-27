@@ -461,6 +461,20 @@ export class WorldView {
       const size = 0.64 + random() * 0.38;
       const choice = random();
       const desert = isDesertPoint(country, point);
+      const mountainArea =
+        country.id === "united-states"
+          ? isUnitedStatesMountainPoint(point)
+          : country.id === "canada"
+            ? isCanadaMountainPoint(point)
+            : country.id === "mexico"
+              ? isMexicoMountainPoint(point)
+              : country.scenery === "atlas" || country.scenery === "highland";
+      const mountainChance =
+        country.id === "united-states"
+          ? 0.72
+          : country.id === "canada" || country.id === "mexico"
+            ? 0.62
+            : 0.38;
 
       if (desert && choice < 0.74) {
         this.addDune(world.x, world.z, size * 1.1);
@@ -471,8 +485,8 @@ export class WorldView {
       } else if (country.id === "france" && choice < 0.14) {
         this.addLavenderPatch(world.x, world.z, size);
       } else if (
-        (country.scenery === "atlas" || country.scenery === "highland") &&
-        choice < 0.38
+        mountainArea &&
+        choice < mountainChance
       ) {
         this.addMountain(world.x, world.z, size, 0x886f55);
       } else if (
@@ -564,7 +578,7 @@ export class WorldView {
     const country = getCountryContentForAtlas(
       getWorldCountryByName(spot.atlasCountryName),
     );
-    const accent = country?.accent ?? spot.accent ?? 0xc16f54;
+    const accent = spot.accent ?? country?.accent ?? 0xc16f54;
     const world = geoToWorld(spot.point);
     const group = new THREE.Group();
     group.position.set(world.x, 0.445, world.z);
@@ -1578,6 +1592,24 @@ function createRiverRibbonGeometry(
 }
 
 function isDesertPoint(country: CountryDefinition, point: GeoPoint): boolean {
+  if (country.id === "united-states") {
+    const [longitude, latitude] = point;
+    return (
+      longitude >= -124 &&
+      longitude <= -102 &&
+      latitude >= 30 &&
+      latitude <= 39
+    );
+  }
+
+  if (country.id === "mexico") {
+    const [longitude, latitude] = point;
+    return (
+      latitude >= 22 &&
+      (latitude >= 25 || longitude <= -99)
+    );
+  }
+
   if (country.scenery === "sahara") {
     return !(
       country.id === "egypt" &&
@@ -1593,6 +1625,57 @@ function isDesertPoint(country: CountryDefinition, point: GeoPoint): boolean {
   const desertLatitude =
     country.id === "morocco" ? 31.7 : country.id === "tunisia" ? 34.0 : 34.5;
   return point[1] < desertLatitude;
+}
+
+function isUnitedStatesMountainPoint(point: GeoPoint): boolean {
+  const [longitude, latitude] = point;
+  if (latitude < 31 || latitude > 49.5) {
+    return false;
+  }
+
+  const rockiesLongitude = -111 - (latitude - 42) * 0.45;
+  const inRockies = Math.abs(longitude - rockiesLongitude) < 5.2;
+  const inPacificRanges =
+    longitude >= -124.5 &&
+    longitude <= -117 &&
+    latitude >= 34 &&
+    latitude <= 49.5;
+  return inRockies || inPacificRanges;
+}
+
+function isCanadaMountainPoint(point: GeoPoint): boolean {
+  const [longitude, latitude] = point;
+  const inWesternCordillera =
+    longitude >= -140 &&
+    longitude <= -113 &&
+    latitude >= 48 &&
+    latitude <= 69;
+  const inEasternRanges =
+    longitude >= -80 &&
+    longitude <= -58 &&
+    latitude >= 45 &&
+    latitude <= 55;
+  return inWesternCordillera || inEasternRanges;
+}
+
+function isMexicoMountainPoint(point: GeoPoint): boolean {
+  const [longitude, latitude] = point;
+  const inWesternSierra =
+    longitude >= -109 &&
+    longitude <= -103 &&
+    latitude >= 20 &&
+    latitude <= 31.5;
+  const inEasternSierra =
+    longitude >= -102 &&
+    longitude <= -96 &&
+    latitude >= 19 &&
+    latitude <= 30;
+  const inVolcanicBelt =
+    longitude >= -104.5 &&
+    longitude <= -96 &&
+    latitude >= 18 &&
+    latitude <= 20.5;
+  return inWesternSierra || inEasternSierra || inVolcanicBelt;
 }
 
 const EUROPEAN_SCENERY_COUNTRY_IDS: ReadonlySet<CountryDefinition["id"]> =

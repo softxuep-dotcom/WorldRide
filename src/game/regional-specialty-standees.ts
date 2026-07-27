@@ -6,10 +6,8 @@ const textureLoader = new THREE.TextureLoader();
 const boardGeometry = new THREE.BoxGeometry(1.58, 1.58, 0.085);
 const backplateGeometry = new THREE.BoxGeometry(1.72, 1.72, 0.1);
 const artworkGeometry = new THREE.PlaneGeometry(1.48, 1.48);
-const poleGeometry = new THREE.CylinderGeometry(0.045, 0.055, 2.18, 10);
-const finialGeometry = new THREE.SphereGeometry(0.082, 12, 8);
-const bracketGeometry = new THREE.BoxGeometry(0.19, 0.055, 0.07);
-const footGeometry = new THREE.CylinderGeometry(0.24, 0.31, 0.13, 10);
+const supportGeometry = new THREE.CylinderGeometry(0.045, 0.055, 0.68, 10);
+const supportRailGeometry = new THREE.BoxGeometry(0.94, 0.065, 0.08);
 
 export interface RegionalSpecialtyStandeeView {
   readonly root: THREE.Group;
@@ -27,12 +25,11 @@ export function createRegionalSpecialtyStandee(
 
   const boardBottom = 0.42;
   const boardCenterY = boardBottom + 0.79;
-  const poleX = -0.91;
+  const supportOffset = 0.38;
 
   const boardMaterial = createStandardMaterial(0xf1efd7, 0.9);
   const frameMaterial = createStandardMaterial(0x245f52, 0.78);
   const poleMaterial = createStandardMaterial(0x2f806b, 0.68);
-  const footMaterial = createStandardMaterial(0x7c8d70, 0.92);
 
   const backplate = new THREE.Mesh(backplateGeometry, frameMaterial);
   backplate.name = `${specialty.id} specialty frame`;
@@ -57,32 +54,24 @@ export function createRegionalSpecialtyStandee(
   art.position.set(0, boardCenterY, 0.075);
   art.renderOrder = 2;
 
-  const pole = new THREE.Mesh(poleGeometry, poleMaterial);
-  pole.name = `${specialty.id} short teal pole`;
-  pole.position.set(poleX, 1.09, -0.11);
+  const leftSupport = new THREE.Mesh(supportGeometry, poleMaterial);
+  leftSupport.name = `${specialty.id} left centered support`;
+  leftSupport.position.set(-supportOffset, 0.34, -0.11);
+  const rightSupport = new THREE.Mesh(supportGeometry, poleMaterial);
+  rightSupport.name = `${specialty.id} right centered support`;
+  rightSupport.position.set(supportOffset, 0.34, -0.11);
 
-  const finial = new THREE.Mesh(finialGeometry, poleMaterial);
-  finial.name = `${specialty.id} teal finial`;
-  finial.position.set(poleX, 2.22, -0.11);
-
-  const upperBracket = new THREE.Mesh(bracketGeometry, poleMaterial);
-  upperBracket.position.set(poleX + 0.08, boardCenterY + 0.47, -0.055);
-  const lowerBracket = new THREE.Mesh(bracketGeometry, poleMaterial);
-  lowerBracket.position.set(poleX + 0.08, boardCenterY - 0.47, -0.055);
-
-  const foot = new THREE.Mesh(footGeometry, footMaterial);
-  foot.name = `${specialty.id} compact placard foot`;
-  foot.position.set(poleX, 0.065, -0.11);
+  const supportRail = new THREE.Mesh(supportRailGeometry, poleMaterial);
+  supportRail.name = `${specialty.id} centered support rail`;
+  supportRail.position.set(0, boardBottom - 0.045, -0.065);
 
   root.add(
     backplate,
     board,
     art,
-    pole,
-    finial,
-    upperBracket,
-    lowerBracket,
-    foot,
+    leftSupport,
+    rightSupport,
+    supportRail,
   );
 
   textureLoader.load(
@@ -109,7 +98,6 @@ export function createRegionalSpecialtyStandee(
       boardMaterial,
       frameMaterial,
       poleMaterial,
-      footMaterial,
     ],
     swayPhase: createStablePhase(specialty.id),
     baseLean: createStableLean(specialty.id),

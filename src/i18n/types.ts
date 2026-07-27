@@ -15,6 +15,11 @@ export interface UiMessages {
   "worldMap.closeToast": string;
   "controls.desktop": string;
   "controls.touch": string;
+  "actions.label": string;
+  "settings.open": string;
+  "settings.title": string;
+  "settings.sound": string;
+  "settings.language": string;
   "passport.open": string;
   "passport.eyebrow": string;
   "passport.title": string;
@@ -40,6 +45,8 @@ export interface UiMessages {
   "action.backToJourney": string;
   "aria.countryDetail": string;
   "aria.landmarkDetail": string;
+  "context.country": string;
+  "context.landmark": string;
   "toast.discoveredSpot": string;
   "toast.discoveredHistoricalSite": string;
   "toast.countryEntered": string;
@@ -51,6 +58,7 @@ export interface UiMessages {
   "toast.contextLost": string;
   "toast.contextRestored": string;
   "quiz.challenge": string;
+  "quiz.unavailable": string;
   "quiz.close": string;
   "quiz.leave": string;
   "quiz.next": string;
