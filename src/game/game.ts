@@ -215,6 +215,8 @@ export class PocketEarthGame {
       state.velocity,
       state.heading,
       state.vehicleMode === "boat",
+      state.cruiseFlow,
+      state.modeTransition,
       this.overviewBlend,
     );
     this.updateCamera(delta);
@@ -264,6 +266,9 @@ export class PocketEarthGame {
       case "mode-changed":
         this.audio.onModeChanged(event.mode);
         break;
+      case "cruise-flow":
+        this.audio.onCruiseFlow();
+        break;
       case "country-entered":
         this.audio.onCountryEntered(event.firstVisit);
         break;
@@ -282,7 +287,8 @@ export class PocketEarthGame {
   }
 
   private updateCamera(delta: number): void {
-    const { position } = this.simulation.state;
+    const { position, velocity, cruiseFlow, modeTransition } =
+      this.simulation.state;
     const transitionSmoothing = 1 - Math.exp(-3.2 * delta);
     this.overviewBlend +=
       ((this.worldOverview ? 1 : 0) - this.overviewBlend) *
@@ -292,17 +298,20 @@ export class PocketEarthGame {
       0,
       1,
     );
+    const localFactor = 1 - easedOverviewBlend;
+    const leadX = velocity.x * 0.2 * localFactor;
+    const leadZ = velocity.z * 0.2 * localFactor;
     const targetPosition = new THREE.Vector3(
-      position.x,
+      position.x + leadX * 0.45,
       20,
-      position.z + 16,
+      position.z + 16 + leadZ * 0.45,
     ).lerp(new THREE.Vector3(0, 240, 92), easedOverviewBlend);
     const smoothing = 1 - Math.exp(-4.5 * delta);
     this.camera.position.lerp(targetPosition, smoothing);
     const lookAtTarget = new THREE.Vector3(
-      position.x,
+      position.x + leadX,
       0,
-      position.z - 2.4,
+      position.z - 2.4 + leadZ,
     ).lerp(new THREE.Vector3(0, 0, 0), easedOverviewBlend);
     this.camera.lookAt(lookAtTarget);
     const lightingCenter = new THREE.Vector3(
@@ -318,7 +327,9 @@ export class PocketEarthGame {
     this.sunTarget.position.copy(lightingCenter);
     this.sun.castShadow = easedOverviewBlend < 0.35;
 
-    const targetViewSize = this.getTargetViewSize();
+    const targetViewSize =
+      this.getTargetViewSize() +
+      (cruiseFlow * 0.55 + modeTransition * 1.25) * localFactor;
     this.projectionViewSize +=
       (targetViewSize - this.projectionViewSize) * transitionSmoothing;
     this.applyCameraProjection(this.projectionViewSize);

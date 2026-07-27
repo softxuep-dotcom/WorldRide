@@ -29,6 +29,7 @@ export type VehicleMode = "car" | "boat";
 export type GameEvent =
   | { type: "country-entered"; country: CountryProfile; firstVisit: boolean }
   | { type: "mode-changed"; mode: VehicleMode }
+  | { type: "cruise-flow" }
   | { type: "map-edge" }
   | { type: "world-wrapped"; deltaX: number }
   | { type: "postcard-collected"; spot: PhotoSpotDefinition; firstCollection: boolean }
@@ -43,6 +44,8 @@ export interface GameState {
   velocity: { x: number; z: number };
   heading: number;
   vehicleMode: VehicleMode;
+  cruiseFlow: number;
+  modeTransition: number;
   currentCountry?: CountryDefinition;
   currentCountryProfile?: CountryProfile;
   currentWorldCountryName?: string;
@@ -64,6 +67,8 @@ export class GameSimulation {
     velocity: { x: 0, z: 0 },
     heading: 0,
     vehicleMode: "car",
+    cruiseFlow: 0,
+    modeTransition: 0,
     currentCountry: undefined,
     currentCountryProfile: undefined,
     currentWorldCountryName: undefined,
@@ -77,16 +82,73 @@ export class GameSimulation {
 
   private events: GameEvent[] = [];
   private edgeCooldown = 0;
+  private cruiseFlowActive = false;
+  private cruiseFlowCueCooldown = 0;
 
   update(deltaSeconds: number, input: MovementInput): void {
     const dt = Math.min(deltaSeconds, 0.05);
     this.state.elapsed += dt;
     this.edgeCooldown = Math.max(0, this.edgeCooldown - dt);
+    this.cruiseFlowCueCooldown = Math.max(
+      0,
+      this.cruiseFlowCueCooldown - dt,
+    );
+    this.state.modeTransition = Math.max(
+      0,
+      this.state.modeTransition - dt / MODE_TRANSITION_SECONDS,
+    );
 
     const inputLength = Math.hypot(input.x, input.z);
     const normalizedX = inputLength > 1 ? input.x / inputLength : input.x;
     const normalizedZ = inputLength > 1 ? input.z / inputLength : input.z;
-    const speed = this.state.vehicleMode === "car" ? 5.6 : 4.5;
+    const velocityBefore = Math.hypot(
+      this.state.velocity.x,
+      this.state.velocity.z,
+    );
+    const directionAlignment =
+      velocityBefore < 0.35 || inputLength < 0.01
+        ? 1
+        : (
+            normalizedX * (this.state.velocity.x / velocityBefore) +
+            normalizedZ * (this.state.velocity.z / velocityBefore)
+          ) / Math.max(0.01, Math.min(1, inputLength));
+    const holdingCourse =
+      inputLength > 0.72 && directionAlignment > CRUISE_ALIGNMENT;
+    const flowTarget = holdingCourse ? 1 : 0;
+    const flowResponse = 1 - Math.exp(
+      -(holdingCourse ? CRUISE_BUILD_RATE : CRUISE_BREAK_RATE) * dt,
+    );
+    this.state.cruiseFlow +=
+      (flowTarget - this.state.cruiseFlow) * flowResponse;
+
+    if (
+      this.state.cruiseFlow >= CRUISE_CUE_THRESHOLD &&
+      !this.cruiseFlowActive &&
+      this.cruiseFlowCueCooldown === 0
+    ) {
+      this.cruiseFlowActive = true;
+      this.cruiseFlowCueCooldown = CRUISE_CUE_COOLDOWN_SECONDS;
+      this.events.push({ type: "cruise-flow" });
+    } else if (this.state.cruiseFlow < CRUISE_REARM_THRESHOLD) {
+      this.cruiseFlowActive = false;
+    }
+
+    const baseSpeed = this.state.vehicleMode === "car" ? 5.6 : 4.5;
+    const cruiseBonus =
+      1 +
+      smoothstep(
+        this.state.cruiseFlow,
+        CRUISE_SPEED_START,
+        1,
+      ) *
+        CRUISE_SPEED_BONUS;
+    const transitionBonus =
+      1 +
+      this.state.modeTransition *
+        (this.state.vehicleMode === "boat"
+          ? WATER_ENTRY_SPEED_BONUS
+          : LANDING_SPEED_BONUS);
+    const speed = baseSpeed * cruiseBonus * transitionBonus;
     const responsiveness = 1 - Math.exp(-8 * dt);
 
     this.state.velocity.x += (normalizedX * speed - this.state.velocity.x) * responsiveness;
@@ -181,6 +243,10 @@ export class GameSimulation {
     this.state.velocity.z = 0;
     this.state.heading = snapshot.heading;
     this.state.elapsed = snapshot.elapsed;
+    this.state.cruiseFlow = 0;
+    this.state.modeTransition = 0;
+    this.cruiseFlowActive = false;
+    this.cruiseFlowCueCooldown = 0;
 
     this.state.visitedCountries = new Set(snapshot.visitedCountries);
     this.state.collectedPostcards = new Set(
@@ -204,6 +270,7 @@ export class GameSimulation {
     // Restoring is not an arrival: drop the events it just produced so the
     // player is not greeted by a country reveal for where they already were.
     this.events.length = 0;
+    this.state.modeTransition = 0;
   }
 
   teleport(longitude: number, latitude: number): void {
@@ -212,6 +279,9 @@ export class GameSimulation {
     this.state.position.z = world.z;
     this.state.velocity.x = 0;
     this.state.velocity.z = 0;
+    this.state.cruiseFlow = 0;
+    this.state.modeTransition = 0;
+    this.cruiseFlowActive = false;
     this.updateLocation();
     this.updateNearestPhotoSpot();
   }
@@ -237,6 +307,7 @@ export class GameSimulation {
 
     if (nextMode !== this.state.vehicleMode) {
       this.state.vehicleMode = nextMode;
+      this.state.modeTransition = 1;
       this.events.push({ type: "mode-changed", mode: nextMode });
     }
 
@@ -311,9 +382,25 @@ export class GameSimulation {
 }
 
 const SPECIALTY_DISCOVERY_RADIUS = 1.9;
+const CRUISE_ALIGNMENT = 0.94;
+const CRUISE_BUILD_RATE = 1.35;
+const CRUISE_BREAK_RATE = 4.8;
+const CRUISE_SPEED_START = 0.48;
+const CRUISE_SPEED_BONUS = 0.18;
+const CRUISE_CUE_THRESHOLD = 0.82;
+const CRUISE_REARM_THRESHOLD = 0.42;
+const CRUISE_CUE_COOLDOWN_SECONDS = 7;
+const MODE_TRANSITION_SECONDS = 0.82;
+const WATER_ENTRY_SPEED_BONUS = 0.34;
+const LANDING_SPEED_BONUS = 0.08;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+function smoothstep(value: number, minimum: number, maximum: number): number {
+  const normalized = clamp((value - minimum) / (maximum - minimum), 0, 1);
+  return normalized * normalized * (3 - 2 * normalized);
 }
 
 function dampAngle(current: number, target: number, amount: number): number {

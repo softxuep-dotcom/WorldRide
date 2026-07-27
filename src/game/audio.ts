@@ -77,7 +77,7 @@ export class GameAudio {
     }
 
     const speed = Math.hypot(state.velocity.x, state.velocity.z);
-    const normalized = Math.min(1, speed / 6);
+    const normalized = Math.min(1, speed / 6.8);
     const now = this.context.currentTime;
 
     // Pitch and loudness rise with speed. The car sits lower in the mix than
@@ -118,6 +118,20 @@ export class GameAudio {
     } else {
       this.playClack();
     }
+  }
+
+  /**
+   * A brief wind lift confirms that holding a clean line has reached cruising
+   * flow. It stays lighter than discovery and milestone cues because it can
+   * recur during ordinary driving.
+   */
+  onCruiseFlow(): void {
+    this.playNoiseBurst(0.2, 2200, 0.045, true);
+    this.playTone(392, 0.16, "triangle", 0.045);
+    window.setTimeout(
+      () => this.playTone(587.33, 0.18, "sine", 0.04),
+      90,
+    );
   }
 
   onCountryEntered(firstVisit: boolean): void {
@@ -287,6 +301,10 @@ export class GameAudio {
   private playSplash(): void {
     this.playNoiseBurst(0.28, 1400, 0.16, true);
     this.playTone(180, 0.12, "sine", 0.06);
+    window.setTimeout(
+      () => this.playNoiseBurst(0.14, 2400, 0.07, true),
+      90,
+    );
   }
 
   private playNoiseBurst(

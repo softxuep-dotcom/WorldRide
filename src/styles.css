@@ -316,6 +316,20 @@ button {
   line-height: 1;
 }
 
+.country-reveal.has-ocean .travel-info {
+  border-color: rgba(143, 208, 226, 0.78);
+  background: rgba(239, 249, 250, 0.9);
+  cursor: default;
+}
+
+.country-reveal.has-ocean .travel-info__action {
+  display: none;
+}
+
+.country-reveal.has-ocean .travel-info__kicker {
+  color: #28859b;
+}
+
 .travel-info__intro {
   display: -webkit-box;
   margin-top: 3px;
@@ -2235,13 +2249,6 @@ button {
   font-size: 12px;
 }
 
-.action-dock .quiz-button:disabled {
-  background: rgba(23, 49, 71, 0.13);
-  color: var(--ink-soft);
-  cursor: default;
-  opacity: 1;
-}
-
 .action-dock .quiz-button.is-completed {
   background: #318d62;
 }
@@ -2353,7 +2360,6 @@ button {
   transform-origin: bottom center;
 }
 
-#game-shell.is-world-overview .action-dock,
 #game-shell.is-world-overview .feedback-zone {
   opacity: 0;
   pointer-events: none;
@@ -2446,10 +2452,6 @@ button {
     left: 50%;
     width: min(440px, calc(100vw - 32px));
     transform: translateX(-50%);
-  }
-
-  #game-shell.is-world-overview .action-dock {
-    transform: translate(-50%, 8px);
   }
 
   .passport-panel {

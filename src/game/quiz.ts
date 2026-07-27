@@ -392,6 +392,162 @@ const COUNTRY_QUIZ_SEEDS = {
       ["The Atlantic lies to the east and the Pacific to the west.", "东边是大西洋，西边是太平洋。"],
     ),
   },
+  Algeria: {
+    label: ["Algeria", "阿尔及利亚"],
+    capital: ["Algiers", "阿尔及尔"],
+    continent: "africa",
+    feature: quizQuestion(
+      "algeria-sahara",
+      ["Which vast desert covers most of Algeria?", "哪片广阔的沙漠覆盖了阿尔及利亚大部分国土？"],
+      [["The Sahara", "撒哈拉沙漠"], ["The Gobi", "戈壁沙漠"], ["The Atacama", "阿塔卡马沙漠"]],
+      0,
+      ["The Sahara covers more than four fifths of Algeria.", "撒哈拉沙漠覆盖了阿尔及利亚五分之四以上的国土。"],
+    ),
+  },
+  Chile: {
+    label: ["Chile", "智利"],
+    capital: ["Santiago", "圣地亚哥"],
+    continent: "south-america",
+    feature: quizQuestion(
+      "chile-shape",
+      ["Which landscape best describes mainland Chile?", "哪种地理形态最符合智利本土？"],
+      [["A long strip between the Andes and Pacific", "安第斯山与太平洋之间的狭长地带"], ["A broad island plateau", "宽阔的岛屿高原"], ["A landlocked desert basin", "内陆沙漠盆地"]],
+      0,
+      ["Chile stretches along South America's Pacific coast beside the Andes.", "智利沿南美洲太平洋海岸和安第斯山脉狭长延伸。"],
+    ),
+  },
+  Ethiopia: {
+    label: ["Ethiopia", "埃塞俄比亚"],
+    capital: ["Addis Ababa", "亚的斯亚贝巴"],
+    continent: "africa",
+    feature: quizQuestion(
+      "ethiopia-highlands",
+      ["Which landform dominates much of central and northern Ethiopia?", "埃塞俄比亚中北部主要由哪种地貌构成？"],
+      [["The Ethiopian Highlands", "埃塞俄比亚高原"], ["The Amazon lowlands", "亚马孙低地"], ["The Siberian tundra", "西伯利亚苔原"]],
+      0,
+      ["The Ethiopian Highlands contain some of Africa's highest terrain.", "埃塞俄比亚高原拥有非洲一些海拔最高的地形。"],
+    ),
+  },
+  Greece: {
+    label: ["Greece", "希腊"],
+    capital: ["Athens", "雅典"],
+    continent: "europe",
+    feature: quizQuestion(
+      "greece-aegean",
+      ["Which sea contains many of Greece's famous islands?", "希腊许多著名岛屿分布在哪片海域？"],
+      [["The Aegean Sea", "爱琴海"], ["The Baltic Sea", "波罗的海"], ["The Caribbean Sea", "加勒比海"]],
+      0,
+      ["The Aegean Sea lies between mainland Greece and western Turkey.", "爱琴海位于希腊本土与土耳其西部之间。"],
+    ),
+  },
+  Kazakhstan: {
+    label: ["Kazakhstan", "哈萨克斯坦"],
+    capital: ["Astana", "阿斯塔纳"],
+    continent: "asia",
+    feature: quizQuestion(
+      "kazakhstan-landlocked",
+      ["What geographic distinction does Kazakhstan hold?", "哈萨克斯坦拥有哪项地理特征？"],
+      [["It is the world's largest landlocked country", "它是世界上面积最大的内陆国"], ["It is the world's smallest island nation", "它是世界上最小的岛国"], ["It lies entirely within the Arctic Circle", "它完全位于北极圈内"]],
+      0,
+      ["Kazakhstan is the world's largest country without direct access to an open ocean.", "哈萨克斯坦是世界上面积最大的无出海口国家。"],
+    ),
+  },
+  Mongolia: {
+    label: ["Mongolia", "蒙古国"],
+    capital: ["Ulaanbaatar", "乌兰巴托"],
+    continent: "asia",
+    feature: quizQuestion(
+      "mongolia-gobi",
+      ["Which desert extends across southern Mongolia?", "哪片沙漠横跨蒙古国南部？"],
+      [["The Gobi", "戈壁沙漠"], ["The Kalahari", "卡拉哈里沙漠"], ["The Sonoran", "索诺兰沙漠"]],
+      0,
+      ["The Gobi spans southern Mongolia and northern China.", "戈壁沙漠横跨蒙古国南部与中国北部。"],
+    ),
+  },
+  Morocco: {
+    label: ["Morocco", "摩洛哥"],
+    capital: ["Rabat", "拉巴特"],
+    continent: "africa",
+    feature: quizQuestion(
+      "morocco-atlas",
+      ["Which mountain system crosses Morocco?", "哪条山脉横贯摩洛哥？"],
+      [["The Atlas Mountains", "阿特拉斯山脉"], ["The Andes", "安第斯山脉"], ["The Urals", "乌拉尔山脉"]],
+      0,
+      ["The Atlas Mountains cross Morocco, Algeria and Tunisia.", "阿特拉斯山脉横跨摩洛哥、阿尔及利亚和突尼斯。"],
+    ),
+  },
+  Norway: {
+    label: ["Norway", "挪威"],
+    capital: ["Oslo", "奥斯陆"],
+    continent: "europe",
+    feature: quizQuestion(
+      "norway-fjords",
+      ["How were Norway's deep fjords mainly formed?", "挪威幽深的峡湾主要如何形成？"],
+      [["By glaciers carving valleys", "由冰川侵蚀山谷形成"], ["By coral reefs growing inland", "由珊瑚礁向内陆生长形成"], ["By desert dunes collapsing", "由沙丘坍塌形成"]],
+      0,
+      ["Glaciers carved valleys that later flooded with seawater.", "冰川侵蚀出的山谷后来被海水淹没，形成峡湾。"],
+    ),
+  },
+  Pakistan: {
+    label: ["Pakistan", "巴基斯坦"],
+    capital: ["Islamabad", "伊斯兰堡"],
+    continent: "asia",
+    feature: quizQuestion(
+      "pakistan-indus",
+      ["Which major river runs through Pakistan toward the Arabian Sea?", "哪条大河流经巴基斯坦并注入阿拉伯海？"],
+      [["The Indus", "印度河"], ["The Danube", "多瑙河"], ["The Mississippi", "密西西比河"]],
+      0,
+      ["The Indus River and its tributaries support Pakistan's largest farming regions.", "印度河及其支流滋养了巴基斯坦主要农业区。"],
+    ),
+  },
+  Peru: {
+    label: ["Peru", "秘鲁"],
+    capital: ["Lima", "利马"],
+    continent: "south-america",
+    feature: quizQuestion(
+      "peru-andes",
+      ["Which mountain range crosses Peru from north to south?", "哪条山脉纵贯秘鲁南北？"],
+      [["The Andes", "安第斯山脉"], ["The Alps", "阿尔卑斯山脉"], ["The Appalachians", "阿巴拉契亚山脉"]],
+      0,
+      ["The Andes shape Peru's climate, rivers and historic settlement routes.", "安第斯山脉深刻影响秘鲁的气候、河流与历史聚落。"],
+    ),
+  },
+  Poland: {
+    label: ["Poland", "波兰"],
+    capital: ["Warsaw", "华沙"],
+    continent: "europe",
+    feature: quizQuestion(
+      "poland-baltic",
+      ["Which sea borders northern Poland?", "波兰北部濒临哪片海？"],
+      [["The Baltic Sea", "波罗的海"], ["The Black Sea", "黑海"], ["The Arabian Sea", "阿拉伯海"]],
+      0,
+      ["Poland's Baltic coast includes the port city of Gdańsk.", "波兰的波罗的海沿岸包括港口城市格但斯克。"],
+    ),
+  },
+  Portugal: {
+    label: ["Portugal", "葡萄牙"],
+    capital: ["Lisbon", "里斯本"],
+    continent: "europe",
+    feature: quizQuestion(
+      "portugal-atlantic",
+      ["Which ocean borders mainland Portugal to the west?", "葡萄牙本土西侧濒临哪片海洋？"],
+      [["The Atlantic Ocean", "大西洋"], ["The Indian Ocean", "印度洋"], ["The Arctic Ocean", "北冰洋"]],
+      0,
+      ["Portugal occupies the Atlantic-facing western edge of the Iberian Peninsula.", "葡萄牙位于伊比利亚半岛面向大西洋的西缘。"],
+    ),
+  },
+  Vietnam: {
+    label: ["Vietnam", "越南"],
+    capital: ["Hanoi", "河内"],
+    continent: "asia",
+    feature: quizQuestion(
+      "vietnam-mekong",
+      ["Which major river forms a broad delta in southern Vietnam?", "哪条大河在越南南部形成广阔三角洲？"],
+      [["The Mekong", "湄公河"], ["The Rhine", "莱茵河"], ["The Yukon", "育空河"]],
+      0,
+      ["The Mekong Delta is one of Vietnam's most productive farming regions.", "湄公河三角洲是越南最重要的农业区之一。"],
+    ),
+  },
 } satisfies Readonly<Record<TierACountryName, CountryQuizSeed>>;
 
 function insertCorrectOption(
@@ -538,6 +694,69 @@ function spotQuiz(
     id: `spot:v${QUIZ_BANK_VERSION}:${id}`,
     questions: [...questions, kindQuestion],
   };
+}
+
+const EXPANSION_COUNTRY_LABELS = [
+  ["Russia", "俄罗斯"],
+  ["Iran", "伊朗"],
+  ["Saudi Arabia", "沙特阿拉伯"],
+  ["Iraq", "伊拉克"],
+  ["Canada", "加拿大"],
+  ["Mexico", "墨西哥"],
+  ["Panama", "巴拿马"],
+  ["Argentina", "阿根廷"],
+  ["Bolivia", "玻利维亚"],
+  ["Chile", "智利"],
+  ["Namibia", "纳米比亚"],
+  ["South Africa", "南非"],
+  ["Ethiopia", "埃塞俄比亚"],
+  ["Mali", "马里"],
+  ["Uzbekistan", "乌兹别克斯坦"],
+] as const satisfies readonly BilingualCopy[];
+
+function expansionSpotQuiz(
+  id: PhotoSpotId,
+  featureId: string,
+  featurePrompt: BilingualCopy,
+  featureOptions: readonly BilingualCopy[],
+  featureAnswerIndex: number,
+  featureExplain: BilingualCopy,
+): QuizSet {
+  const spot = PHOTO_SPOTS.find((candidate) => candidate.id === id);
+  if (!spot) {
+    throw new Error(`Expansion spot quiz "${id}" has no matching photo spot.`);
+  }
+  const countryIndex = EXPANSION_COUNTRY_LABELS.findIndex(
+    ([englishName]) => englishName === spot.atlasCountryName,
+  );
+  if (countryIndex < 0) {
+    throw new Error(`Expansion spot quiz "${id}" has no country label.`);
+  }
+  const correctCountry = EXPANSION_COUNTRY_LABELS[countryIndex];
+  const countryOptions = [
+    correctCountry,
+    EXPANSION_COUNTRY_LABELS[(countryIndex + 5) % EXPANSION_COUNTRY_LABELS.length],
+    EXPANSION_COUNTRY_LABELS[(countryIndex + 10) % EXPANSION_COUNTRY_LABELS.length],
+  ];
+  return spotQuiz(id, [
+    spotQuestion(
+      `${id}-country`,
+      ["In which country is this place located?", "这个地点位于哪个国家？"],
+      countryOptions,
+      0,
+      [
+        `This travel stop is located in ${correctCountry[0]}.`,
+        `这个旅行地点位于${correctCountry[1]}。`,
+      ],
+    ),
+    spotQuestion(
+      featureId,
+      featurePrompt,
+      featureOptions,
+      featureAnswerIndex,
+      featureExplain,
+    ),
+  ]);
 }
 
 /**
@@ -1494,6 +1713,134 @@ const SPOT_QUIZZES: Readonly<Record<PhotoSpotId, QuizSet>> = {
       ["The memorial bears witness to the consequences of war and expresses a hope for peace.", "这处纪念碑见证战争后果，并寄托对和平的愿望。"],
     ),
   ]),
+  "lake-baikal": expansionSpotQuiz(
+    "lake-baikal",
+    "baikal-depth",
+    ["What world record does Lake Baikal hold?", "贝加尔湖拥有哪项世界纪录？"],
+    [["The deepest lake", "最深的湖泊"], ["The highest waterfall", "最高的瀑布"], ["The largest coral reef", "最大的珊瑚礁"]],
+    0,
+    ["Baikal is the deepest lake on Earth.", "贝加尔湖是地球上最深的湖泊。"],
+  ),
+  "lena-pillars": expansionSpotQuiz(
+    "lena-pillars",
+    "lena-shape",
+    ["What shaped the Lena Pillars into towers and needles?", "什么作用把勒拿河柱状岩塑造成塔柱与尖峰？"],
+    [["Freeze-thaw weathering and erosion", "冻融风化与侵蚀"], ["Coral growth", "珊瑚生长"], ["Modern quarrying", "现代采石"]],
+    0,
+    ["Weathering in a permafrost environment split the limestone cliffs.", "永久冻土环境中的风化切割了石灰岩峭壁。"],
+  ),
+  persepolis: expansionSpotQuiz(
+    "persepolis",
+    "persepolis-empire",
+    ["Which empire built Persepolis as a ceremonial centre?", "哪个帝国把波斯波利斯建成礼仪中心？"],
+    [["The Achaemenid Empire", "阿契美尼德帝国"], ["The Roman Empire", "罗马帝国"], ["The Inca Empire", "印加帝国"]],
+    0,
+    ["Its palaces and reliefs were created for the Achaemenid kings.", "这里的宫殿与浮雕为阿契美尼德王朝建造。"],
+  ),
+  hegra: expansionSpotQuiz(
+    "hegra",
+    "hegra-building",
+    ["How were Hegra's monumental tomb façades made?", "黑格拉宏伟的墓门如何建成？"],
+    [["Carved directly into sandstone", "直接雕入砂岩"], ["Assembled from steel panels", "用钢板拼装"], ["Grown from coral", "由珊瑚生长"]],
+    0,
+    ["Nabataean masons carved the façades downward from the rock face.", "纳巴泰工匠从岩壁上方向下雕刻墓门。"],
+  ),
+  "samarra-minaret": expansionSpotQuiz(
+    "samarra-minaret",
+    "samarra-form",
+    ["What makes Samarra's minaret instantly recognisable?", "萨迈拉宣礼塔最醒目的形态是什么？"],
+    [["A spiral ramp around a tapering tower", "绕锥形塔身盘旋的坡道"], ["Twin glass domes", "两座玻璃穹顶"], ["A suspended bridge deck", "悬空桥面"]],
+    0,
+    ["A broad external spiral rises around the brick core.", "宽阔的外部螺旋坡道绕砖塔向上。"],
+  ),
+  "lake-louise": expansionSpotQuiz(
+    "lake-louise",
+    "louise-colour",
+    ["What helps give Lake Louise its turquoise colour?", "什么让露易丝湖呈现蓝绿色？"],
+    [["Fine rock flour from glaciers", "冰川带来的细微岩粉"], ["Blue paint on the lakebed", "湖底的蓝色颜料"], ["City lights", "城市灯光"]],
+    0,
+    ["Suspended glacial rock flour scatters sunlight in the water.", "悬浮的冰川岩粉在水中散射阳光。"],
+  ),
+  teotihuacan: expansionSpotQuiz(
+    "teotihuacan",
+    "teotihuacan-axis",
+    ["Which avenue forms Teotihuacan's great urban axis?", "哪条道路构成特奥蒂瓦坎的城市主轴？"],
+    [["The Avenue of the Dead", "亡灵大道"], ["The Silk Road", "丝绸之路"], ["The Appian Way", "阿庇亚大道"]],
+    0,
+    ["The pyramids and plazas align along the Avenue of the Dead.", "金字塔和广场沿亡灵大道排列。"],
+  ),
+  "panama-canal": expansionSpotQuiz(
+    "panama-canal",
+    "panama-locks",
+    ["What do the Panama Canal's locks do?", "巴拿马运河的船闸有什么作用？"],
+    [["Raise and lower ships between water levels", "在不同水位间升降船只"], ["Freeze the canal in summer", "夏季冻结运河"], ["Turn ships into trains", "把船变成火车"]],
+    0,
+    ["Locks lift ships to the canal's lake level and lower them again.", "船闸把船提升到运河湖面水位，再在另一侧降下。"],
+  ),
+  "iguazu-falls": expansionSpotQuiz(
+    "iguazu-falls",
+    "iguazu-count",
+    ["Iguazú is best described as what?", "伊瓜苏最适合被描述为什么？"],
+    [["A system of more than 200 falls", "由两百多条瀑布组成的瀑布群"], ["One narrow artificial fountain", "一条狭窄人工喷泉"], ["A frozen fjord", "一条冰封峡湾"]],
+    0,
+    ["Many channels plunge over the forested escarpment together.", "许多水道同时从森林覆盖的断崖跌落。"],
+  ),
+  "salar-de-uyuni": expansionSpotQuiz(
+    "salar-de-uyuni",
+    "uyuni-mirror",
+    ["When does Salar de Uyuni become a giant mirror?", "乌尤尼盐沼何时会变成巨大镜面？"],
+    [["When a thin layer of rainwater covers it", "薄薄雨水覆盖盐面时"], ["When forests grow across it", "森林覆盖盐面时"], ["When lava fills it", "熔岩灌入时"]],
+    0,
+    ["Wet-season water reflects the sky across the flat salt surface.", "雨季薄水在平坦盐面上倒映天空。"],
+  ),
+  "torres-del-paine": expansionSpotQuiz(
+    "torres-del-paine",
+    "paine-rock",
+    ["What kind of rock forms the famous Torres del Paine towers?", "百内三塔主要由哪种岩石构成？"],
+    [["Granite", "花岗岩"], ["Chalk", "白垩"], ["Coal", "煤"]],
+    0,
+    ["Glacial erosion exposed the resistant granite cores.", "冰川侵蚀暴露出坚硬的花岗岩核心。"],
+  ),
+  "fish-river-canyon": expansionSpotQuiz(
+    "fish-river-canyon",
+    "fish-river-scale",
+    ["About how long is Fish River Canyon?", "鱼河大峡谷全长大约多少？"],
+    [["160 kilometres", "160公里"], ["6 kilometres", "6公里"], ["1,600 kilometres", "1600公里"]],
+    0,
+    ["The canyon winds through southern Namibia for about 160 kilometres.", "峡谷在纳米比亚南部蜿蜒约160公里。"],
+  ),
+  drakensberg: expansionSpotQuiz(
+    "drakensberg",
+    "drakensberg-falls",
+    ["Which great waterfall descends near the Drakensberg Amphitheatre?", "哪座大瀑布从德拉肯斯堡圆形剧场附近跌落？"],
+    [["Tugela Falls", "图盖拉瀑布"], ["Niagara Falls", "尼亚加拉瀑布"], ["Iguazú Falls", "伊瓜苏瀑布"]],
+    0,
+    ["Tugela Falls drops in several stages from the escarpment.", "图盖拉瀑布从峭壁分段跌落。"],
+  ),
+  lalibela: expansionSpotQuiz(
+    "lalibela",
+    "lalibela-method",
+    ["How were Lalibela's churches constructed?", "拉利贝拉教堂如何建造？"],
+    [["Carved downward from bedrock", "从整块基岩向下雕凿"], ["Built as floating wooden rafts", "建成漂浮木筏"], ["Cast from glass", "用玻璃浇铸"]],
+    0,
+    ["Workers excavated the churches, courtyards, and passages from volcanic rock.", "工匠从火山岩中凿出教堂、院落与通道。"],
+  ),
+  "great-mosque-djenne": expansionSpotQuiz(
+    "great-mosque-djenne",
+    "djenne-material",
+    ["What is the Great Mosque of Djenné mainly built from?", "杰内大清真寺主要用什么材料建成？"],
+    [["Mud brick and plaster", "泥砖与抹泥"], ["Marble and steel", "大理石与钢"], ["Ice blocks", "冰块"]],
+    0,
+    ["The community periodically renews the mosque's earthen plaster.", "当地社区会定期修补清真寺的泥土抹面。"],
+  ),
+  registan: expansionSpotQuiz(
+    "registan",
+    "registan-buildings",
+    ["What three monumental buildings frame Registan Square?", "哪三座宏大建筑围合雷吉斯坦广场？"],
+    [["Madrasas", "伊斯兰学校"], ["Lighthouses", "灯塔"], ["Railway stations", "火车站"]],
+    0,
+    ["Three tiled madrasas face the historic square in Samarkand.", "三座铺满彩砖的伊斯兰学校面向撒马尔罕古老广场。"],
+  ),
 };
 
 export function getCountryQuiz(atlasName: string | undefined): QuizSet | undefined {
@@ -1504,4 +1851,27 @@ export function getCountryQuiz(atlasName: string | undefined): QuizSet | undefin
 
 export function getSpotQuiz(spotId: PhotoSpotId | undefined): QuizSet | undefined {
   return spotId ? SPOT_QUIZZES[spotId] : undefined;
+}
+
+const WORLD_QUIZ_POOL: readonly QuizSet[] = [
+  ...Object.values(COUNTRY_QUIZZES),
+  ...Object.values(SPOT_QUIZZES),
+];
+
+/**
+ * Keeps the persistent challenge entry useful away from authored locations.
+ * Unfinished sets are exhausted in a stable order so progress survives reloads;
+ * once the whole bank is complete, the first set remains available for replay.
+ */
+export function getWorldQuiz(
+  completedQuizIds: ReadonlySet<string>,
+): QuizSet {
+  const unfinished = WORLD_QUIZ_POOL.find(
+    (quiz) => !completedQuizIds.has(quiz.id),
+  );
+  const fallback = WORLD_QUIZ_POOL[0];
+  if (!fallback) {
+    throw new Error("The world quiz pool must contain at least one quiz.");
+  }
+  return unfinished ?? fallback;
 }

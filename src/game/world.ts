@@ -1,23 +1,18 @@
 import * as THREE from "three";
 import {
-  MAP_SCALE,
   PHOTO_SPOTS,
-  type CountryDefinition,
   type GeoPoint,
   type PhotoSpotDefinition,
   geoToWorld,
   worldToGeo,
 } from "./data";
 import {
-  COUNTRY_ATLAS_BINDINGS,
   WORLD_COUNTRIES,
   getCountryContentForAtlas,
   getWorldCountryByName,
   getWorldCountryAtGeo,
-  isGeoPointInWorldCountry,
   type WorldCountry,
 } from "./world-map";
-import { PropBatcher, type PropArchetypeId } from "./prop-kit";
 import {
   getMapDimensions,
   getWorldTerrainMaterial,
@@ -37,6 +32,7 @@ import {
   updateRegionalSpecialtyStandeeOverview,
   type RegionalSpecialtyStandeeView,
 } from "./regional-specialty-standees";
+import { WorldEcology } from "./world-ecology";
 import { WorldLife } from "./world-life";
 
 const RESERVED_MAP_MARKER_POSITIONS = [
@@ -49,6 +45,16 @@ interface VehicleView {
   wheels: THREE.Mesh[];
   pontoons: THREE.Mesh[];
   wake: THREE.Mesh[];
+}
+
+interface VehicleTrailParticle {
+  readonly mesh: THREE.Mesh;
+  readonly material: THREE.MeshBasicMaterial;
+  age: number;
+  lifetime: number;
+  velocityX: number;
+  velocityZ: number;
+  baseScale: number;
 }
 
 interface LandmarkEffect {
@@ -69,35 +75,6 @@ interface LandmarkEffect {
   quiet: boolean;
 }
 
-interface FieldPatchEffect {
-  readonly x: number;
-  readonly z: number;
-  readonly size: number;
-  readonly rotationY: number;
-  readonly strips: {
-    readonly mesh: THREE.Mesh;
-    readonly baseY: number;
-    readonly baseScaleZ: number;
-  }[];
-  waveTime: number;
-  waveDirection: 1 | -1;
-  cooldown: number;
-}
-
-const shared = {
-  grassGeometry: new THREE.ConeGeometry(0.11, 0.3, 5),
-  groundPatchGeometry: new THREE.DodecahedronGeometry(0.28, 0),
-  fieldStripGeometry: new THREE.BoxGeometry(0.72, 0.055, 0.12),
-  grassMaterial: new THREE.MeshStandardMaterial({ color: 0x55a95f, roughness: 0.98 }),
-  grassLightMaterial: new THREE.MeshStandardMaterial({ color: 0x83bd67, roughness: 0.98 }),
-  oliveMaterial: new THREE.MeshStandardMaterial({ color: 0x6f965c, roughness: 0.95 }),
-  purpleMaterial: new THREE.MeshStandardMaterial({ color: 0x8c75bd, roughness: 0.9 }),
-  sandLightMaterial: new THREE.MeshStandardMaterial({ color: 0xf2cb75, roughness: 1 }),
-  fieldGreenMaterial: new THREE.MeshStandardMaterial({ color: 0x739c4f, roughness: 1 }),
-  fieldGoldMaterial: new THREE.MeshStandardMaterial({ color: 0xc8a64e, roughness: 1 }),
-  fieldSoilMaterial: new THREE.MeshStandardMaterial({ color: 0x8d6844, roughness: 1 }),
-};
-
 export class WorldView {
   readonly root = new THREE.Group();
   readonly vehicle: VehicleView;
@@ -106,10 +83,15 @@ export class WorldView {
   private readonly landmarkStandees: LandmarkStandeeView[] = [];
   private readonly regionalSpecialtyStandees: RegionalSpecialtyStandeeView[] =
     [];
-  private readonly props = new PropBatcher();
+  private readonly ecology = new WorldEcology(RESERVED_MAP_MARKER_POSITIONS);
   private readonly life = new WorldLife();
-  private readonly fieldPatches: FieldPatchEffect[] = [];
+  private readonly vehicleTrail: VehicleTrailParticle[] = [];
   private modeBlend = 0;
+  private vehicleLean = 0;
+  private previousVehicleHeading?: number;
+  private previousVehicleBoatMode?: boolean;
+  private vehicleTrailClock = 0;
+  private vehicleTrailCursor = 0;
 
   constructor() {
     this.root.name = "Pocket Earth world";
@@ -118,16 +100,11 @@ export class WorldView {
     this.addCountries();
     this.addGeographyFeatures();
     this.addOceanDetails();
-    this.flushProps();
     this.vehicle = this.createVehicle();
     this.root.add(this.vehicle.root);
+    this.buildVehicleTrail();
+    this.root.add(this.ecology.root);
     this.root.add(this.life.root);
-  }
-
-  private flushProps(): void {
-    for (const mesh of this.props.build()) {
-      this.root.add(mesh);
-    }
   }
 
   update(
@@ -137,6 +114,8 @@ export class WorldView {
     velocity: { x: number; z: number },
     heading: number,
     boatMode: boolean,
+    cruiseFlow = 0,
+    modeTransition = 0,
     overviewBlend = 0,
   ): void {
     this.modeBlend += ((boatMode ? 1 : 0) - this.modeBlend) * (1 - Math.exp(-7 * delta));
@@ -148,12 +127,33 @@ export class WorldView {
       velocity,
       overviewBlend,
     );
-    this.updateFieldPatches(delta, position, velocity, overviewBlend);
+    this.ecology.update(delta, position, velocity, overviewBlend);
+    const speed = Math.hypot(velocity.x, velocity.z);
+    const headingDelta =
+      this.previousVehicleHeading === undefined
+        ? 0
+        : shortestAngleDelta(this.previousVehicleHeading, heading);
+    this.previousVehicleHeading = heading;
+    const turnRate = headingDelta / Math.max(0.001, delta);
+    const targetLean =
+      THREE.MathUtils.clamp(-turnRate * 0.038, -0.15, 0.15) *
+      THREE.MathUtils.lerp(0.9, 1.18, this.modeBlend);
+    this.vehicleLean +=
+      (targetLean - this.vehicleLean) * (1 - Math.exp(-9 * delta));
+    const transitionArc = Math.sin(
+      (1 - THREE.MathUtils.clamp(modeTransition, 0, 1)) * Math.PI,
+    );
     this.vehicle.root.position.x = position.x;
     this.vehicle.root.position.z = position.z;
-    this.vehicle.root.position.y = THREE.MathUtils.lerp(0.37, 0.09, this.modeBlend);
+    this.vehicle.root.position.y =
+      THREE.MathUtils.lerp(0.37, 0.09, this.modeBlend) +
+      transitionArc * (boatMode ? 0.13 : 0.06);
     this.vehicle.root.rotation.y = heading;
-    this.vehicle.root.rotation.z = boatMode ? Math.sin(elapsed * 2.1) * 0.045 : 0;
+    this.vehicle.root.rotation.x =
+      -transitionArc * (boatMode ? 0.085 : 0.035);
+    this.vehicle.root.rotation.z =
+      this.vehicleLean +
+      (boatMode ? Math.sin(elapsed * 2.1) * 0.045 : 0);
 
     for (const wheel of this.vehicle.wheels) {
       const scale = THREE.MathUtils.lerp(1, 0.08, this.modeBlend);
@@ -169,11 +169,26 @@ export class WorldView {
     for (let index = 0; index < this.vehicle.wake.length; index += 1) {
       const wake = this.vehicle.wake[index];
       wake.visible = this.modeBlend > 0.2;
-      const pulse = (elapsed * 1.3 + index * 0.35) % 1;
-      wake.position.z = 0.9 + pulse * 1.5;
+      const speedFactor = THREE.MathUtils.clamp(speed / 6.4, 0, 1);
+      const pulse =
+        (elapsed * (1.15 + speedFactor * 0.75) + index * 0.35) % 1;
+      wake.position.z = 0.9 + pulse * (1.35 + speedFactor * 0.55);
       wake.scale.setScalar(0.4 + pulse);
-      (wake.material as THREE.MeshBasicMaterial).opacity = (1 - pulse) * this.modeBlend * 0.5;
+      (wake.material as THREE.MeshBasicMaterial).opacity =
+        (1 - pulse) *
+        this.modeBlend *
+        (0.28 + speedFactor * 0.28 + modeTransition * 0.32);
     }
+
+    this.updateVehicleTrail(
+      delta,
+      position,
+      velocity,
+      heading,
+      boatMode,
+      cruiseFlow,
+      overviewBlend,
+    );
 
     for (const [index, wavelet] of this.wavelets.entries()) {
       wavelet.position.y = 0.09 + Math.sin(elapsed * 1.2 + index) * 0.025;
@@ -394,169 +409,12 @@ export class WorldView {
   }
 
   private addCountries(): void {
-    for (const { content: country, atlas } of COUNTRY_ATLAS_BINDINGS) {
-      this.addScenery(country, atlas);
-    }
-
     for (const spot of PHOTO_SPOTS) {
       this.addPhotoSpot(spot);
     }
 
     for (const specialty of REGIONAL_SPECIALTIES) {
       this.addRegionalSpecialty(specialty);
-    }
-  }
-
-  private addScenery(
-    country: CountryDefinition,
-    atlas: WorldCountry,
-  ): void {
-    const random = mulberry32(hashString(country.id));
-    const allBorderPoints = atlas.renderPolygons.flat();
-    const longitudes = allBorderPoints.map((point) => point[0]);
-    const latitudes = allBorderPoints.map((point) => point[1]);
-    const minimumLongitude = Math.min(...longitudes);
-    const maximumLongitude = Math.max(...longitudes);
-    const minimumLatitude = Math.min(...latitudes);
-    const maximumLatitude = Math.max(...latitudes);
-    const geographicArea =
-      (maximumLongitude - minimumLongitude) * (maximumLatitude - minimumLatitude);
-    const lushBiome =
-      country.scenery === "tropical" || country.scenery === "monsoon";
-    const targetCount = THREE.MathUtils.clamp(
-      Math.round(geographicArea * (lushBiome ? 0.23 : 0.18)),
-      8,
-      country.id === "russia" ? 56 : lushBiome ? 46 : 38,
-    );
-    let placed = 0;
-    let attempts = 0;
-
-    while (placed < targetCount && attempts < targetCount * 70) {
-      attempts += 1;
-      const point = [
-        THREE.MathUtils.lerp(minimumLongitude, maximumLongitude, random()),
-        THREE.MathUtils.lerp(minimumLatitude, maximumLatitude, random()),
-      ] as const;
-
-      if (!isGeoPointInWorldCountry(point, atlas)) {
-        continue;
-      }
-
-      const cityDistance = Math.hypot(
-        (point[0] - country.city.point[0]) * MAP_SCALE.x,
-        (point[1] - country.city.point[1]) * MAP_SCALE.z,
-      );
-      if (cityDistance < 2.35) {
-        continue;
-      }
-
-      const world = geoToWorld(point);
-      const nearMapMarker = RESERVED_MAP_MARKER_POSITIONS.some(
-        (marker) => Math.hypot(marker.x - world.x, marker.z - world.z) < 2.05,
-      );
-      if (nearMapMarker) {
-        continue;
-      }
-
-      const size = 0.64 + random() * 0.38;
-      const choice = random();
-      const desert = isDesertPoint(country, point);
-      const mountainArea =
-        country.id === "united-states"
-          ? isUnitedStatesMountainPoint(point)
-          : country.id === "canada"
-            ? isCanadaMountainPoint(point)
-            : country.id === "mexico"
-              ? isMexicoMountainPoint(point)
-              : country.scenery === "atlas" || country.scenery === "highland";
-      const mountainChance =
-        country.id === "united-states"
-          ? 0.72
-          : country.id === "canada" || country.id === "mexico"
-            ? 0.62
-            : 0.38;
-
-      if (desert && choice < 0.74) {
-        this.addDune(world.x, world.z, size * 1.1);
-      } else if (desert && choice < 0.91) {
-        this.addDesertRock(world.x, world.z, size);
-      } else if (desert) {
-        this.addTree(world.x, world.z, size * 0.92, country);
-      } else if (country.id === "france" && choice < 0.14) {
-        this.addLavenderPatch(world.x, world.z, size);
-      } else if (
-        mountainArea &&
-        choice < mountainChance
-      ) {
-        this.addMountain(world.x, world.z, size, 0x886f55);
-      } else if (
-        (country.scenery === "tropical" || country.scenery === "monsoon") &&
-        choice < 0.52
-      ) {
-        this.addTreeCluster(world.x, world.z, size, country, atlas, random);
-      } else if (
-        (country.scenery === "tropical" || country.scenery === "monsoon") &&
-        choice < 0.68
-      ) {
-        this.addFieldPatch(world.x, world.z, size, country);
-      } else if (
-        (country.scenery === "tropical" || country.scenery === "monsoon") &&
-        choice < 0.84
-      ) {
-        this.addMeadowPatch(world.x, world.z, size, true);
-      } else if (
-        (country.scenery === "green" || country.scenery === "atlantic") &&
-        choice < 0.42
-      ) {
-        this.addTreeCluster(world.x, world.z, size, country, atlas, random);
-      } else if (
-        (country.scenery === "green" || country.scenery === "atlantic") &&
-        choice < 0.58
-      ) {
-        this.addFieldPatch(world.x, world.z, size, country);
-      } else if (
-        (country.scenery === "green" || country.scenery === "atlantic") &&
-        choice < 0.78
-      ) {
-        this.addMeadowPatch(world.x, world.z, size, true);
-      } else if (country.scenery === "mediterranean" && choice < 0.34) {
-        this.addTreeCluster(world.x, world.z, size, country, atlas, random);
-      } else if (country.scenery === "mediterranean" && choice < 0.52) {
-        this.addFieldPatch(world.x, world.z, size, country);
-      } else if (country.scenery === "mediterranean" && choice < 0.72) {
-        this.addMeadowPatch(world.x, world.z, size, false);
-      } else if (country.scenery === "highland" && choice < 0.66) {
-        this.addTreeCluster(world.x, world.z, size, country, atlas, random);
-      } else if (country.scenery === "highland" && choice < 0.82) {
-        this.addMeadowPatch(world.x, world.z, size, false);
-      } else if (
-        isEuropeanSceneryPoint(country, point) &&
-        choice < 0.99
-      ) {
-        this.addEuropeanBackgroundDetail(world.x, world.z, size, country);
-      } else {
-        this.addBuilding(world.x, world.z, size, country);
-      }
-      placed += 1;
-    }
-
-    if (country.id === "spain" || country.id === "france") {
-      const mountainPoints =
-        country.id === "spain"
-          ? ([
-              [-0.8, 42.8],
-              [0.25, 42.55],
-              [1.25, 42.45],
-            ] as const)
-          : ([
-              [-0.45, 43.15],
-              [0.65, 43.0],
-              [1.6, 42.7],
-            ] as const);
-      for (const point of mountainPoints) {
-        const world = geoToWorld(point);
-        this.addMountain(world.x, world.z, 1.25, 0x718b77);
-      }
     }
   }
 
@@ -916,38 +774,6 @@ export class WorldView {
       "Murray",
     );
 
-    const alpinePoints = [
-      [8.0, 45.8],
-      [10.2, 46.1],
-      [12.2, 46.2],
-    ] as const;
-    for (const point of alpinePoints) {
-      const world = geoToWorld(point);
-      this.addMountain(world.x, world.z, 1.15, 0x718b77);
-    }
-
-    const himalayanPoints = [
-      [77.5, 31.0],
-      [82.0, 29.5],
-      [87.0, 28.5],
-      [92.0, 28.0],
-      [96.0, 28.4],
-    ] as const;
-    for (const point of himalayanPoints) {
-      const world = geoToWorld(point);
-      this.addMountain(world.x, world.z, 1.28, 0x7b8580);
-    }
-
-    const zagrosPoints = [
-      [46.5, 36.0],
-      [49.0, 33.5],
-      [52.0, 30.5],
-      [55.0, 28.0],
-    ] as const;
-    for (const point of zagrosPoints) {
-      const world = geoToWorld(point);
-      this.addMountain(world.x, world.z, 1.15, 0x9a7359);
-    }
   }
 
   private addRiver(
@@ -1230,312 +1056,148 @@ export class WorldView {
     return { root, wheels, pontoons, wake };
   }
 
-  private addTree(x: number, z: number, size: number, country: CountryDefinition): void {
-    this.props.place(treeArchetypeFor(country.scenery), {
-      x,
-      z,
-      y: 0.445,
-      size,
-      rotationY: propRotation(x, z),
-    });
-  }
+  private buildVehicleTrail(): void {
+    const geometry = new THREE.RingGeometry(0.12, 0.24, 10);
+    geometry.rotateX(-Math.PI / 2);
 
-  private addTreeCluster(
-    x: number,
-    z: number,
-    size: number,
-    country: CountryDefinition,
-    atlas: WorldCountry,
-    random: () => number,
-  ): void {
-    const offsets = [
-      [0, 0],
-      [-0.3, 0.18],
-      [0.28, -0.16],
-    ] as const;
-
-    for (const [index, [offsetX, offsetZ]] of offsets.entries()) {
-      const treeX = x + offsetX * size;
-      const treeZ = z + offsetZ * size;
-      if (!isGeoPointInWorldCountry(worldToGeo(treeX, treeZ), atlas)) {
-        continue;
-      }
-      const treeSize = size * (index === 0 ? 0.82 : 0.58 + random() * 0.16);
-      this.addTree(treeX, treeZ, treeSize, country);
-    }
-  }
-
-  private addBuilding(x: number, z: number, size: number, country: CountryDefinition): void {
-    this.props.place(buildingArchetypeFor(country.scenery), {
-      x,
-      z,
-      y: 0.445,
-      size,
-      rotationY: propRotation(x, z),
-    });
-  }
-
-  private addEuropeanBackgroundDetail(
-    x: number,
-    z: number,
-    size: number,
-    country: CountryDefinition,
-  ): void {
-    if (country.scenery === "highland" || country.scenery === "atlas") {
-      this.addMountain(x, z, size * 0.82, 0x7f806f);
-      return;
-    }
-
-    this.addMeadowPatch(
-      x,
-      z,
-      size,
-      country.scenery === "green" || country.scenery === "atlantic",
-    );
-  }
-
-  private addFieldPatch(
-    x: number,
-    z: number,
-    size: number,
-    country: CountryDefinition,
-  ): void {
-    const group = new THREE.Group();
-    const strips: FieldPatchEffect["strips"] = [];
-    const greenField =
-      country.scenery === "green" ||
-      country.scenery === "atlantic" ||
-      country.scenery === "monsoon" ||
-      country.scenery === "tropical";
-
-    for (let row = 0; row < 5; row += 1) {
-      const material =
-        row % 3 === 0
-          ? shared.fieldSoilMaterial
-          : greenField
-            ? shared.fieldGreenMaterial
-            : shared.fieldGoldMaterial;
-      const strip = new THREE.Mesh(shared.fieldStripGeometry, material);
-      strip.position.set(0, 0.035 + (row % 2) * 0.004, (row - 2) * 0.14 * size);
-      strip.scale.set(size * (0.9 + (row % 2) * 0.1), 1, size);
-      strip.castShadow = true;
-      strip.receiveShadow = true;
-      group.add(strip);
-      strips.push({
-        mesh: strip,
-        baseY: strip.position.y,
-        baseScaleZ: strip.scale.z,
+    for (let index = 0; index < 32; index += 1) {
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
       });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.visible = false;
+      mesh.renderOrder = 4;
+      this.vehicleTrail.push({
+        mesh,
+        material,
+        age: 0,
+        lifetime: 0.6,
+        velocityX: 0,
+        velocityZ: 0,
+        baseScale: 1,
+      });
+      this.root.add(mesh);
     }
-
-    group.position.set(x, 0.445, z);
-    group.rotation.y = x * 0.13 + z * 0.17;
-    this.root.add(group);
-    this.fieldPatches.push({
-      x,
-      z,
-      size,
-      rotationY: group.rotation.y,
-      strips,
-      waveTime: -1,
-      waveDirection: 1,
-      cooldown: 0,
-    });
   }
 
-  /**
-   * Field strips lift in sequence when the vehicle brushes past. This is a
-   * purely visual response: it adds texture to driving without creating a
-   * collectible, prompt, collision, or simulation rule.
-   */
-  private updateFieldPatches(
+  private updateVehicleTrail(
     delta: number,
     position: { x: number; z: number },
     velocity: { x: number; z: number },
+    heading: number,
+    boatMode: boolean,
+    cruiseFlow: number,
     overviewBlend: number,
   ): void {
-    const playerSpeed = Math.hypot(velocity.x, velocity.z);
-    const localView = overviewBlend < 0.35;
+    const speed = Math.hypot(velocity.x, velocity.z);
+    const localFactor =
+      1 - THREE.MathUtils.smoothstep(overviewBlend, 0.2, 0.55);
 
-    for (const field of this.fieldPatches) {
-      field.cooldown = Math.max(0, field.cooldown - delta);
-      if (field.waveTime >= 0) {
-        field.waveTime += delta;
-        for (let index = 0; index < field.strips.length; index += 1) {
-          const strip = field.strips[index];
-          const order =
-            field.waveDirection === 1
-              ? index
-              : field.strips.length - 1 - index;
-          const phase = field.waveTime * 5.5 - order * 0.42;
-          const wave =
-            phase > 0 && phase < Math.PI ? Math.sin(phase) : 0;
-          strip.mesh.position.y = strip.baseY + wave * 0.13;
-          strip.mesh.scale.z = strip.baseScaleZ * (1 + wave * 0.16);
-        }
-        if (field.waveTime > 1.75) {
-          field.waveTime = -1;
-          for (const strip of field.strips) {
-            strip.mesh.position.y = strip.baseY;
-            strip.mesh.scale.z = strip.baseScaleZ;
-          }
-        }
+    if (
+      this.previousVehicleBoatMode !== undefined &&
+      this.previousVehicleBoatMode !== boatMode
+    ) {
+      for (let index = 0; index < 9; index += 1) {
+        const angle = (index / 9) * Math.PI * 2;
+        this.spawnVehicleTrailParticle(
+          {
+            x: position.x + Math.cos(angle) * 0.36,
+            z: position.z + Math.sin(angle) * 0.36,
+          },
+          heading,
+          boatMode,
+          true,
+          angle,
+        );
+      }
+    }
+    this.previousVehicleBoatMode = boatMode;
+
+    if (localFactor > 0.05 && speed > 0.8) {
+      const speedFactor = THREE.MathUtils.clamp(speed / 6.4, 0, 1);
+      const interval = boatMode
+        ? THREE.MathUtils.lerp(0.15, 0.075, speedFactor)
+        : THREE.MathUtils.lerp(
+            0.24,
+            0.105,
+            Math.max(speedFactor * 0.45, cruiseFlow),
+          );
+      this.vehicleTrailClock += delta;
+      let spawnBudget = 3;
+      while (this.vehicleTrailClock >= interval && spawnBudget > 0) {
+        this.vehicleTrailClock -= interval;
+        this.spawnVehicleTrailParticle(
+          position,
+          heading,
+          boatMode,
+          false,
+        );
+        spawnBudget -= 1;
+      }
+    } else {
+      this.vehicleTrailClock = 0;
+    }
+
+    for (const particle of this.vehicleTrail) {
+      if (!particle.mesh.visible) {
         continue;
       }
-
-      if (!localView || playerSpeed < 0.8 || field.cooldown > 0) {
+      particle.age += delta;
+      const progress = particle.age / particle.lifetime;
+      if (progress >= 1) {
+        particle.mesh.visible = false;
+        particle.material.opacity = 0;
         continue;
       }
-      const dx = position.x - field.x;
-      const dz = position.z - field.z;
-      if (Math.hypot(dx, dz) > Math.max(1.25, field.size * 1.55)) {
-        continue;
-      }
-
-      const localZ =
-        -Math.sin(field.rotationY) * dx + Math.cos(field.rotationY) * dz;
-      field.waveDirection = localZ >= 0 ? -1 : 1;
-      field.waveTime = 0;
-      field.cooldown = 3.2;
+      particle.mesh.position.x += particle.velocityX * delta;
+      particle.mesh.position.z += particle.velocityZ * delta;
+      const scale = particle.baseScale * (0.72 + progress * 1.55);
+      particle.mesh.scale.setScalar(scale);
+      particle.material.opacity =
+        Math.sin(progress * Math.PI) *
+        (particle.material.color.getHex() === 0xe7fbff ? 0.5 : 0.24) *
+        localFactor;
     }
   }
 
-  private addMeadowPatch(
-    x: number,
-    z: number,
-    size: number,
-    lush: boolean,
+  private spawnVehicleTrailParticle(
+    position: { x: number; z: number },
+    heading: number,
+    boatMode: boolean,
+    burst: boolean,
+    burstAngle = 0,
   ): void {
-    const group = new THREE.Group();
-    const patchMaterial = lush ? shared.grassMaterial : shared.oliveMaterial;
-    const highlightMaterial = lush ? shared.grassLightMaterial : shared.sandLightMaterial;
+    const particle =
+      this.vehicleTrail[this.vehicleTrailCursor % this.vehicleTrail.length];
+    this.vehicleTrailCursor += 1;
 
-    for (let index = 0; index < 3; index += 1) {
-      const patch = new THREE.Mesh(
-        shared.groundPatchGeometry,
-        index === 1 ? highlightMaterial : patchMaterial,
-      );
-      patch.position.set((index - 1) * 0.28 * size, 0.04, (index % 2) * 0.17 * size);
-      patch.scale.set(size * 0.9, size * 0.16, size * 0.62);
-      patch.rotation.y = index * 0.72;
-      patch.castShadow = true;
-      group.add(patch);
-    }
-
-    for (const offset of [-0.19, 0.18]) {
-      const grass = new THREE.Mesh(shared.grassGeometry, patchMaterial);
-      grass.position.set(offset * size, 0.2 * size, -0.12 * size);
-      grass.scale.setScalar(size * 0.82);
-      grass.castShadow = true;
-      group.add(grass);
-    }
-
-    group.position.set(x, 0.445, z);
-    group.rotation.y = x * 0.17 + z * 0.11;
-    this.root.add(group);
-  }
-
-  private addDune(x: number, z: number, size: number): void {
-    const baseRotation = x * 0.09 + z * 0.13;
-    for (let index = 0; index < 3; index += 1) {
-      this.props.place("dune", {
-        x: x + (index - 1) * 0.38 * size,
-        z: z + (index % 2) * 0.3 * size,
-        y: 0.44 + index * 0.025,
-        size: size * (0.82 + index * 0.14),
-        rotationY: baseRotation + index * 0.35,
-      });
-    }
-  }
-
-  private addDesertRock(x: number, z: number, size: number): void {
-    this.props.place("rock", {
-      x,
-      z,
-      y: 0.445,
-      size,
-      rotationY: propRotation(x, z),
-    });
-  }
-
-  private addMountain(x: number, z: number, size: number, color: number): void {
-    const mountain = new THREE.Mesh(
-      sharedMountainGeometry(),
-      sharedMountainMaterial(color),
+    const lateral = burst
+      ? 0
+      : (this.vehicleTrailCursor % 2 === 0 ? -1 : 1) * 0.24;
+    const rearX = Math.sin(heading) * 0.88 + Math.cos(heading) * lateral;
+    const rearZ = Math.cos(heading) * 0.88 - Math.sin(heading) * lateral;
+    particle.mesh.position.set(
+      position.x + (burst ? 0 : rearX),
+      boatMode ? 0.115 : 0.49,
+      position.z + (burst ? 0 : rearZ),
     );
-    mountain.position.set(x, 0.44 + 0.7 * size, z);
-    mountain.scale.setScalar(size);
-    mountain.rotation.y = x + z;
-    mountain.castShadow = true;
-    this.root.add(mountain);
+    particle.mesh.visible = true;
+    particle.mesh.scale.setScalar(0.7);
+    particle.material.color.setHex(boatMode ? 0xe7fbff : 0xd6bd84);
+    particle.material.opacity = 0;
+    particle.age = 0;
+    particle.lifetime = burst
+      ? boatMode ? 0.72 : 0.52
+      : boatMode ? 0.62 : 0.5;
+    particle.baseScale = burst ? 1.35 : boatMode ? 0.85 : 0.65;
+    particle.velocityX = burst ? Math.cos(burstAngle) * 1.15 : 0;
+    particle.velocityZ = burst ? Math.sin(burstAngle) * 1.15 : 0;
   }
 
-  private addLavenderPatch(x: number, z: number, size: number): void {
-    const patch = new THREE.Mesh(
-      new THREE.BoxGeometry(0.75 * size, 0.09, 0.36 * size),
-      shared.purpleMaterial,
-    );
-    patch.position.set(x, 0.49, z);
-    patch.rotation.y = x * 0.2;
-    patch.castShadow = true;
-    this.root.add(patch);
-  }
-}
-
-type Scenery = CountryDefinition["scenery"];
-
-const TREE_ARCHETYPES: Record<Scenery, PropArchetypeId> = {
-  atlantic: "broadleaf",
-  green: "broadleaf",
-  mediterranean: "cypress",
-  highland: "pine",
-  atlas: "acacia",
-  sahara: "acacia",
-  monsoon: "palm",
-  tropical: "palm",
-};
-
-const BUILDING_ARCHETYPES: Record<Scenery, PropArchetypeId> = {
-  atlantic: "townhouse",
-  green: "townhouse",
-  mediterranean: "villa",
-  highland: "chalet",
-  atlas: "adobe",
-  sahara: "adobe",
-  monsoon: "villa",
-  tropical: "villa",
-};
-
-function treeArchetypeFor(scenery: Scenery): PropArchetypeId {
-  return TREE_ARCHETYPES[scenery];
-}
-
-function buildingArchetypeFor(scenery: Scenery): PropArchetypeId {
-  return BUILDING_ARCHETYPES[scenery];
-}
-
-function propRotation(x: number, z: number): number {
-  const value = Math.sin(x * 91.7 + z * 47.3) * 43758.5453;
-  return (value - Math.floor(value)) * Math.PI * 2;
-}
-
-let mountainGeometry: THREE.ConeGeometry | undefined;
-const mountainMaterials = new Map<number, THREE.MeshStandardMaterial>();
-
-function sharedMountainGeometry(): THREE.ConeGeometry {
-  if (!mountainGeometry) {
-    mountainGeometry = new THREE.ConeGeometry(0.6, 1.4, 5);
-  }
-  return mountainGeometry;
-}
-
-function sharedMountainMaterial(color: number): THREE.MeshStandardMaterial {
-  let material = mountainMaterials.get(color);
-  if (!material) {
-    material = new THREE.MeshStandardMaterial({ color, roughness: 1 });
-    mountainMaterials.set(color, material);
-  }
-  return material;
 }
 
 function createRiverRibbonGeometry(
@@ -1591,135 +1253,12 @@ function createRiverRibbonGeometry(
   return geometry;
 }
 
-function isDesertPoint(country: CountryDefinition, point: GeoPoint): boolean {
-  if (country.id === "united-states") {
-    const [longitude, latitude] = point;
-    return (
-      longitude >= -124 &&
-      longitude <= -102 &&
-      latitude >= 30 &&
-      latitude <= 39
-    );
+function shortestAngleDelta(from: number, to: number): number {
+  let difference = ((to - from + Math.PI) % (Math.PI * 2)) - Math.PI;
+  if (difference < -Math.PI) {
+    difference += Math.PI * 2;
   }
-
-  if (country.id === "mexico") {
-    const [longitude, latitude] = point;
-    return (
-      latitude >= 22 &&
-      (latitude >= 25 || longitude <= -99)
-    );
-  }
-
-  if (country.scenery === "sahara") {
-    return !(
-      country.id === "egypt" &&
-      Math.abs(point[0] - 31.2) < 1.05 &&
-      point[1] < 31.4
-    );
-  }
-
-  if (country.scenery !== "atlas") {
-    return false;
-  }
-
-  const desertLatitude =
-    country.id === "morocco" ? 31.7 : country.id === "tunisia" ? 34.0 : 34.5;
-  return point[1] < desertLatitude;
-}
-
-function isUnitedStatesMountainPoint(point: GeoPoint): boolean {
-  const [longitude, latitude] = point;
-  if (latitude < 31 || latitude > 49.5) {
-    return false;
-  }
-
-  const rockiesLongitude = -111 - (latitude - 42) * 0.45;
-  const inRockies = Math.abs(longitude - rockiesLongitude) < 5.2;
-  const inPacificRanges =
-    longitude >= -124.5 &&
-    longitude <= -117 &&
-    latitude >= 34 &&
-    latitude <= 49.5;
-  return inRockies || inPacificRanges;
-}
-
-function isCanadaMountainPoint(point: GeoPoint): boolean {
-  const [longitude, latitude] = point;
-  const inWesternCordillera =
-    longitude >= -140 &&
-    longitude <= -113 &&
-    latitude >= 48 &&
-    latitude <= 69;
-  const inEasternRanges =
-    longitude >= -80 &&
-    longitude <= -58 &&
-    latitude >= 45 &&
-    latitude <= 55;
-  return inWesternCordillera || inEasternRanges;
-}
-
-function isMexicoMountainPoint(point: GeoPoint): boolean {
-  const [longitude, latitude] = point;
-  const inWesternSierra =
-    longitude >= -109 &&
-    longitude <= -103 &&
-    latitude >= 20 &&
-    latitude <= 31.5;
-  const inEasternSierra =
-    longitude >= -102 &&
-    longitude <= -96 &&
-    latitude >= 19 &&
-    latitude <= 30;
-  const inVolcanicBelt =
-    longitude >= -104.5 &&
-    longitude <= -96 &&
-    latitude >= 18 &&
-    latitude <= 20.5;
-  return inWesternSierra || inEasternSierra || inVolcanicBelt;
-}
-
-const EUROPEAN_SCENERY_COUNTRY_IDS: ReadonlySet<CountryDefinition["id"]> =
-  new Set([
-    "portugal",
-    "spain",
-    "france",
-    "united-kingdom",
-    "germany",
-    "italy",
-    "greece",
-    "netherlands",
-    "switzerland",
-    "austria",
-    "poland",
-    "norway",
-  ]);
-
-function isEuropeanSceneryPoint(
-  country: CountryDefinition,
-  point: GeoPoint,
-): boolean {
-  if (EUROPEAN_SCENERY_COUNTRY_IDS.has(country.id)) {
-    return true;
-  }
-
-  if (country.id === "russia") {
-    return point[0] < 45;
-  }
-
-  if (country.id === "turkey") {
-    return point[0] < 29.8 && point[1] > 40.4;
-  }
-
-  return false;
-}
-
-function hashString(value: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
+  return difference;
 }
 
 function mulberry32(seed: number): () => number {

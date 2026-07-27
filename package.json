@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "generate:ecology": "node scripts/generate-world-ecology.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

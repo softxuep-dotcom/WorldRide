@@ -24,7 +24,12 @@ export type PropArchetypeId =
   | "chalet"
   | "adobe"
   | "dune"
-  | "rock";
+  | "rock"
+  | "mountain-green"
+  | "mountain-dry"
+  | "mountain-alpine"
+  | "meadow-lush"
+  | "meadow-dry";
 
 interface PropPart {
   geometry: THREE.BufferGeometry;
@@ -60,6 +65,14 @@ const PALETTE = {
   roofWood: 0x8a5a3b,
   sand: 0xe4bd7d,
   rock: 0x8a8375,
+  mountainGreen: 0x718b77,
+  mountainDry: 0x9a7359,
+  mountainAlpine: 0x7b8580,
+  snow: 0xe3e7df,
+  grass: 0x55a95f,
+  grassLight: 0x83bd67,
+  olive: 0x6f965c,
+  sandLight: 0xf2cb75,
 } as const;
 
 function bakePart(part: PropPart): THREE.BufferGeometry {
@@ -329,7 +342,49 @@ const ARCHETYPE_BUILDERS: Record<PropArchetypeId, () => THREE.BufferGeometry> = 
         position: [0.24, 0.09, 0.1],
       },
     ]),
+
+  "mountain-green": () => buildMountain(PALETTE.mountainGreen, false),
+  "mountain-dry": () => buildMountain(PALETTE.mountainDry, false),
+  "mountain-alpine": () => buildMountain(PALETTE.mountainAlpine, true),
+
+  "meadow-lush": () => buildMeadow(PALETTE.grass, PALETTE.grassLight),
+  "meadow-dry": () => buildMeadow(PALETTE.olive, PALETTE.sandLight),
 };
+
+function buildMountain(color: number, snowy: boolean): THREE.BufferGeometry {
+  const parts: PropPart[] = [
+    {
+      geometry: new THREE.ConeGeometry(0.6, 1.4, 5),
+      color,
+      position: [0, 0.7, 0],
+    },
+  ];
+  if (snowy) {
+    parts.push({
+      geometry: new THREE.ConeGeometry(0.31, 0.5, 5),
+      color: PALETTE.snow,
+      position: [0, 1.22, 0],
+    });
+  }
+  return buildProp(parts);
+}
+
+function buildMeadow(baseColor: number, highlightColor: number): THREE.BufferGeometry {
+  return buildProp([
+    ...[-1, 0, 1].map((offset, index) => ({
+      geometry: new THREE.DodecahedronGeometry(0.28, 0),
+      color: index === 1 ? highlightColor : baseColor,
+      position: [offset * 0.28, 0.04, (index % 2) * 0.17] as const,
+      scale: [0.9, 0.16, 0.62] as const,
+      rotation: [0, index * 0.72, 0] as const,
+    })),
+    ...[-0.19, 0.18].map((offset) => ({
+      geometry: new THREE.ConeGeometry(0.11, 0.3, 5),
+      color: baseColor,
+      position: [offset, 0.15, -0.12] as const,
+    })),
+  ]);
+}
 
 let sharedMaterial: THREE.MeshStandardMaterial | undefined;
 
@@ -345,65 +400,82 @@ function getPropMaterial(): THREE.MeshStandardMaterial {
   return sharedMaterial;
 }
 
+interface InstancePoolEntry {
+  readonly mesh: THREE.InstancedMesh;
+  readonly capacity: number;
+  count: number;
+}
+
 /**
- * Collects prop placements across the whole world, then emits one InstancedMesh
- * per archetype. Call `build()` after every placement has been registered.
+ * Fixed-capacity dynamic instance slots. The meshes are allocated once and
+ * their matrices are rewritten only when the active ecology cells change.
  */
-export class PropBatcher {
-  private readonly placements = new Map<PropArchetypeId, PropPlacement[]>();
+export class PropInstancePool {
+  readonly root = new THREE.Group();
+  private readonly entries = new Map<PropArchetypeId, InstancePoolEntry>();
+  private readonly matrix = new THREE.Matrix4();
+  private readonly position = new THREE.Vector3();
+  private readonly quaternion = new THREE.Quaternion();
+  private readonly scale = new THREE.Vector3();
+  private readonly axis = new THREE.Vector3(0, 1, 0);
+  private droppedPlacements = 0;
 
-  place(archetype: PropArchetypeId, placement: PropPlacement): void {
-    const bucket = this.placements.get(archetype);
-    if (bucket) {
-      bucket.push(placement);
-    } else {
-      this.placements.set(archetype, [placement]);
-    }
-  }
-
-  get placementCount(): number {
-    let total = 0;
-    for (const bucket of this.placements.values()) {
-      total += bucket.length;
-    }
-    return total;
-  }
-
-  build(): THREE.InstancedMesh[] {
-    const material = getPropMaterial();
-    const meshes: THREE.InstancedMesh[] = [];
-    const matrix = new THREE.Matrix4();
-    const position = new THREE.Vector3();
-    const quaternion = new THREE.Quaternion();
-    const scale = new THREE.Vector3();
-    const axis = new THREE.Vector3(0, 1, 0);
-
-    for (const [archetype, bucket] of this.placements) {
-      if (bucket.length === 0) {
+  constructor(capacities: Partial<Record<PropArchetypeId, number>>) {
+    this.root.name = "Ecology instance pools";
+    for (const [archetype, capacity] of Object.entries(capacities) as [
+      PropArchetypeId,
+      number,
+    ][]) {
+      if (capacity <= 0) {
         continue;
       }
-
-      const geometry = ARCHETYPE_BUILDERS[archetype]();
-      const mesh = new THREE.InstancedMesh(geometry, material, bucket.length);
-      mesh.name = `props:${archetype}`;
-
-      bucket.forEach((placement, index) => {
-        const size = placement.size ?? 1;
-        position.set(placement.x, placement.y ?? 0, placement.z);
-        quaternion.setFromAxisAngle(axis, placement.rotationY ?? 0);
-        scale.setScalar(size);
-        matrix.compose(position, quaternion, scale);
-        mesh.setMatrixAt(index, matrix);
-      });
-
-      mesh.instanceMatrix.needsUpdate = true;
+      const mesh = new THREE.InstancedMesh(
+        ARCHETYPE_BUILDERS[archetype](),
+        getPropMaterial(),
+        capacity,
+      );
+      mesh.name = `ecology:${archetype}`;
+      mesh.count = 0;
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      mesh.computeBoundingSphere();
-      meshes.push(mesh);
+      this.entries.set(archetype, { mesh, capacity, count: 0 });
+      this.root.add(mesh);
+    }
+  }
+
+  beginUpdate(): void {
+    this.droppedPlacements = 0;
+    for (const entry of this.entries.values()) {
+      entry.count = 0;
+    }
+  }
+
+  place(archetype: PropArchetypeId, placement: PropPlacement): void {
+    const entry = this.entries.get(archetype);
+    if (!entry || entry.count >= entry.capacity) {
+      this.droppedPlacements += 1;
+      return;
     }
 
-    this.placements.clear();
-    return meshes;
+    const size = placement.size ?? 1;
+    this.position.set(placement.x, placement.y ?? 0, placement.z);
+    this.quaternion.setFromAxisAngle(this.axis, placement.rotationY ?? 0);
+    this.scale.setScalar(size);
+    this.matrix.compose(this.position, this.quaternion, this.scale);
+    entry.mesh.setMatrixAt(entry.count, this.matrix);
+    entry.count += 1;
+  }
+
+  commit(): number {
+    for (const entry of this.entries.values()) {
+      entry.mesh.count = entry.count;
+      entry.mesh.visible = entry.count > 0;
+      if (entry.count > 0) {
+        entry.mesh.instanceMatrix.needsUpdate = true;
+        entry.mesh.computeBoundingSphere();
+      }
+    }
+    return this.droppedPlacements;
   }
 }

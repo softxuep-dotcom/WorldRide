@@ -53,15 +53,6 @@ export interface CountryDefinition {
     name: string;
     point: GeoPoint;
   };
-  scenery:
-    | "atlantic"
-    | "mediterranean"
-    | "green"
-    | "atlas"
-    | "sahara"
-    | "monsoon"
-    | "tropical"
-    | "highland";
 }
 
 export type PhotoSpotId =
@@ -102,7 +93,23 @@ export type PhotoSpotId =
   | "victoria-falls"
   | "great-barrier-reef"
   | "pointe-du-hoc"
-  | "hiroshima-peace-memorial";
+  | "hiroshima-peace-memorial"
+  | "lake-baikal"
+  | "lena-pillars"
+  | "persepolis"
+  | "hegra"
+  | "samarra-minaret"
+  | "lake-louise"
+  | "teotihuacan"
+  | "panama-canal"
+  | "iguazu-falls"
+  | "salar-de-uyuni"
+  | "torres-del-paine"
+  | "fish-river-canyon"
+  | "drakensberg"
+  | "lalibela"
+  | "great-mosque-djenne"
+  | "registan";
 
 export interface PhotoSpotDefinition {
   id: PhotoSpotId;
@@ -164,7 +171,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "里斯本",
       point: [-9.18, 38.78],
     },
-    scenery: "atlantic",
   },
   {
     id: "spain",
@@ -184,7 +190,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "加的斯",
       point: [-6.22, 36.55],
     },
-    scenery: "mediterranean",
   },
   {
     id: "france",
@@ -204,7 +209,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "马赛",
       point: [5.35, 43.35],
     },
-    scenery: "green",
   },
   {
     id: "united-states",
@@ -224,7 +228,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "华盛顿",
       point: [-77.04, 38.91],
     },
-    scenery: "highland",
   },
   {
     id: "canada",
@@ -244,7 +247,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "渥太华",
       point: [-75.7, 45.42],
     },
-    scenery: "highland",
   },
   {
     id: "mexico",
@@ -264,7 +266,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "墨西哥城",
       point: [-99.13, 19.43],
     },
-    scenery: "atlas",
   },
   {
     id: "brazil",
@@ -284,7 +285,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "巴西利亚",
       point: [-47.88, -15.79],
     },
-    scenery: "tropical",
   },
   {
     id: "united-kingdom",
@@ -304,7 +304,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "伦敦",
       point: [-0.13, 51.51],
     },
-    scenery: "atlantic",
   },
   {
     id: "germany",
@@ -324,7 +323,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "柏林",
       point: [13.41, 52.52],
     },
-    scenery: "green",
   },
   {
     id: "italy",
@@ -344,7 +342,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "罗马",
       point: [12.5, 41.9],
     },
-    scenery: "mediterranean",
   },
   {
     id: "greece",
@@ -364,7 +361,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "雅典",
       point: [23.73, 37.98],
     },
-    scenery: "mediterranean",
   },
   {
     id: "morocco",
@@ -384,7 +380,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "丹吉尔",
       point: [-5.81, 35.76],
     },
-    scenery: "atlas",
   },
   {
     id: "algeria",
@@ -404,7 +399,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "阿尔及尔",
       point: [3.05, 36.5],
     },
-    scenery: "sahara",
   },
   {
     id: "tunisia",
@@ -424,7 +418,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "突尼斯城",
       point: [10.18, 36.81],
     },
-    scenery: "atlas",
   },
   {
     id: "egypt",
@@ -444,7 +437,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "开罗",
       point: [31.24, 30.04],
     },
-    scenery: "sahara",
   },
   {
     id: "turkey",
@@ -464,7 +456,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "伊斯坦布尔",
       point: [28.95, 41.05],
     },
-    scenery: "mediterranean",
   },
   {
     id: "china",
@@ -484,7 +475,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "北京",
       point: [116.41, 39.9],
     },
-    scenery: "highland",
   },
   {
     id: "japan",
@@ -504,7 +494,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "东京",
       point: [139.69, 35.68],
     },
-    scenery: "monsoon",
   },
   {
     id: "south-korea",
@@ -524,7 +513,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "首尔",
       point: [126.98, 37.57],
     },
-    scenery: "monsoon",
   },
   {
     id: "india",
@@ -544,7 +532,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "新德里",
       point: [77.21, 28.61],
     },
-    scenery: "tropical",
   },
   {
     id: "thailand",
@@ -564,7 +551,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "曼谷",
       point: [100.5, 13.75],
     },
-    scenery: "tropical",
   },
   {
     id: "vietnam",
@@ -584,7 +570,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "河内",
       point: [105.85, 21.03],
     },
-    scenery: "tropical",
   },
   {
     id: "indonesia",
@@ -604,7 +589,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "雅加达",
       point: [106.85, -6.2],
     },
-    scenery: "tropical",
   },
   {
     id: "netherlands",
@@ -624,7 +608,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "阿姆斯特丹",
       point: [4.9, 52.37],
     },
-    scenery: "green",
   },
   {
     id: "switzerland",
@@ -644,7 +627,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "伯尔尼",
       point: [7.45, 46.95],
     },
-    scenery: "highland",
   },
   {
     id: "austria",
@@ -664,7 +646,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "维也纳",
       point: [16.37, 48.21],
     },
-    scenery: "highland",
   },
   {
     id: "poland",
@@ -684,7 +665,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "华沙",
       point: [21.01, 52.23],
     },
-    scenery: "green",
   },
   {
     id: "norway",
@@ -704,7 +684,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "奥斯陆",
       point: [10.75, 59.91],
     },
-    scenery: "highland",
   },
   {
     id: "russia",
@@ -724,7 +703,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "莫斯科",
       point: [37.62, 55.75],
     },
-    scenery: "green",
   },
   {
     id: "iran",
@@ -744,7 +722,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "德黑兰",
       point: [51.39, 35.69],
     },
-    scenery: "highland",
   },
   {
     id: "saudi-arabia",
@@ -764,7 +741,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "利雅得",
       point: [46.68, 24.71],
     },
-    scenery: "sahara",
   },
   {
     id: "pakistan",
@@ -784,7 +760,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "伊斯兰堡",
       point: [73.05, 33.69],
     },
-    scenery: "highland",
   },
   {
     id: "mongolia",
@@ -804,7 +779,6 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       name: "乌兰巴托",
       point: [106.91, 47.92],
     },
-    scenery: "highland",
   },
 ] as const;
 
@@ -1256,6 +1230,198 @@ export const PHOTO_SPOTS: readonly PhotoSpotDefinition[] = [
       "广岛和平纪念碑又称原爆圆顶馆。1945年8月6日原子弹在附近上空爆炸，建筑中心部分仍以残损砖墙和裸露钢架圆顶留存。今天它与和平纪念公园共同提醒人们认识战争后果，并思考和平的价值。",
     fact: "这座建筑于1915年建成，爆心约在其东南方160米处；遗址后来被保存为追念遇难者和祈愿和平的象征。",
   },
+  {
+    id: "lake-baikal",
+    name: "贝加尔湖",
+    kind: "natural",
+    atlasCountryName: "Russia",
+    accent: 0x318cb8,
+    point: [104.3, 53.5],
+    postcard: "西伯利亚群山间一道狭长而深蓝的湖面",
+    description:
+      "贝加尔湖位于西伯利亚南部的裂谷中，狭长湖盆被山地与针叶林包围。冬季湖面会形成透明冰层与长裂纹，夏季则呈现深蓝水面和漫长湖岸。",
+    fact: "贝加尔湖是世界上最深的湖泊，也储存着全球很大一部分未冻结地表淡水。",
+  },
+  {
+    id: "lena-pillars",
+    name: "勒拿河柱状岩",
+    kind: "natural",
+    atlasCountryName: "Russia",
+    accent: 0xb66f39,
+    point: [127.0, 61.1],
+    postcard: "勒拿河岸连续升起的金红色石柱",
+    description:
+      "在西伯利亚东部，数十公里长的石灰岩峭壁沿勒拿河排列。冻融和侵蚀把岩层切割成塔柱、尖峰与狭缝，乘船经过时轮廓会不断变化。",
+    fact: "这些岩柱部分高出河面约一百米，是永久冻土地区长期风化的结果。",
+  },
+  {
+    id: "persepolis",
+    name: "波斯波利斯",
+    kind: "wonder",
+    atlasCountryName: "Iran",
+    accent: 0xb59161,
+    point: [52.891, 29.935],
+    postcard: "伊朗高原上铺开的古波斯台阶与石柱",
+    description:
+      "波斯波利斯建在巨大的石砌台地上。宽阔阶梯、浮雕队列和高大的宫殿石柱共同展示阿契美尼德王朝礼仪中心的规模与工艺。",
+    fact: "遗址始建于公元前六世纪末，台阶浮雕刻画了来自帝国各地的使团。",
+  },
+  {
+    id: "hegra",
+    name: "黑格拉古城",
+    kind: "wonder",
+    atlasCountryName: "Saudi Arabia",
+    accent: 0xc17f46,
+    point: [37.956, 26.804],
+    postcard: "沙岩孤丘上被完整雕出的纳巴泰墓门",
+    description:
+      "黑格拉散布在沙特西北部的砂岩地貌中。纳巴泰工匠从崖面上方向下雕刻出山花、柱式和入口，让巨大墓葬立面直接成为岩体的一部分。",
+    fact: "黑格拉保存了一百多座有装饰立面的墓葬，是沙特阿拉伯首个世界遗产地。",
+  },
+  {
+    id: "samarra-minaret",
+    name: "萨迈拉螺旋宣礼塔",
+    kind: "landmark",
+    atlasCountryName: "Iraq",
+    accent: 0xb88445,
+    point: [43.88, 34.2],
+    postcard: "伊拉克平原上盘旋升高的砖砌圆塔",
+    description:
+      "萨迈拉大清真寺的宣礼塔以宽阔螺旋坡道绕塔身向上，形成极易辨认的锥形轮廓。它矗立在底格里斯河附近的平原上，见证阿拔斯时代城市规模。",
+    fact: "这座宣礼塔建于九世纪，高约五十米，当地常称它为马尔维亚塔。",
+  },
+  {
+    id: "lake-louise",
+    name: "露易丝湖",
+    kind: "natural",
+    atlasCountryName: "Canada",
+    accent: 0x35a8aa,
+    point: [-116.177, 51.425],
+    postcard: "冰川雪峰下呈乳蓝色的加拿大山湖",
+    description:
+      "露易丝湖位于加拿大落基山脉班夫国家公园内。冰川研磨出的细小岩粉悬浮在水中，使湖面在阳光下呈现鲜明的蓝绿色，周围则是森林与雪峰。",
+    fact: "湖水的蓝绿色来自冰川融水携带的细微岩粉对光线的散射。",
+  },
+  {
+    id: "teotihuacan",
+    name: "特奥蒂瓦坎",
+    kind: "wonder",
+    atlasCountryName: "Mexico",
+    accent: 0xb5753f,
+    point: [-98.843, 19.692],
+    postcard: "墨西哥高原上沿亡灵大道排列的阶梯金字塔",
+    description:
+      "特奥蒂瓦坎曾是古代美洲规模最大的城市之一。太阳金字塔、月亮金字塔和亡灵大道组成清晰的城市轴线，从高处可以看见遗址向高原展开。",
+    fact: "这座城市在公元一至七世纪间繁盛，其原名和建造者身份仍有许多未解之处。",
+  },
+  {
+    id: "panama-canal",
+    name: "巴拿马运河",
+    kind: "landmark",
+    atlasCountryName: "Panama",
+    accent: 0x238f9f,
+    point: [-79.68, 9.08],
+    postcard: "巨轮在热带森林间逐级通过船闸",
+    description:
+      "巴拿马运河穿过中美洲地峡，以船闸升降船只并连接人工湖与两侧海洋。观景点能直观看到闸门、拖轮和大型货轮在狭窄水道中协同运行。",
+    fact: "运河把大西洋与太平洋航线连接起来，使许多船只不必绕行南美洲南端。",
+  },
+  {
+    id: "iguazu-falls",
+    name: "伊瓜苏瀑布",
+    kind: "natural",
+    atlasCountryName: "Argentina",
+    accent: 0x3c9c83,
+    point: [-54.44, -25.695],
+    postcard: "热带森林中层层展开的巨大瀑布群",
+    description:
+      "伊瓜苏河在阿根廷与巴西边界处分裂成许多水道，再沿弧形断崖同时跌落。森林步道穿行于水雾、岩岛和不同高度的瀑布之间。",
+    fact: "伊瓜苏瀑布由约两百多条大小瀑布组成，水量会随季节显著变化。",
+  },
+  {
+    id: "salar-de-uyuni",
+    name: "乌尤尼盐沼",
+    kind: "natural",
+    atlasCountryName: "Bolivia",
+    accent: 0x8fbfc9,
+    point: [-67.49, -20.13],
+    postcard: "雨水把白色盐原变成通向天际的镜面",
+    description:
+      "乌尤尼盐沼位于玻利维亚高原，干季呈现辽阔白色盐壳与多边形纹理。雨季薄水覆盖地表时，天空和远山会被完整倒映。",
+    fact: "它是世界上面积最大的盐沼，由史前湖泊干涸后留下的盐层形成。",
+  },
+  {
+    id: "torres-del-paine",
+    name: "百内三塔",
+    kind: "natural",
+    atlasCountryName: "Chile",
+    accent: 0x527f96,
+    point: [-73.0, -50.94],
+    postcard: "巴塔哥尼亚湖泊上方并立的三座花岗岩尖塔",
+    description:
+      "百内国家公园位于智利巴塔哥尼亚，花岗岩山峰、冰川、草原和蓝色湖泊紧密相邻。三座高耸岩塔是这里最醒目的远足目标。",
+    fact: "冰川侵蚀剥去了较软岩层，使坚硬花岗岩核心形成今天陡峭的塔状轮廓。",
+  },
+  {
+    id: "fish-river-canyon",
+    name: "鱼河大峡谷",
+    kind: "natural",
+    atlasCountryName: "Namibia",
+    accent: 0xa45f38,
+    point: [17.6, -27.6],
+    postcard: "纳米比亚南部荒原中蜿蜒切开的层叠峡谷",
+    description:
+      "鱼河在纳米比亚干旱高原上切出漫长曲折的峡谷。观景台下方是层层岩壁、砾石台地和季节性河道，色彩会随日照从灰褐转为红金。",
+    fact: "鱼河大峡谷是非洲规模最大的峡谷之一，全长约一百六十公里。",
+  },
+  {
+    id: "drakensberg",
+    name: "德拉肯斯堡圆形剧场",
+    kind: "natural",
+    atlasCountryName: "South Africa",
+    accent: 0x6d9257,
+    point: [28.9, -28.75],
+    postcard: "南非草坡上方展开的巨大玄武岩弧形峭壁",
+    description:
+      "德拉肯斯堡北部的圆形剧场是一面长达数公里的弧形岩壁。山顶高原、垂直断崖、草地和季节性瀑布共同形成南部非洲最宏大的山地景观之一。",
+    fact: "图盖拉瀑布从这片峭壁附近分段跌落，是世界上落差最大的瀑布之一。",
+  },
+  {
+    id: "lalibela",
+    name: "拉利贝拉岩石教堂",
+    kind: "wonder",
+    atlasCountryName: "Ethiopia",
+    accent: 0xa9663f,
+    point: [39.05, 12.03],
+    postcard: "从高原整块岩石向下凿出的十字形教堂",
+    description:
+      "拉利贝拉的教堂不是堆砌而成，而是从火山岩基岩中向下雕凿。沟槽、隧道和院落连接各座建筑，其中圣乔治教堂以完整十字形平面最为醒目。",
+    fact: "这里共有十一座中世纪岩石教堂，至今仍是活跃的宗教场所。",
+  },
+  {
+    id: "great-mosque-djenne",
+    name: "杰内大清真寺",
+    kind: "landmark",
+    atlasCountryName: "Mali",
+    accent: 0xb78048,
+    point: [-4.55, 13.905],
+    postcard: "尼日尔河内陆三角洲上布满木梁的泥土高塔",
+    description:
+      "杰内大清真寺以泥砖和抹泥建成，三座高塔、成排扶壁与突出墙面的木梁形成独特外观。当地社区会定期共同修补雨季损耗的墙面。",
+    fact: "现存建筑于二十世纪初重建，是世界上规模最大的泥土建筑之一。",
+  },
+  {
+    id: "registan",
+    name: "雷吉斯坦广场",
+    kind: "landmark",
+    atlasCountryName: "Uzbekistan",
+    accent: 0x2b9caa,
+    point: [66.975, 39.654],
+    postcard: "撒马尔罕广场上相对而立的蓝色穹顶与马赛克门廊",
+    description:
+      "雷吉斯坦广场由三座宏大的伊斯兰学校围合。高耸门廊、细长宣礼塔、蓝色穹顶和密集几何砖饰，让广场在中亚古城中具有极高辨识度。",
+    fact: "“雷吉斯坦”意为沙地，这里曾是撒马尔罕举行集会与贸易的重要公共空间。",
+  },
 ];
 
 /** New journeys begin at the existing Marseille city anchor in southern France. */
@@ -1284,7 +1450,30 @@ export function getCountryById(id: CountryId): CountryDefinition {
   return country;
 }
 
-export function getSeaName(point: GeoPoint): string {
+export type SeaId =
+  | "map-boundary"
+  | "gibraltar-strait"
+  | "mediterranean"
+  | "arctic-ocean"
+  | "southern-ocean"
+  | "indian-ocean"
+  | "pacific-ocean"
+  | "atlantic-ocean"
+  | "world-ocean";
+
+const SEA_NAMES_ZH: Readonly<Record<SeaId, string>> = {
+  "map-boundary": "原型边界海域",
+  "gibraltar-strait": "直布罗陀海峡",
+  mediterranean: "地中海",
+  "arctic-ocean": "北冰洋",
+  "southern-ocean": "南冰洋",
+  "indian-ocean": "印度洋",
+  "pacific-ocean": "太平洋",
+  "atlantic-ocean": "大西洋",
+  "world-ocean": "世界海洋",
+};
+
+export function getSeaId(point: GeoPoint): SeaId {
   const [longitude, latitude] = point;
 
   if (
@@ -1293,41 +1482,45 @@ export function getSeaName(point: GeoPoint): string {
     longitude < MAP_BOUNDS.minLongitude + 0.6 ||
     longitude > MAP_BOUNDS.maxLongitude - 0.6
   ) {
-    return "原型边界海域";
+    return "map-boundary";
   }
 
   if (latitude >= 35.5 && latitude <= 37.2 && longitude >= -6.5 && longitude <= -4.5) {
-    return "直布罗陀海峡";
+    return "gibraltar-strait";
   }
 
   if (latitude >= 30 && latitude <= 47 && longitude >= -6.5 && longitude <= 37) {
-    return "地中海";
+    return "mediterranean";
   }
 
   if (latitude > 66) {
-    return "北冰洋";
+    return "arctic-ocean";
   }
 
   if (latitude < -55) {
-    return "南冰洋";
+    return "southern-ocean";
   }
 
   if (
     (longitude >= 20 && longitude <= 120 && latitude <= 30) ||
     (longitude >= 95 && longitude <= 145 && latitude <= -10)
   ) {
-    return "印度洋";
+    return "indian-ocean";
   }
 
   if (longitude <= -70 || longitude >= 145) {
-    return "太平洋";
+    return "pacific-ocean";
   }
 
   if (longitude < 20) {
-    return "大西洋";
+    return "atlantic-ocean";
   }
 
-  return "世界海洋";
+  return "world-ocean";
+}
+
+export function getSeaName(point: GeoPoint): string {
+  return SEA_NAMES_ZH[getSeaId(point)];
 }
 
 function latitudeToMercator(latitude: number): number {

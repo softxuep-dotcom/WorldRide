@@ -3,7 +3,9 @@ import {
   PHOTO_SPOTS,
   type PhotoSpotDefinition,
   type PhotoSpotId,
+  type SeaId,
   geoToWorld,
+  getSeaId,
 } from "./data";
 import type { GameEvent, GameState } from "./simulation";
 import { getCurrentGeoPosition } from "./simulation";
@@ -26,6 +28,7 @@ import {
 import {
   getCountryQuiz,
   getSpotQuiz,
+  getWorldQuiz,
   localizeText,
   type QuizSet,
 } from "./quiz";
@@ -79,6 +82,7 @@ interface UIElements {
   settingsPopover: HTMLElement;
   quizButton: HTMLButtonElement;
   quizButtonSubject: HTMLElement;
+  quizButtonAction: HTMLElement;
   quizPanel: HTMLElement;
   quizBackdrop: HTMLButtonElement;
   quizClose: HTMLButtonElement;
@@ -206,6 +210,7 @@ export class GameUI {
       settingsPopover: requireElement("settings-popover"),
       quizButton: requireButton("quiz-button"),
       quizButtonSubject: requireElement("quiz-button-subject"),
+      quizButtonAction: requireElement("quiz-button-action"),
       quizPanel: requireElement("quiz-panel"),
       quizBackdrop: requireButton("quiz-backdrop"),
       quizClose: requireButton("quiz-close"),
@@ -338,7 +343,10 @@ export class GameUI {
     this.currentCountry = profile;
     this.currentNearestPhotoSpot = state.nearestPhotoSpot;
     this.currentNearestSpecialty = state.nearestSpecialty;
-    this.updateTravelInfo(profile, localizedSpot);
+    const seaId = state.vehicleMode === "boat"
+      ? getSeaId(geoPosition)
+      : undefined;
+    this.updateTravelInfo(profile, localizedSpot, seaId);
     this.updateProgress(state);
     const passportCountries = getPassportCountryProfiles();
     this.elements.visitedCount.textContent =
@@ -369,7 +377,8 @@ export class GameUI {
     }
 
     const nearestId = state.nearestPhotoSpot?.id;
-    this.elements.interactButton.disabled = !profile && !state.nearestPhotoSpot;
+    this.elements.interactButton.disabled =
+      !profile && !state.nearestPhotoSpot && !state.nearestSpecialty;
 
     if (nearestId && nearestId !== this.previousNearestPhotoSpot) {
       const nearestSpot = state.nearestPhotoSpot!;
@@ -812,29 +821,35 @@ export class GameUI {
     const spotQuiz = getSpotQuiz(spot?.id);
     if (spot && spotQuiz) {
       subject = { quiz: spotQuiz, label: localizePhotoSpot(spot).name };
-    } else if (profile?.tier === "A") {
+    } else if (profile) {
       const countryQuiz = getCountryQuiz(profile.atlasName);
       if (countryQuiz) {
         subject = { quiz: countryQuiz, label: profile.name };
       }
     }
 
+    subject ??= {
+      quiz: getWorldQuiz(this.completedQuizzes),
+      label: t("quiz.world"),
+    };
     this.availableQuiz = subject;
 
-    const completed = Boolean(
-      subject && this.completedQuizzes.has(subject.quiz.id),
-    );
+    const completed = this.completedQuizzes.has(subject.quiz.id);
     this.elements.quizButton.hidden = false;
-    this.elements.quizButton.disabled =
-      !subject || this.worldOverviewActive || this.hasPrimarySurface();
+    this.elements.quizButton.disabled = false;
     this.elements.quizButton.classList.toggle("is-completed", completed);
-    this.elements.quizButtonSubject.textContent = subject
-      ? `${subject.label}${completed ? " · ✓" : ""}`
-      : t("quiz.unavailable");
+    this.elements.quizButtonSubject.textContent = subject.label;
+    this.elements.quizButtonAction.textContent = t(
+      completed ? "quiz.retry" : "quiz.challenge",
+    );
+    this.elements.quizButton.setAttribute(
+      "aria-label",
+      `${subject.label} · ${this.elements.quizButtonAction.textContent}`,
+    );
   }
 
   private openQuiz(): void {
-    if (!this.availableQuiz || this.worldOverviewActive) {
+    if (!this.availableQuiz) {
       return;
     }
     this.setSettingsOpen(false);
@@ -993,6 +1008,9 @@ export class GameUI {
           event.mode === "boat" ? t("toast.boatMode") : t("toast.carMode"),
         );
         break;
+      case "cruise-flow":
+        this.showToast(t("toast.cruiseFlow"));
+        break;
       case "map-edge":
         this.showToast(t("toast.mapEdge"));
         break;
@@ -1080,21 +1098,30 @@ export class GameUI {
   private updateTravelInfo(
     country?: CountryProfile,
     spot?: PhotoSpotDefinition,
+    seaId?: SeaId,
   ): void {
-    if (!country && !spot) {
+    if (!country && !spot && !seaId) {
       this.displayedContextId = undefined;
       this.elements.countryReveal.classList.remove("is-visible");
       return;
     }
 
     this.elements.countryReveal.classList.add("is-visible");
-    const contextId = spot ? `spot:${spot.id}` : `country:${country!.id}`;
+    const contextId = spot
+      ? `spot:${spot.id}`
+      : country
+        ? `country:${country.id}`
+        : `sea:${seaId}`;
     if (contextId === this.displayedContextId) {
       return;
     }
 
     this.displayedContextId = contextId;
     this.elements.countryReveal.classList.toggle("has-landmark", Boolean(spot));
+    this.elements.countryReveal.classList.toggle(
+      "has-ocean",
+      Boolean(seaId && !spot && !country),
+    );
     if (spot) {
       const atlasCountry = getWorldCountryByName(spot.atlasCountryName);
       const spotCountry = country ?? (
@@ -1108,6 +1135,16 @@ export class GameUI {
         "aria-label",
         t("aria.landmarkDetail", { name: spot.name }),
       );
+      return;
+    }
+
+    if (seaId) {
+      const seaName = t(`sea.${seaId}` as never);
+      this.elements.countryReveal.classList.remove("has-landmark");
+      this.elements.countryKicker.textContent = `⛵ ${t("context.ocean")}`;
+      this.elements.countryName.textContent = seaName;
+      this.elements.countryIntro.textContent = t("ocean.sailing");
+      this.elements.interactButton.setAttribute("aria-label", seaName);
       return;
     }
 

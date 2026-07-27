@@ -128,6 +128,70 @@ const COPY: Readonly<Record<string, BilingualEntry>> = {
     en: { name: "Zampoña Panpipes", blurb: "Two rows of cane pipes; players often interlock to finish a melody." },
     "zh-CN": { name: "安第斯排箫", blurb: "两排芦管，演奏者常常互相接力才吹完一支曲子。" },
   },
+  "argan-oil": {
+    en: { name: "Argan Oil", blurb: "Moroccan argan kernels are pressed into a fragrant oil used in cooking and craft." },
+    "zh-CN": { name: "阿甘油", blurb: "摩洛哥人把阿甘果仁压成芳香油脂，用于烹饪和传统手艺。" },
+  },
+  "shea-butter": {
+    en: { name: "Shea Butter", blurb: "Nuts from the shea tree are worked into a rich butter across West Africa." },
+    "zh-CN": { name: "乳木果油", blurb: "西非许多地方把乳木果仁加工成滋润而耐储存的油脂。" },
+  },
+  "rooibos-tea": {
+    en: { name: "Rooibos Tea", blurb: "This naturally caffeine-free red infusion grows only around South Africa's Cederberg." },
+    "zh-CN": { name: "路易波士茶", blurb: "这种天然不含咖啡因的红茶主要生长在南非塞德伯格山区。" },
+  },
+  "malagasy-vanilla": {
+    en: { name: "Malagasy Vanilla", blurb: "Each vanilla flower is pollinated by hand before its pod is slowly cured." },
+    "zh-CN": { name: "马达加斯加香草", blurb: "每朵香草花都要人工授粉，结出的豆荚还需慢慢发酵晾制。" },
+  },
+  "uzbek-ceramics": {
+    en: { name: "Uzbek Ceramics", blurb: "Cobalt and turquoise patterns turn everyday bowls into bright Silk Road craft." },
+    "zh-CN": { name: "乌兹别克彩陶", blurb: "钴蓝与青绿色纹样让日常陶碗带上鲜明的丝路色彩。" },
+  },
+  "kyrgyz-shyrdak": {
+    en: { name: "Kyrgyz Shyrdak", blurb: "Contrasting felt pieces are fitted together into rugs with curling horn motifs." },
+    "zh-CN": { name: "吉尔吉斯毡毯", blurb: "不同颜色的羊毛毡彼此拼合，形成卷曲的羊角纹样。" },
+  },
+  "kazakh-kumis": {
+    en: { name: "Kazakh Kumis", blurb: "Fresh mare's milk is fermented into a lightly sparkling steppe drink." },
+    "zh-CN": { name: "哈萨克马奶酒", blurb: "新鲜马奶经过发酵，成为带微微气泡的草原饮品。" },
+  },
+  "tajik-pomegranate": {
+    en: { name: "Tajik Pomegranate", blurb: "Warm valleys produce ruby-red fruit packed with jewel-like seeds." },
+    "zh-CN": { name: "塔吉克石榴", blurb: "温暖河谷孕育出红宝石般的果实，里面挤满晶亮籽粒。" },
+  },
+  "ningxia-goji": {
+    en: { name: "Ningxia Goji", blurb: "Sun and dry air help these small berries keep their vivid red colour." },
+    "zh-CN": { name: "宁夏枸杞", blurb: "充足日照和干燥空气，让这些小果实保持鲜亮红色。" },
+  },
+  "sichuan-paper-umbrella": {
+    en: { name: "Sichuan Paper Umbrella", blurb: "Bamboo ribs and oiled paper make a light canopy painted for rain and celebration." },
+    "zh-CN": { name: "四川油纸伞", blurb: "竹骨撑起刷油纸面，既能挡雨，也常绘上喜庆花纹。" },
+  },
+  "mongolian-cashmere": {
+    en: { name: "Mongolian Cashmere", blurb: "Goats grow an exceptionally soft undercoat against the steppe's severe winter." },
+    "zh-CN": { name: "蒙古羊绒", blurb: "山羊为了抵御草原严冬，长出格外柔软细密的底绒。" },
+  },
+  "okinawan-bingata": {
+    en: { name: "Okinawan Bingata", blurb: "Stencils and resist dye create brilliant island flowers on cloth." },
+    "zh-CN": { name: "冲绳红型染", blurb: "工匠用型纸和防染技法，把鲜艳的海岛花草留在布面上。" },
+  },
+  "andean-quinoa": {
+    en: { name: "Andean Quinoa", blurb: "This hardy seed crop thrives in cold, high fields where many grains struggle." },
+    "zh-CN": { name: "安第斯藜麦", blurb: "这种耐寒籽粮能在许多谷物难以生长的高海拔田地结实。" },
+  },
+  "peruvian-textile": {
+    en: { name: "Peruvian Andean Textile", blurb: "Geometric colours carry local patterns through generations of weaving." },
+    "zh-CN": { name: "秘鲁安第斯织物", blurb: "鲜明几何色块把地方纹样沿着一代代编织手艺传下去。" },
+  },
+  "amazon-acai": {
+    en: { name: "Amazon Açaí", blurb: "Dark purple berries grow in clusters high on palms beside Amazon waterways." },
+    "zh-CN": { name: "亚马孙巴西莓", blurb: "深紫色小果成串长在棕榈高处，常见于亚马孙水道两岸。" },
+  },
+  "colombian-coffee": {
+    en: { name: "Colombian Coffee", blurb: "Mountain slopes, equatorial sun, and cool nights help coffee cherries ripen slowly." },
+    "zh-CN": { name: "哥伦比亚咖啡", blurb: "山坡、赤道阳光与凉爽夜晚让咖啡果实缓慢成熟。" },
+  },
 };
 
 const FALLBACK_LOCALE = "en";
