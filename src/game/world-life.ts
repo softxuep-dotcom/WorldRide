@@ -2,8 +2,7 @@ import * as THREE from "three";
 
 /**
  * Ambient "living world" layer: things that move but never gate gameplay —
- * a few flocks of birds, blossom petals drifting on the wind, and slow clouds
- * that trail soft shadows across the ground.
+ * a few flocks of birds and blossom petals drifting on the wind.
  *
  * Everything is anchored to a moving field centred on the player, so the local
  * travel view is always populated without spawning life across the whole map.
@@ -31,16 +30,6 @@ interface Bird {
   frightCooldown: number;
 }
 
-interface Cloud {
-  readonly puff: THREE.Mesh;
-  readonly shadow: THREE.Mesh;
-  offsetX: number;
-  offsetZ: number;
-  readonly speedX: number;
-  readonly speedZ: number;
-  readonly cloudY: number;
-}
-
 interface Petal {
   offsetX: number;
   offsetY: number;
@@ -62,8 +51,6 @@ interface Fadeable {
 
 const BIRD_FIELD_X = 16;
 const BIRD_FIELD_Z = 14;
-const CLOUD_FIELD_X = 20;
-const CLOUD_FIELD_Z = 17;
 const PETAL_FIELD_X = 11;
 const PETAL_FIELD_Z = 9;
 const PETAL_TOP = 7.5;
@@ -75,7 +62,6 @@ export class WorldLife {
   readonly root = new THREE.Group();
 
   private readonly birds: Bird[] = [];
-  private readonly clouds: Cloud[] = [];
   private readonly petals: Petal[] = [];
   private petalMesh?: THREE.InstancedMesh;
   private readonly fadeables: Fadeable[] = [];
@@ -87,7 +73,6 @@ export class WorldLife {
     this.root.name = "Ambient life";
     const soft = createSoftSpriteTexture();
     this.buildBirds();
-    this.buildClouds(soft);
     this.buildPetals(soft);
   }
 
@@ -124,7 +109,6 @@ export class WorldLife {
       playerDeltaZ,
       playerVelocity,
     );
-    this.updateClouds(delta, playerX, playerZ);
     this.updatePetals(elapsed, delta, playerX, playerZ);
   }
 
@@ -205,24 +189,6 @@ export class WorldLife {
         (bird.startledFor > 0 ? 0.72 : 0.55);
       bird.leftWing.rotation.z = 0.22 + flap;
       bird.rightWing.rotation.z = -0.22 - flap;
-    }
-  }
-
-  private updateClouds(delta: number, playerX: number, playerZ: number): void {
-    for (const cloud of this.clouds) {
-      cloud.offsetX = wrapField(cloud.offsetX + cloud.speedX * delta, CLOUD_FIELD_X);
-      cloud.offsetZ = wrapField(cloud.offsetZ + cloud.speedZ * delta, CLOUD_FIELD_Z);
-      cloud.puff.position.set(
-        playerX + cloud.offsetX,
-        cloud.cloudY,
-        playerZ + cloud.offsetZ,
-      );
-      // Sun comes from roughly (-x, +z), so shadows fall toward (+x, -z).
-      cloud.shadow.position.set(
-        playerX + cloud.offsetX + 2.1,
-        0.5,
-        playerZ + cloud.offsetZ - 2.1,
-      );
     }
   }
 
@@ -364,56 +330,6 @@ export class WorldLife {
       group.scale.setScalar(scale);
       this.birds.push(bird);
       this.root.add(group);
-    }
-  }
-
-  private buildClouds(sprite: THREE.Texture): void {
-    const cloudMaterial = new THREE.MeshBasicMaterial({
-      map: sprite,
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.5,
-      depthWrite: false,
-    });
-    const shadowMaterial = new THREE.MeshBasicMaterial({
-      map: sprite,
-      color: 0x16394a,
-      transparent: true,
-      opacity: 0.16,
-      depthWrite: false,
-    });
-    this.fadeables.push(
-      { material: cloudMaterial, baseOpacity: 0.5 },
-      { material: shadowMaterial, baseOpacity: 0.16 },
-    );
-
-    const planeGeometry = new THREE.PlaneGeometry(1, 1);
-    planeGeometry.rotateX(-Math.PI / 2); // Lie flat for the top-down view.
-
-    for (let index = 0; index < 4; index += 1) {
-      const puff = new THREE.Mesh(planeGeometry, cloudMaterial);
-      const width = randomBetween(6.5, 9.5);
-      const depth = randomBetween(4.5, 6.5);
-      puff.scale.set(width, 1, depth);
-      puff.frustumCulled = false;
-      puff.renderOrder = 3;
-
-      const shadow = new THREE.Mesh(planeGeometry, shadowMaterial);
-      shadow.scale.set(width * 0.82, 1, depth * 0.82);
-      shadow.frustumCulled = false;
-      shadow.renderOrder = 1;
-
-      const cloud: Cloud = {
-        puff,
-        shadow,
-        offsetX: randomBetween(-CLOUD_FIELD_X, CLOUD_FIELD_X),
-        offsetZ: randomBetween(-CLOUD_FIELD_Z, CLOUD_FIELD_Z),
-        speedX: randomBetween(0.55, 0.95),
-        speedZ: randomBetween(0.2, 0.45),
-        cloudY: randomBetween(14, 16.5),
-      };
-      this.clouds.push(cloud);
-      this.root.add(shadow, puff);
     }
   }
 

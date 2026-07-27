@@ -147,21 +147,9 @@ function getNaturalTerrainColor(longitude: number, latitude: number): Rgb {
     desert,
   );
   color = mixRgb(color, mountainRock, elevation * (0.56 + detailNoise * 0.18));
-  const snowyMountainRange =
-    (longitude >= -80 && longitude <= -60 && latitude >= -58 && latitude <= 12) ||
-    (longitude >= -126 && longitude <= -98 && latitude >= 48 && latitude <= 65) ||
-    (longitude >= -3 && longitude <= 20 && latitude >= 42 && latitude <= 50) ||
-    (longitude >= 65 && longitude <= 108 && latitude >= 22 && latitude <= 40);
-  const highAltitudeCold = snowyMountainRange
-    ? THREE.MathUtils.smoothstep(absoluteLatitude, 12, 30)
-    : 0;
-  const snowLine =
-    THREE.MathUtils.clamp(
-      (elevation - (0.93 - absoluteLatitude * 0.0007)) * 8,
-      0,
-      1,
-    ) * highAltitudeCold;
-  color = mixRgb(color, snow, Math.max(polar, snowLine));
+  // Keep polar land pale, but do not paint compressed mountain ranges with a
+  // high-altitude snow mask: at this map scale it reads as a thin white line.
+  color = mixRgb(color, snow, polar);
 
   const reliefLight = 0.88 + broadNoise * 0.13 + detailNoise * 0.08;
   return [

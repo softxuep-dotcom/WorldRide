@@ -34,6 +34,10 @@ import {
 } from "./regional-specialty-standees";
 import { WorldEcology } from "./world-ecology";
 import { WorldLife } from "./world-life";
+import {
+  OceanLife,
+  createOceanSurfaceMaterial,
+} from "./ocean-life";
 
 const RESERVED_MAP_MARKER_POSITIONS = [
   ...PHOTO_SPOTS.map((spot) => geoToWorld(spot.point)),
@@ -87,6 +91,7 @@ export class WorldView {
     [];
   private readonly ecology = new WorldEcology(RESERVED_MAP_MARKER_POSITIONS);
   private readonly life = new WorldLife();
+  private readonly oceanLife = new OceanLife();
   private readonly vehicleTrail: VehicleTrailParticle[] = [];
   private modeBlend = 0;
   private vehicleLean = 0;
@@ -107,6 +112,7 @@ export class WorldView {
     this.buildVehicleTrail();
     this.root.add(this.ecology.root);
     this.root.add(this.life.root);
+    this.root.add(this.oceanLife.root);
   }
 
   update(
@@ -127,6 +133,15 @@ export class WorldView {
       position.x,
       position.z,
       velocity,
+      overviewBlend,
+    );
+    this.oceanLife.update(
+      elapsed,
+      delta,
+      position,
+      velocity,
+      heading,
+      boatMode,
       overviewBlend,
     );
     this.ecology.update(delta, position, velocity, overviewBlend);
@@ -283,11 +298,7 @@ export class WorldView {
 
     const ocean = new THREE.Mesh(
       new THREE.BoxGeometry(width, 0.34, depth),
-      new THREE.MeshStandardMaterial({
-        color: 0x58bdd8,
-        roughness: 0.62,
-        metalness: 0.02,
-      }),
+      createOceanSurfaceMaterial(),
     );
     ocean.position.y = -0.18;
     ocean.receiveShadow = true;
