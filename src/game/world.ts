@@ -45,6 +45,8 @@ interface VehicleView {
   wheels: THREE.Mesh[];
   pontoons: THREE.Mesh[];
   wake: THREE.Mesh[];
+  /** Shared body material, retained so unlocked paints can recolour it. */
+  bodyMaterial: THREE.MeshStandardMaterial;
 }
 
 interface VehicleTrailParticle {
@@ -1053,7 +1055,12 @@ export class WorldView {
       root.add(ripple);
     }
 
-    return { root, wheels, pontoons, wake };
+    return { root, wheels, pontoons, wake, bodyMaterial };
+  }
+
+  /** Applies an unlocked paint colour to the travel car and boat hull. */
+  setVehiclePaint(color: number): void {
+    this.vehicle.bodyMaterial.color.setHex(color);
   }
 
   private buildVehicleTrail(): void {

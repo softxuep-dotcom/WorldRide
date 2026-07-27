@@ -19,6 +19,10 @@ export interface SaveSnapshot {
   collectedPostcards: string[];
   completedQuizzes: string[];
   discoveredSpecialties: string[];
+  activeTrip: string[];
+  completedTrips: number;
+  unlockedPaints: string[];
+  equippedPaint: string;
 }
 
 function probeStorage(): Storage | undefined {
@@ -62,6 +66,10 @@ function parseSnapshot(raw: string): SaveSnapshot | undefined {
     return undefined;
   }
 
+  // Trip and paint fields arrived after the first saves were written, so they
+  // are read as optional: an older save loads and simply starts a fresh trip
+  // rather than being thrown away.
+
   const position = candidate.position;
   if (
     !position ||
@@ -84,6 +92,14 @@ function parseSnapshot(raw: string): SaveSnapshot | undefined {
     collectedPostcards: toStringArray(candidate.collectedPostcards),
     completedQuizzes: toStringArray(candidate.completedQuizzes),
     discoveredSpecialties: toStringArray(candidate.discoveredSpecialties),
+    activeTrip: toStringArray(candidate.activeTrip),
+    completedTrips:
+      isFiniteNumber(candidate.completedTrips) && candidate.completedTrips >= 0
+        ? Math.floor(candidate.completedTrips)
+        : 0,
+    unlockedPaints: toStringArray(candidate.unlockedPaints),
+    equippedPaint:
+      typeof candidate.equippedPaint === "string" ? candidate.equippedPaint : "",
   };
 }
 

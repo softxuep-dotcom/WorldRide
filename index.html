@@ -81,8 +81,11 @@
             </span>
           </button>
           <div id="wishlist" class="wishlist" hidden>
-            <h3 class="wishlist__title" data-i18n="wishlist.title">Places to go</h3>
-            <p class="wishlist__hint" data-i18n="wishlist.hint">Pick a destination and follow the compass.</p>
+            <div class="wishlist__head">
+              <h3 class="wishlist__title" data-i18n="trip.title">This trip</h3>
+              <span id="trip-progress" class="wishlist__progress"></span>
+            </div>
+            <p class="wishlist__hint" data-i18n="trip.hint">Visit these three stops to finish the trip.</p>
             <ul id="wishlist-items" class="wishlist__items"></ul>
           </div>
         </div>
@@ -205,6 +208,11 @@
           <span class="album-open__label" data-i18n="album.open">Open postcard album</span>
           <span class="album-open__arrow" aria-hidden="true">›</span>
         </button>
+        <section id="garage-panel" class="garage-panel">
+          <h3 data-i18n="garage.title">Travel car paint</h3>
+          <p class="garage-panel__hint" data-i18n="garage.hint">Keep collecting to unlock new paints, then tap one to apply it.</p>
+          <div id="garage-grid" class="garage-grid"></div>
+        </section>
         <div id="stamp-grid" class="stamp-grid"></div>
       </aside>
 

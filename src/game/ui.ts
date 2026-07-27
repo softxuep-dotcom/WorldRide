@@ -41,6 +41,17 @@ import {
   hasLandmarkIllustration,
   landmarkIllustrationUrl,
 } from "./landmark-standees";
+import {
+  DEFAULT_PAINT_ID,
+  VEHICLE_PAINTS,
+  buildTrip,
+  evaluateUnlockedPaints,
+  getPaint,
+  sanitizeTrip,
+  wrappedDeltaX,
+  type ProgressTotals,
+  type VehiclePaint,
+} from "./progression";
 
 interface QuizSubject {
   quiz: QuizSet;
@@ -113,6 +124,16 @@ interface UIElements {
   albumProgress: HTMLElement;
   albumEmpty: HTMLElement;
   albumGrid: HTMLElement;
+  tripProgress: HTMLElement;
+  garageGrid: HTMLElement;
+}
+
+/** Everything the trip/paint loop needs to survive a reload. */
+export interface ProgressionSnapshot {
+  activeTrip: string[];
+  completedTrips: number;
+  unlockedPaints: string[];
+  equippedPaint: string;
 }
 
 interface WishlistRow {
@@ -126,6 +147,12 @@ interface CelebrationItem {
   eyebrow: string;
   title: string;
   detail: string;
+}
+
+interface TripStop {
+  spot: PhotoSpotDefinition;
+  worldDistance: number;
+  done: boolean;
 }
 
 export class GameUI {
@@ -155,7 +182,6 @@ export class GameUI {
   private selectedTargetId?: PhotoSpotId;
   private wishlistOpen = false;
   private settingsOpen = false;
-  private wishlistStructureSig?: string;
   private wishlistRows: WishlistRow[] = [];
   private compassSignature?: string;
   private compassAvailable = false;
@@ -168,13 +194,25 @@ export class GameUI {
   private celebrationActive = false;
   private celebrationTimer?: number;
   private readonly onCelebrate: () => void;
+  private readonly onPaintChange: (color: number) => void;
+  private readonly onProgressionChanged: () => void;
+  private trip: PhotoSpotId[] = [];
+  private completedTrips = 0;
+  private readonly unlockedPaints = new Set<string>([DEFAULT_PAINT_ID]);
+  private equippedPaint = DEFAULT_PAINT_ID;
+  private progressionReady = false;
+  private tripStructureSig?: string;
 
   constructor(
     onInteract: () => void,
     onToggleWorldView: () => void,
     onCelebrate: () => void = () => {},
+    onPaintChange: (color: number) => void = () => {},
+    onProgressionChanged: () => void = () => {},
   ) {
     this.onCelebrate = onCelebrate;
+    this.onPaintChange = onPaintChange;
+    this.onProgressionChanged = onProgressionChanged;
     this.elements = {
       countryReveal: requireElement("country-reveal"),
       countryKicker: requireElement("context-kicker"),
@@ -241,6 +279,8 @@ export class GameUI {
       albumProgress: requireElement("album-progress"),
       albumEmpty: requireElement("album-empty"),
       albumGrid: requireElement("album-grid"),
+      tripProgress: requireElement("trip-progress"),
+      garageGrid: requireElement("garage-grid"),
     };
 
     this.buildLanguageSelector();
@@ -392,8 +432,9 @@ export class GameUI {
     }
     this.previousNearestPhotoSpot = nearestId;
     this.refreshQuizAvailability(profile, state.nearestPhotoSpot);
-    this.updateCompass(state);
     this.checkMilestones(state);
+    this.updateProgression(state);
+    this.updateCompass(state);
   }
 
   /**
@@ -432,9 +473,20 @@ export class GameUI {
       !this.compassAvailable ||
       this.worldOverviewActive ||
       this.hasPrimarySurface();
-    const targets = blocked ? [] : this.uncollectedByDistance(state);
+    // The itinerary drives the compass; the nearest uncollected spot is only a
+    // fallback for the endgame, once no trip can be formed any more.
+    const stops = blocked ? [] : this.tripStops(state);
+    const targets = stops.filter((entry) => !entry.done);
+    const fallback: TripStop[] =
+      blocked || targets.length > 0
+        ? []
+        : this.uncollectedByDistance(state).map((entry) => ({
+            ...entry,
+            done: false,
+          }));
+    const pointable = targets.length > 0 ? targets : fallback;
 
-    if (targets.length === 0) {
+    if (pointable.length === 0) {
       if (!dock.hidden) {
         dock.hidden = true;
         this.setWishlistOpen(false);
@@ -444,11 +496,11 @@ export class GameUI {
     dock.hidden = false;
 
     let target = this.selectedTargetId
-      ? targets.find((entry) => entry.spot.id === this.selectedTargetId)
+      ? pointable.find((entry) => entry.spot.id === this.selectedTargetId)
       : undefined;
     if (!target) {
       this.selectedTargetId = undefined;
-      target = targets[0];
+      target = pointable[0];
     }
 
     const targetWorld = geoToWorld(target.spot.point);
@@ -471,8 +523,29 @@ export class GameUI {
     }
 
     if (this.wishlistOpen) {
-      this.renderWishlist(targets, target.spot.id);
+      this.renderTrip(stops, target.spot.id);
     }
+  }
+
+  /** The active itinerary, in order, with live distance and visited state. */
+  private tripStops(state: GameState): TripStop[] {
+    const stops: TripStop[] = [];
+    for (const id of this.trip) {
+      const spot = PHOTO_SPOTS.find((candidate) => candidate.id === id);
+      if (!spot) {
+        continue;
+      }
+      const world = geoToWorld(spot.point);
+      stops.push({
+        spot,
+        worldDistance: Math.hypot(
+          wrappedDeltaX(world.x, state.position.x),
+          world.z - state.position.z,
+        ),
+        done: state.collectedPostcards.has(spot.id),
+      });
+    }
+    return stops;
   }
 
   private uncollectedByDistance(
@@ -511,14 +584,15 @@ export class GameUI {
     this.elements.wishlist.hidden = !next;
     this.elements.compass.setAttribute("aria-expanded", String(next));
     if (next) {
-      this.wishlistStructureSig = undefined;
+      this.tripStructureSig = undefined;
       if (this.latestState) {
-        const targets = this.uncollectedByDistance(this.latestState);
+        const stops = this.tripStops(this.latestState);
+        const remaining = stops.filter((entry) => !entry.done);
         const targetId =
-          targets.find((entry) => entry.spot.id === this.selectedTargetId)?.spot
-            .id ?? targets[0]?.spot.id;
+          remaining.find((entry) => entry.spot.id === this.selectedTargetId)
+            ?.spot.id ?? remaining[0]?.spot.id;
         if (targetId) {
-          this.renderWishlist(targets, targetId);
+          this.renderTrip(stops, targetId);
         }
       }
     }
@@ -541,15 +615,16 @@ export class GameUI {
     this.syncSurfaceState();
   }
 
-  private renderWishlist(
-    targets: { spot: PhotoSpotDefinition; worldDistance: number }[],
-    targetId: PhotoSpotId,
-  ): void {
-    const top = targets.slice(0, 3);
-    const structureSig = `${top.map((entry) => entry.spot.id).join(",")}`;
-    if (structureSig !== this.wishlistStructureSig) {
-      this.wishlistStructureSig = structureSig;
-      this.wishlistRows = top.map((entry) => {
+  private renderTrip(stops: TripStop[], targetId: PhotoSpotId): void {
+    const done = stops.filter((entry) => entry.done).length;
+    this.elements.tripProgress.textContent = stops.length
+      ? t("trip.progress", { done, total: stops.length })
+      : "";
+
+    const structureSig = stops.map((entry) => entry.spot.id).join(",");
+    if (structureSig !== this.tripStructureSig) {
+      this.tripStructureSig = structureSig;
+      this.wishlistRows = stops.map((entry) => {
         const li = document.createElement("li");
         const button = document.createElement("button");
         button.type = "button";
@@ -574,15 +649,23 @@ export class GameUI {
     }
 
     for (const row of this.wishlistRows) {
-      const entry = top.find((candidate) => candidate.spot.id === row.id);
+      const entry = stops.find((candidate) => candidate.spot.id === row.id);
       if (!entry) {
         continue;
       }
-      row.distance.textContent =
-        entry.worldDistance < INTERACT_RADIUS
+      // A finished stop keeps its place in the list so the itinerary reads as
+      // a route being ticked off rather than a shrinking queue.
+      row.distance.textContent = entry.done
+        ? t("trip.visited")
+        : entry.worldDistance < INTERACT_RADIUS
           ? t("wishlist.here")
           : t(qualitativeDistanceKey(entry.worldDistance));
-      row.button.classList.toggle("is-active", row.id === targetId);
+      row.button.classList.toggle("is-done", entry.done);
+      row.button.disabled = entry.done;
+      row.button.classList.toggle(
+        "is-active",
+        !entry.done && row.id === targetId,
+      );
     }
   }
 
@@ -681,6 +764,167 @@ export class GameUI {
     this.prevSpecialties = specialties;
     this.prevCountries = countries;
     this.prevRegionDone = regionDone;
+  }
+
+  /**
+   * Keeps an itinerary alive and turns finished ones into rewards. Like the
+   * milestones above, the first pass only seeds state: a restored save must
+   * never replay the trips and unlocks it already earned.
+   */
+  private updateProgression(state: GameState): void {
+    let changed = false;
+
+    if (this.trip.length > 0 && this.tripIsComplete(state)) {
+      this.completedTrips += 1;
+      if (this.progressionReady) {
+        this.enqueueCelebration(
+          t("celebrate.tripDone"),
+          t("celebrate.tripCount", { count: this.completedTrips }),
+        );
+      }
+      this.trip = [];
+      this.selectedTargetId = undefined;
+      changed = true;
+    }
+
+    if (this.trip.length === 0) {
+      // Returns empty once every landmark is collected; leaving the trip empty
+      // then is intentional, and stops this from rebuilding every frame.
+      const fresh = buildTrip(state.collectedPostcards, state.position);
+      if (fresh.length > 0) {
+        this.trip = fresh;
+        this.tripStructureSig = undefined;
+        changed = true;
+      }
+    }
+
+    for (const id of evaluateUnlockedPaints(this.progressTotals(state))) {
+      if (this.unlockedPaints.has(id)) {
+        continue;
+      }
+      this.unlockedPaints.add(id);
+      changed = true;
+      if (this.progressionReady) {
+        this.enqueueCelebration(
+          t("celebrate.paintUnlocked", { name: paintName(id) }),
+          t("garage.title"),
+        );
+        this.buildGarageGrid();
+      }
+    }
+
+    if (!this.progressionReady) {
+      this.progressionReady = true;
+      this.buildGarageGrid();
+      return;
+    }
+    if (changed) {
+      this.onProgressionChanged();
+    }
+  }
+
+  private tripIsComplete(state: GameState): boolean {
+    return this.trip.every((id) => state.collectedPostcards.has(id));
+  }
+
+  private progressTotals(state: GameState): ProgressTotals {
+    return {
+      trips: this.completedTrips,
+      landmarks: state.collectedPostcards.size,
+      countries: state.visitedCountries.size,
+      specialties: state.discoveredSpecialties.size,
+    };
+  }
+
+  /** Restores the trip/paint loop from a save, then applies the paint. */
+  restoreProgression(snapshot: ProgressionSnapshot): void {
+    this.trip = sanitizeTrip(snapshot.activeTrip);
+    this.completedTrips = Math.max(0, Math.floor(snapshot.completedTrips));
+    for (const id of snapshot.unlockedPaints) {
+      if (VEHICLE_PAINTS.some((paint) => paint.id === id)) {
+        this.unlockedPaints.add(id);
+      }
+    }
+    if (this.unlockedPaints.has(snapshot.equippedPaint)) {
+      this.equippedPaint = snapshot.equippedPaint;
+    }
+    this.tripStructureSig = undefined;
+    this.onPaintChange(getPaint(this.equippedPaint).color);
+    this.buildGarageGrid();
+  }
+
+  getProgression(): ProgressionSnapshot {
+    return {
+      activeTrip: [...this.trip],
+      completedTrips: this.completedTrips,
+      unlockedPaints: [...this.unlockedPaints],
+      equippedPaint: this.equippedPaint,
+    };
+  }
+
+  private equipPaint(id: string): void {
+    if (!this.unlockedPaints.has(id) || this.equippedPaint === id) {
+      return;
+    }
+    this.equippedPaint = id;
+    this.onPaintChange(getPaint(id).color);
+    this.buildGarageGrid();
+    this.showToast(t("garage.paintToast", { name: paintName(id) }));
+    this.onProgressionChanged();
+  }
+
+  private buildGarageGrid(): void {
+    const totals = this.latestState
+      ? this.progressTotals(this.latestState)
+      : undefined;
+
+    this.elements.garageGrid.replaceChildren(
+      ...VEHICLE_PAINTS.map((paint) => {
+        const unlocked = this.unlockedPaints.has(paint.id);
+        const equipped = unlocked && paint.id === this.equippedPaint;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "paint-chip";
+        button.classList.toggle("is-locked", !unlocked);
+        button.classList.toggle("is-equipped", equipped);
+        button.disabled = !unlocked;
+        button.setAttribute(
+          "aria-label",
+          unlocked
+            ? t("garage.equip", { name: paintName(paint.id) })
+            : requirementText(paint),
+        );
+
+        const swatch = document.createElement("span");
+        swatch.className = "paint-chip__swatch";
+        swatch.style.setProperty(
+          "--paint",
+          `#${paint.color.toString(16).padStart(6, "0")}`,
+        );
+        swatch.setAttribute("aria-hidden", "true");
+        swatch.textContent = unlocked ? (equipped ? "✓" : "") : "🔒";
+
+        const name = document.createElement("span");
+        name.className = "paint-chip__name";
+        name.textContent = unlocked ? paintName(paint.id) : "???";
+
+        const status = document.createElement("span");
+        status.className = "paint-chip__status";
+        if (equipped) {
+          status.textContent = t("garage.equipped");
+        } else if (!unlocked) {
+          status.textContent = requirementText(paint);
+          if (totals && paint.requirement) {
+            status.textContent +=
+              ` · ${totals[paint.requirement.type]}/${paint.requirement.count}`;
+          }
+        }
+
+        button.append(swatch, name, status);
+        button.addEventListener("click", () => this.equipPaint(paint.id));
+        return button;
+      }),
+    );
   }
 
   private enqueueCelebration(title: string, detail: string): void {
@@ -1502,6 +1746,9 @@ export class GameUI {
       ? t("worldMap.back")
       : t("worldMap.label");
     this.buildPassport();
+    this.buildGarageGrid();
+    this.tripStructureSig = undefined;
+    this.compassSignature = undefined;
     if (this.elements.postcardAlbum.classList.contains("is-visible")) {
       this.buildAlbumGrid();
     }
@@ -1529,16 +1776,6 @@ const INTERACT_RADIUS = 2.6;
 const LANDMARK_STEPS = [10, 20, 30] as const;
 const COUNTRY_STEPS = [25, 50, 100] as const;
 
-const COMPASS_MIN_WORLD = geoToWorld([
-  MAP_BOUNDS.minLongitude,
-  MAP_BOUNDS.maxLatitude,
-]);
-const COMPASS_MAX_WORLD = geoToWorld([
-  MAP_BOUNDS.maxLongitude,
-  MAP_BOUNDS.minLatitude,
-]);
-const WORLD_WIDTH = COMPASS_MAX_WORLD.x - COMPASS_MIN_WORLD.x;
-
 const REGION_TOTALS: ReadonlyMap<string, number> = (() => {
   const totals = new Map<string, number>();
   for (const specialty of REGIONAL_SPECIALTIES) {
@@ -1554,15 +1791,19 @@ const KIND_ICON: Readonly<Record<PhotoSpotDefinition["kind"], string>> = {
   historical: "🕊️",
 };
 
-/** Shortest signed x offset, accounting for the east–west world wrap. */
-function wrappedDeltaX(targetX: number, playerX: number): number {
-  let dx = targetX - playerX;
-  if (dx > WORLD_WIDTH / 2) {
-    dx -= WORLD_WIDTH;
-  } else if (dx < -WORLD_WIDTH / 2) {
-    dx += WORLD_WIDTH;
+function paintName(id: string): string {
+  return t(`paint.name.${id}` as never);
+}
+
+function requirementText(paint: VehiclePaint): string {
+  if (!paint.requirement) {
+    return "";
   }
-  return dx;
+  const { type, count } = paint.requirement;
+  // Only the trip track can ask for a single item, so it is the one place
+  // where a plural label would read wrong.
+  const key = type === "trips" && count === 1 ? "garage.req.tripsOne" : `garage.req.${type}`;
+  return t(key as never, { count });
 }
 
 function qualitativeDistanceKey(

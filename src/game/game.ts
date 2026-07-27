@@ -60,6 +60,8 @@ export class PocketEarthGame {
       () => this.simulation.interact(),
       () => this.toggleWorldOverview(),
       () => this.audio.onMilestone(),
+      (color) => this.world.setVehiclePaint(color),
+      () => this.persist(true),
     );
 
     this.camera.near = 0.1;
@@ -120,12 +122,19 @@ export class PocketEarthGame {
     }
     this.simulation.restore(snapshot);
     this.ui.restoreCompletedQuizzes(snapshot.completedQuizzes);
+    this.ui.restoreProgression({
+      activeTrip: snapshot.activeTrip,
+      completedTrips: snapshot.completedTrips,
+      unlockedPaints: snapshot.unlockedPaints,
+      equippedPaint: snapshot.equippedPaint,
+    });
     this.restoredFromSave = true;
   }
 
   /** `immediate` is used for milestones so progress survives an instant close. */
   private persist(immediate = false): void {
     const { state } = this.simulation;
+    const progression = this.ui.getProgression();
     this.saveStore.save(
       {
         position: { x: state.position.x, z: state.position.z },
@@ -135,6 +144,7 @@ export class PocketEarthGame {
         collectedPostcards: [...state.collectedPostcards],
         completedQuizzes: this.ui.getCompletedQuizzes(),
         discoveredSpecialties: [...state.discoveredSpecialties],
+        ...progression,
       },
       immediate,
     );
