@@ -1,0 +1,353 @@
+import * as THREE from "three";
+
+/**
+ * Ambient "living world" layer: things that move but never gate gameplay —
+ * a few flocks of birds, blossom petals drifting on the wind, and slow clouds
+ * that trail soft shadows across the ground.
+ *
+ * Everything is anchored to a moving field centred on the player, so the local
+ * travel view is always populated without spawning life across the whole map.
+ * Offsets wrap inside that field, which also means the east–west world wrap
+ * needs no special handling here. The whole layer fades out with the overview
+ * blend, exactly like the landmark standees, to keep the global map clean.
+ */
+
+interface Bird {
+  readonly group: THREE.Group;
+  readonly leftWing: THREE.Mesh;
+  readonly rightWing: THREE.Mesh;
+  offsetX: number;
+  offsetZ: number;
+  readonly velocityX: number;
+  readonly velocityZ: number;
+  readonly altitude: number;
+  readonly phase: number;
+  readonly flapSpeed: number;
+}
+
+interface Cloud {
+  readonly puff: THREE.Mesh;
+  readonly shadow: THREE.Mesh;
+  offsetX: number;
+  offsetZ: number;
+  readonly speedX: number;
+  readonly speedZ: number;
+  readonly cloudY: number;
+}
+
+interface Petal {
+  offsetX: number;
+  offsetY: number;
+  offsetZ: number;
+  readonly driftX: number;
+  readonly driftZ: number;
+  readonly fall: number;
+  readonly size: number;
+  spin: number;
+  readonly spinSpeed: number;
+  readonly tilt: number;
+  readonly phase: number;
+}
+
+interface Fadeable {
+  readonly material: THREE.Material & { opacity: number };
+  readonly baseOpacity: number;
+}
+
+const BIRD_FIELD_X = 16;
+const BIRD_FIELD_Z = 14;
+const CLOUD_FIELD_X = 20;
+const CLOUD_FIELD_Z = 17;
+const PETAL_FIELD_X = 11;
+const PETAL_FIELD_Z = 9;
+const PETAL_TOP = 7.5;
+const PETAL_FLOOR = 0.45;
+
+export class WorldLife {
+  readonly root = new THREE.Group();
+
+  private readonly birds: Bird[] = [];
+  private readonly clouds: Cloud[] = [];
+  private readonly petals: Petal[] = [];
+  private petalMesh?: THREE.InstancedMesh;
+  private readonly fadeables: Fadeable[] = [];
+  private readonly dummy = new THREE.Object3D();
+
+  constructor() {
+    this.root.name = "Ambient life";
+    const soft = createSoftSpriteTexture();
+    this.buildBirds();
+    this.buildClouds(soft);
+    this.buildPetals(soft);
+  }
+
+  update(
+    elapsed: number,
+    delta: number,
+    playerX: number,
+    playerZ: number,
+    overviewBlend: number,
+  ): void {
+    const localFactor = 1 - THREE.MathUtils.smoothstep(overviewBlend, 0.3, 0.72);
+    this.root.visible = localFactor > 0.01;
+    if (!this.root.visible) {
+      return;
+    }
+    for (const fade of this.fadeables) {
+      fade.material.opacity = fade.baseOpacity * localFactor;
+    }
+
+    this.updateBirds(elapsed, delta, playerX, playerZ);
+    this.updateClouds(delta, playerX, playerZ);
+    this.updatePetals(elapsed, delta, playerX, playerZ);
+  }
+
+  private updateBirds(
+    elapsed: number,
+    delta: number,
+    playerX: number,
+    playerZ: number,
+  ): void {
+    for (const bird of this.birds) {
+      bird.offsetX = wrapField(bird.offsetX + bird.velocityX * delta, BIRD_FIELD_X);
+      bird.offsetZ = wrapField(bird.offsetZ + bird.velocityZ * delta, BIRD_FIELD_Z);
+      bird.group.position.set(
+        playerX + bird.offsetX,
+        bird.altitude + Math.sin(elapsed * 0.6 + bird.phase) * 0.32,
+        playerZ + bird.offsetZ,
+      );
+      bird.group.rotation.y = Math.atan2(bird.velocityX, bird.velocityZ);
+      const flap = Math.sin(elapsed * bird.flapSpeed + bird.phase) * 0.55;
+      bird.leftWing.rotation.z = 0.22 + flap;
+      bird.rightWing.rotation.z = -0.22 - flap;
+    }
+  }
+
+  private updateClouds(delta: number, playerX: number, playerZ: number): void {
+    for (const cloud of this.clouds) {
+      cloud.offsetX = wrapField(cloud.offsetX + cloud.speedX * delta, CLOUD_FIELD_X);
+      cloud.offsetZ = wrapField(cloud.offsetZ + cloud.speedZ * delta, CLOUD_FIELD_Z);
+      cloud.puff.position.set(
+        playerX + cloud.offsetX,
+        cloud.cloudY,
+        playerZ + cloud.offsetZ,
+      );
+      // Sun comes from roughly (-x, +z), so shadows fall toward (+x, -z).
+      cloud.shadow.position.set(
+        playerX + cloud.offsetX + 2.1,
+        0.5,
+        playerZ + cloud.offsetZ - 2.1,
+      );
+    }
+  }
+
+  private updatePetals(
+    elapsed: number,
+    delta: number,
+    playerX: number,
+    playerZ: number,
+  ): void {
+    const mesh = this.petalMesh;
+    if (!mesh) {
+      return;
+    }
+    for (let index = 0; index < this.petals.length; index += 1) {
+      const petal = this.petals[index];
+      petal.offsetY -= petal.fall * delta;
+      petal.offsetX += (petal.driftX + Math.sin(elapsed * 0.8 + petal.phase) * 0.45) * delta;
+      petal.offsetZ += petal.driftZ * delta;
+      if (petal.offsetY < PETAL_FLOOR) {
+        petal.offsetY = PETAL_TOP;
+        petal.offsetX = randomBetween(-PETAL_FIELD_X, PETAL_FIELD_X);
+        petal.offsetZ = randomBetween(-PETAL_FIELD_Z, PETAL_FIELD_Z);
+      }
+      petal.offsetX = wrapField(petal.offsetX, PETAL_FIELD_X);
+      petal.offsetZ = wrapField(petal.offsetZ, PETAL_FIELD_Z);
+      petal.spin += petal.spinSpeed * delta;
+
+      this.dummy.position.set(
+        playerX + petal.offsetX,
+        petal.offsetY,
+        playerZ + petal.offsetZ,
+      );
+      this.dummy.rotation.set(petal.tilt, petal.spin, petal.spin * 0.6);
+      this.dummy.scale.setScalar(petal.size);
+      this.dummy.updateMatrix();
+      mesh.setMatrixAt(index, this.dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  private buildBirds(): void {
+    const birdMaterial = new THREE.MeshBasicMaterial({
+      color: 0x37434d,
+      transparent: true,
+      opacity: 0.82,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    this.fadeables.push({ material: birdMaterial, baseOpacity: 0.82 });
+
+    const wingGeometry = new THREE.BoxGeometry(0.62, 0.03, 0.2);
+    // Nudge the pivot to the inner edge so the wing hinges from the body.
+    wingGeometry.translate(0.31, 0, 0);
+
+    for (let index = 0; index < 8; index += 1) {
+      const group = new THREE.Group();
+      group.name = `bird ${index}`;
+
+      const leftWing = new THREE.Mesh(wingGeometry, birdMaterial);
+      const rightWing = new THREE.Mesh(wingGeometry, birdMaterial);
+      rightWing.scale.x = -1;
+      group.add(leftWing, rightWing);
+
+      // Two loose flocks travelling in slightly different directions.
+      const flock = index % 2;
+      const velocityX = (flock === 0 ? 1.9 : -1.6) + randomBetween(-0.25, 0.25);
+      const velocityZ = (flock === 0 ? 0.7 : 1.0) + randomBetween(-0.25, 0.25);
+
+      const bird: Bird = {
+        group,
+        leftWing,
+        rightWing,
+        offsetX: randomBetween(-BIRD_FIELD_X, BIRD_FIELD_X),
+        offsetZ: randomBetween(-BIRD_FIELD_Z, BIRD_FIELD_Z),
+        velocityX,
+        velocityZ,
+        altitude: randomBetween(9.5, 12.8),
+        phase: randomBetween(0, Math.PI * 2),
+        flapSpeed: randomBetween(6.5, 9),
+      };
+      const scale = randomBetween(0.8, 1.15);
+      group.scale.setScalar(scale);
+      this.birds.push(bird);
+      this.root.add(group);
+    }
+  }
+
+  private buildClouds(sprite: THREE.Texture): void {
+    const cloudMaterial = new THREE.MeshBasicMaterial({
+      map: sprite,
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+    });
+    const shadowMaterial = new THREE.MeshBasicMaterial({
+      map: sprite,
+      color: 0x16394a,
+      transparent: true,
+      opacity: 0.16,
+      depthWrite: false,
+    });
+    this.fadeables.push(
+      { material: cloudMaterial, baseOpacity: 0.5 },
+      { material: shadowMaterial, baseOpacity: 0.16 },
+    );
+
+    const planeGeometry = new THREE.PlaneGeometry(1, 1);
+    planeGeometry.rotateX(-Math.PI / 2); // Lie flat for the top-down view.
+
+    for (let index = 0; index < 4; index += 1) {
+      const puff = new THREE.Mesh(planeGeometry, cloudMaterial);
+      const width = randomBetween(6.5, 9.5);
+      const depth = randomBetween(4.5, 6.5);
+      puff.scale.set(width, 1, depth);
+      puff.frustumCulled = false;
+      puff.renderOrder = 3;
+
+      const shadow = new THREE.Mesh(planeGeometry, shadowMaterial);
+      shadow.scale.set(width * 0.82, 1, depth * 0.82);
+      shadow.frustumCulled = false;
+      shadow.renderOrder = 1;
+
+      const cloud: Cloud = {
+        puff,
+        shadow,
+        offsetX: randomBetween(-CLOUD_FIELD_X, CLOUD_FIELD_X),
+        offsetZ: randomBetween(-CLOUD_FIELD_Z, CLOUD_FIELD_Z),
+        speedX: randomBetween(0.55, 0.95),
+        speedZ: randomBetween(0.2, 0.45),
+        cloudY: randomBetween(14, 16.5),
+      };
+      this.clouds.push(cloud);
+      this.root.add(shadow, puff);
+    }
+  }
+
+  private buildPetals(sprite: THREE.Texture): void {
+    const count = 46;
+    const petalMaterial = new THREE.MeshBasicMaterial({
+      map: sprite,
+      color: 0xffd7e2,
+      transparent: true,
+      opacity: 0.62,
+      depthWrite: false,
+    });
+    this.fadeables.push({ material: petalMaterial, baseOpacity: 0.62 });
+
+    const petalGeometry = new THREE.PlaneGeometry(1, 1);
+    const mesh = new THREE.InstancedMesh(petalGeometry, petalMaterial, count);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 4;
+
+    for (let index = 0; index < count; index += 1) {
+      this.petals.push({
+        offsetX: randomBetween(-PETAL_FIELD_X, PETAL_FIELD_X),
+        offsetY: randomBetween(PETAL_FLOOR, PETAL_TOP),
+        offsetZ: randomBetween(-PETAL_FIELD_Z, PETAL_FIELD_Z),
+        driftX: randomBetween(0.35, 0.85),
+        driftZ: randomBetween(-0.25, 0.25),
+        fall: randomBetween(0.55, 1.05),
+        size: randomBetween(0.13, 0.26),
+        spin: randomBetween(0, Math.PI * 2),
+        spinSpeed: randomBetween(-1.6, 1.6),
+        tilt: randomBetween(0.2, 1.2),
+        phase: randomBetween(0, Math.PI * 2),
+      });
+    }
+
+    this.petalMesh = mesh;
+    this.root.add(mesh);
+  }
+}
+
+function createSoftSpriteTexture(): THREE.Texture {
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Unable to create ambient sprite texture.");
+  }
+  const gradient = context.createRadialGradient(
+    size / 2,
+    size / 2,
+    0,
+    size / 2,
+    size / 2,
+    size / 2,
+  );
+  gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+  gradient.addColorStop(0.55, "rgba(255, 255, 255, 0.82)");
+  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/** Keeps a value inside [-half, half] by wrapping, like a toroidal field. */
+function wrapField(value: number, half: number): number {
+  const span = half * 2;
+  return (((value + half) % span) + span) % span - half;
+}
+
+function randomBetween(minimum: number, maximum: number): number {
+  return minimum + Math.random() * (maximum - minimum);
+}

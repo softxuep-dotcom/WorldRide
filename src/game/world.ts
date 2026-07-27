@@ -37,6 +37,7 @@ import {
   updateRegionalSpecialtyStandeeOverview,
   type RegionalSpecialtyStandeeView,
 } from "./regional-specialty-standees";
+import { WorldLife } from "./world-life";
 
 const RESERVED_MAP_MARKER_POSITIONS = [
   ...PHOTO_SPOTS.map((spot) => geoToWorld(spot.point)),
@@ -91,6 +92,7 @@ export class WorldView {
   private readonly regionalSpecialtyStandees: RegionalSpecialtyStandeeView[] =
     [];
   private readonly props = new PropBatcher();
+  private readonly life = new WorldLife();
   private modeBlend = 0;
 
   constructor() {
@@ -103,6 +105,7 @@ export class WorldView {
     this.flushProps();
     this.vehicle = this.createVehicle();
     this.root.add(this.vehicle.root);
+    this.root.add(this.life.root);
   }
 
   private flushProps(): void {
@@ -120,6 +123,7 @@ export class WorldView {
     overviewBlend = 0,
   ): void {
     this.modeBlend += ((boatMode ? 1 : 0) - this.modeBlend) * (1 - Math.exp(-7 * delta));
+    this.life.update(elapsed, delta, position.x, position.z, overviewBlend);
     this.vehicle.root.position.x = position.x;
     this.vehicle.root.position.z = position.z;
     this.vehicle.root.position.y = THREE.MathUtils.lerp(0.37, 0.09, this.modeBlend);
