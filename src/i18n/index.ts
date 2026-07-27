@@ -3,6 +3,10 @@ import type {
   PhotoSpotDefinition,
 } from "../game/data";
 import { en } from "./locales/en";
+import { es } from "./locales/es";
+import { fr } from "./locales/fr";
+import { it } from "./locales/it";
+import { ptBR } from "./locales/pt-BR";
 import { zhCN } from "./locales/zh-CN";
 import type {
   LocaleDefinition,
@@ -18,6 +22,10 @@ const STORAGE_KEY = "worldride.locale";
 const localeRegistry = {
   "zh-CN": zhCN as LocaleDefinition,
   en: en as LocaleDefinition,
+  fr: fr as LocaleDefinition,
+  "pt-BR": ptBR as LocaleDefinition,
+  it: it as LocaleDefinition,
+  es: es as LocaleDefinition,
 };
 
 export type LocaleCode = keyof typeof localeRegistry;
@@ -93,7 +101,11 @@ export function translateDocument(root: ParentNode = document): void {
 export function localizeCountry(
   country: CountryDefinition,
 ): CountryDefinition {
-  const translation = localeRegistry[activeLocale].countries[country.id];
+  const translation =
+    localeRegistry[activeLocale].countries[country.id] ??
+    (activeLocale === SOURCE_LOCALE
+      ? undefined
+      : localeRegistry[DEFAULT_LOCALE].countries[country.id]);
   if (!translation) {
     return country;
   }
@@ -117,14 +129,24 @@ export function localizeCountry(
 export function localizePhotoSpot(
   spot: PhotoSpotDefinition,
 ): PhotoSpotDefinition {
-  const translation = localeRegistry[activeLocale].photoSpots[spot.id];
+  const translation =
+    localeRegistry[activeLocale].photoSpots[spot.id] ??
+    (activeLocale === SOURCE_LOCALE
+      ? undefined
+      : localeRegistry[DEFAULT_LOCALE].photoSpots[spot.id]);
   return translation ? { ...spot, ...translation } : spot;
 }
 
 export function getWorldCountryTranslation(
   atlasName: string,
 ): WorldCountryTranslation {
-  return localeRegistry[activeLocale].worldCountries[atlasName] ?? {};
+  return (
+    localeRegistry[activeLocale].worldCountries[atlasName] ??
+    (activeLocale === SOURCE_LOCALE
+      ? {}
+      : localeRegistry[DEFAULT_LOCALE].worldCountries[atlasName]) ??
+    {}
+  );
 }
 
 function applyDocumentLanguage(): void {
