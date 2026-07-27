@@ -9,6 +9,7 @@ import { GameAudio } from "./audio";
 import { t } from "../i18n";
 
 const ROUTINE_SAVE_SECONDS = 5;
+const COMPASS_INTRO_MOVEMENT_SECONDS = 0.4;
 
 export class PocketEarthGame {
   readonly simulation = new GameSimulation();
@@ -32,6 +33,8 @@ export class PocketEarthGame {
   private readonly audio = new GameAudio();
   private restoredFromSave = false;
   private sinceRoutineSave = 0;
+  private compassAvailable = false;
+  private compassMovementSeconds = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -78,8 +81,12 @@ export class PocketEarthGame {
     this.onResize();
 
     this.restoreSave();
+    this.compassAvailable = this.restoredFromSave;
+    this.ui.setCompassAvailable(this.compassAvailable);
     this.simulation.update(0, { x: 0, z: 0 });
-    this.processEvents();
+    // Establish Marseille as the starting context without pretending that the
+    // player has just crossed a border into France.
+    this.processEvents(true);
     this.ui.update(this.simulation.state);
   }
 
@@ -187,10 +194,22 @@ export class PocketEarthGame {
     this.processEvents();
 
     const { state } = this.simulation;
+    if (
+      !this.compassAvailable &&
+      Math.hypot(movement.x, movement.z) > 0.1 &&
+      Math.hypot(state.velocity.x, state.velocity.z) > 0.65
+    ) {
+      this.compassMovementSeconds += delta;
+      if (this.compassMovementSeconds >= COMPASS_INTRO_MOVEMENT_SECONDS) {
+        this.compassAvailable = true;
+        this.ui.setCompassAvailable(true);
+      }
+    }
     this.world.update(
       state.elapsed,
       delta,
       state.position,
+      state.velocity,
       state.heading,
       state.vehicleMode === "boat",
       this.overviewBlend,
@@ -209,7 +228,7 @@ export class PocketEarthGame {
     this.animationFrame = requestAnimationFrame(this.tick);
   };
 
-  private processEvents(): void {
+  private processEvents(suppressCountryFeedback = false): void {
     let reachedMilestone = false;
     for (const event of this.simulation.consumeEvents()) {
       if (event.type === "world-wrapped") {
@@ -222,8 +241,12 @@ export class PocketEarthGame {
       ) {
         reachedMilestone = true;
       }
-      this.emitAudioForEvent(event);
-      this.ui.handleEvent(event);
+      const suppressFeedback =
+        suppressCountryFeedback && event.type === "country-entered";
+      if (!suppressFeedback) {
+        this.emitAudioForEvent(event);
+        this.ui.handleEvent(event);
+      }
     }
     if (reachedMilestone) {
       this.persist(true);

@@ -49,6 +49,7 @@ interface UIElements {
   countryName: HTMLElement;
   countryIntro: HTMLElement;
   toast: HTMLElement;
+  countryArrival: HTMLElement;
   visitedCount: HTMLElement;
   miniMapSvg: SVGSVGElement;
   interactButton: HTMLButtonElement;
@@ -124,6 +125,7 @@ export class GameUI {
   private readonly playerDot: SVGCircleElement;
   private readonly playerHalo: SVGCircleElement;
   private toastTimer?: number;
+  private countryArrivalTimer?: number;
   private displayedContextId?: string;
   private previousNearestPhotoSpot?: string;
   private selectedPhotoSpot?: PhotoSpotDefinition;
@@ -147,6 +149,7 @@ export class GameUI {
   private wishlistStructureSig?: string;
   private wishlistRows: WishlistRow[] = [];
   private compassSignature?: string;
+  private compassAvailable = false;
   private milestoneReady = false;
   private prevLandmarks = 0;
   private prevSpecialties = 0;
@@ -168,6 +171,7 @@ export class GameUI {
       countryName: requireElement("country-name"),
       countryIntro: requireElement("country-intro"),
       toast: requireElement("toast"),
+      countryArrival: requireElement("country-arrival"),
       visitedCount: requireElement("visited-count"),
       miniMapSvg: requireSvgElement("mini-map-svg"),
       interactButton: requireButton("interact-button"),
@@ -360,6 +364,30 @@ export class GameUI {
   }
 
   /**
+   * A fresh journey begins with the road, not navigation chrome. Restored
+   * journeys can opt in immediately; new journeys call this after the first
+   * sustained movement input.
+   */
+  setCompassAvailable(available: boolean): void {
+    if (this.compassAvailable === available) {
+      return;
+    }
+    this.compassAvailable = available;
+    if (available) {
+      this.elements.compassDock.classList.add("is-introducing");
+      window.setTimeout(
+        () => this.elements.compassDock.classList.remove("is-introducing"),
+        520,
+      );
+      this.compassSignature = undefined;
+      return;
+    }
+    this.elements.compassDock.hidden = true;
+    this.elements.compassDock.classList.remove("is-introducing");
+    this.setWishlistOpen(false);
+  }
+
+  /**
    * The compass turns aimless roaming into a route: it always points at one
    * uncollected landmark — the player's pick, or the nearest one otherwise —
    * so every session has an obvious "where to next".
@@ -367,6 +395,7 @@ export class GameUI {
   private updateCompass(state: GameState): void {
     const dock = this.elements.compassDock;
     const blocked =
+      !this.compassAvailable ||
       this.worldOverviewActive ||
       this.isInputBlocked() ||
       Boolean(this.activeQuiz);
@@ -400,7 +429,7 @@ export class GameUI {
     const distanceText =
       target.worldDistance < INTERACT_RADIUS
         ? t("compass.arrived")
-        : t("compass.distance", { km: formatKm(target.geoKm) });
+        : t(qualitativeDistanceKey(target.worldDistance));
     const signature = `${target.spot.id}|${name}|${distanceText}`;
     if (signature !== this.compassSignature) {
       this.compassSignature = signature;
@@ -415,12 +444,10 @@ export class GameUI {
 
   private uncollectedByDistance(
     state: GameState,
-  ): { spot: PhotoSpotDefinition; worldDistance: number; geoKm: number }[] {
-    const geo = getCurrentGeoPosition(state);
+  ): { spot: PhotoSpotDefinition; worldDistance: number }[] {
     const entries: {
       spot: PhotoSpotDefinition;
       worldDistance: number;
-      geoKm: number;
     }[] = [];
     for (const spot of PHOTO_SPOTS) {
       if (state.collectedPostcards.has(spot.id)) {
@@ -432,7 +459,6 @@ export class GameUI {
       entries.push({
         spot,
         worldDistance: Math.hypot(dx, dz),
-        geoKm: haversineKm(geo, spot.point),
       });
     }
     entries.sort((a, b) => a.worldDistance - b.worldDistance);
@@ -459,7 +485,7 @@ export class GameUI {
   }
 
   private renderWishlist(
-    targets: { spot: PhotoSpotDefinition; worldDistance: number; geoKm: number }[],
+    targets: { spot: PhotoSpotDefinition; worldDistance: number }[],
     targetId: PhotoSpotId,
   ): void {
     const top = targets.slice(0, 3);
@@ -498,7 +524,7 @@ export class GameUI {
       row.distance.textContent =
         entry.worldDistance < INTERACT_RADIUS
           ? t("wishlist.here")
-          : t("compass.distance", { km: formatKm(entry.geoKm) });
+          : t(qualitativeDistanceKey(entry.worldDistance));
       row.button.classList.toggle("is-active", row.id === targetId);
     }
   }
@@ -892,6 +918,17 @@ export class GameUI {
   handleEvent(event: GameEvent): void {
     switch (event.type) {
       case "country-entered":
+        this.showCountryArrival(
+          t(
+            event.firstVisit
+              ? "toast.countryEntered"
+              : "toast.countryReentered",
+            {
+              flag: event.country.flag,
+              name: event.country.name,
+            },
+          ),
+        );
         break;
       case "mode-changed":
         this.showToast(
@@ -920,6 +957,17 @@ export class GameUI {
     this.toastTimer = window.setTimeout(() => {
       this.elements.toast.classList.remove("is-visible");
     }, 2200);
+  }
+
+  private showCountryArrival(message: string): void {
+    window.clearTimeout(this.countryArrivalTimer);
+    this.elements.countryArrival.textContent = message;
+    this.elements.countryArrival.classList.add("is-visible");
+    this.elements.countryArrival.setAttribute("aria-hidden", "false");
+    this.countryArrivalTimer = window.setTimeout(() => {
+      this.elements.countryArrival.classList.remove("is-visible");
+      this.elements.countryArrival.setAttribute("aria-hidden", "true");
+    }, 2400);
   }
 
   setWorldOverview(active: boolean): void {
@@ -1359,26 +1407,19 @@ function wrappedDeltaX(targetX: number, playerX: number): number {
   return dx;
 }
 
-/** Great-circle distance in kilometres between two [lon, lat] points. */
-function haversineKm(
-  a: readonly [number, number],
-  b: readonly [number, number],
-): number {
-  const radius = 6371;
-  const toRad = (deg: number): number => (deg * Math.PI) / 180;
-  const dLat = toRad(b[1] - a[1]);
-  const dLon = toRad(b[0] - a[0]);
-  const lat1 = toRad(a[1]);
-  const lat2 = toRad(b[1]);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-  return 2 * radius * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
-function formatKm(km: number): string {
-  const rounded = km >= 100 ? Math.round(km / 10) * 10 : Math.max(1, Math.round(km));
-  return rounded.toLocaleString(getLocale());
+function qualitativeDistanceKey(
+  worldDistance: number,
+):
+  | "compass.distanceNear"
+  | "compass.distanceMedium"
+  | "compass.distanceFar" {
+  if (worldDistance < 5.5) {
+    return "compass.distanceNear";
+  }
+  if (worldDistance < 12) {
+    return "compass.distanceMedium";
+  }
+  return "compass.distanceFar";
 }
 
 function crossedStep(

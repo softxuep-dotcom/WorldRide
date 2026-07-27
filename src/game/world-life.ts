@@ -18,11 +18,17 @@ interface Bird {
   readonly rightWing: THREE.Mesh;
   offsetX: number;
   offsetZ: number;
-  readonly velocityX: number;
-  readonly velocityZ: number;
-  readonly altitude: number;
+  velocityX: number;
+  velocityZ: number;
+  readonly cruiseVelocityX: number;
+  readonly cruiseVelocityZ: number;
+  readonly baseAltitude: number;
+  altitude: number;
   readonly phase: number;
   readonly flapSpeed: number;
+  readonly groundBird: boolean;
+  startledFor: number;
+  frightCooldown: number;
 }
 
 interface Cloud {
@@ -62,6 +68,8 @@ const PETAL_FIELD_X = 11;
 const PETAL_FIELD_Z = 9;
 const PETAL_TOP = 7.5;
 const PETAL_FLOOR = 0.45;
+const BIRD_STARTLE_RADIUS = 3.2;
+const BIRD_STARTLE_SPEED = 6.8;
 
 export class WorldLife {
   readonly root = new THREE.Group();
@@ -72,6 +80,8 @@ export class WorldLife {
   private petalMesh?: THREE.InstancedMesh;
   private readonly fadeables: Fadeable[] = [];
   private readonly dummy = new THREE.Object3D();
+  private previousPlayerX?: number;
+  private previousPlayerZ?: number;
 
   constructor() {
     this.root.name = "Ambient life";
@@ -86,6 +96,7 @@ export class WorldLife {
     delta: number,
     playerX: number,
     playerZ: number,
+    playerVelocity: { x: number; z: number },
     overviewBlend: number,
   ): void {
     const localFactor = 1 - THREE.MathUtils.smoothstep(overviewBlend, 0.3, 0.72);
@@ -97,7 +108,22 @@ export class WorldLife {
       fade.material.opacity = fade.baseOpacity * localFactor;
     }
 
-    this.updateBirds(elapsed, delta, playerX, playerZ);
+    const playerDeltaX =
+      this.previousPlayerX === undefined ? 0 : playerX - this.previousPlayerX;
+    const playerDeltaZ =
+      this.previousPlayerZ === undefined ? 0 : playerZ - this.previousPlayerZ;
+    this.previousPlayerX = playerX;
+    this.previousPlayerZ = playerZ;
+
+    this.updateBirds(
+      elapsed,
+      delta,
+      playerX,
+      playerZ,
+      playerDeltaX,
+      playerDeltaZ,
+      playerVelocity,
+    );
     this.updateClouds(delta, playerX, playerZ);
     this.updatePetals(elapsed, delta, playerX, playerZ);
   }
@@ -107,17 +133,76 @@ export class WorldLife {
     delta: number,
     playerX: number,
     playerZ: number,
+    playerDeltaX: number,
+    playerDeltaZ: number,
+    playerVelocity: { x: number; z: number },
   ): void {
     for (const bird of this.birds) {
-      bird.offsetX = wrapField(bird.offsetX + bird.velocityX * delta, BIRD_FIELD_X);
-      bird.offsetZ = wrapField(bird.offsetZ + bird.velocityZ * delta, BIRD_FIELD_Z);
+      // Subtracting player travel keeps each bird anchored in the world until
+      // it leaves the local field. The old implementation moved the whole
+      // flock with the player, so the car could never actually approach it.
+      const nextOffsetX =
+        bird.offsetX - playerDeltaX + bird.velocityX * delta;
+      const nextOffsetZ =
+        bird.offsetZ - playerDeltaZ + bird.velocityZ * delta;
+      const wrapped =
+        Math.abs(nextOffsetX) > BIRD_FIELD_X ||
+        Math.abs(nextOffsetZ) > BIRD_FIELD_Z;
+      bird.offsetX = wrapField(nextOffsetX, BIRD_FIELD_X);
+      bird.offsetZ = wrapField(nextOffsetZ, BIRD_FIELD_Z);
+      bird.frightCooldown = Math.max(0, bird.frightCooldown - delta);
+
+      const playerSpeed = Math.hypot(playerVelocity.x, playerVelocity.z);
+      const distance = Math.hypot(bird.offsetX, bird.offsetZ);
+      if (
+        bird.groundBird &&
+        bird.frightCooldown <= 0 &&
+        playerSpeed > 0.75 &&
+        distance < BIRD_STARTLE_RADIUS
+      ) {
+        const inverseDistance = distance > 0.01 ? 1 / distance : 0;
+        const awayX =
+          distance > 0.01
+            ? bird.offsetX * inverseDistance
+            : -playerVelocity.x / playerSpeed;
+        const awayZ =
+          distance > 0.01
+            ? bird.offsetZ * inverseDistance
+            : -playerVelocity.z / playerSpeed;
+        bird.velocityX = awayX * BIRD_STARTLE_SPEED + playerVelocity.x * 0.18;
+        bird.velocityZ = awayZ * BIRD_STARTLE_SPEED + playerVelocity.z * 0.18;
+        bird.startledFor = 1.35;
+        bird.frightCooldown = 3.4;
+      }
+
+      bird.startledFor = Math.max(0, bird.startledFor - delta);
+      if (wrapped) {
+        bird.startledFor = 0;
+        bird.frightCooldown = 0.8;
+      }
+      const cruiseSmoothing = 1 - Math.exp(-1.8 * delta);
+      if (bird.startledFor <= 0) {
+        bird.velocityX +=
+          (bird.cruiseVelocityX - bird.velocityX) * cruiseSmoothing;
+        bird.velocityZ +=
+          (bird.cruiseVelocityZ - bird.velocityZ) * cruiseSmoothing;
+      }
+      const targetAltitude =
+        bird.baseAltitude + (bird.startledFor > 0 ? 3.2 : 0);
+      bird.altitude +=
+        (targetAltitude - bird.altitude) *
+        (1 - Math.exp(-(bird.startledFor > 0 ? 7 : 2.4) * delta));
+
       bird.group.position.set(
         playerX + bird.offsetX,
         bird.altitude + Math.sin(elapsed * 0.6 + bird.phase) * 0.32,
         playerZ + bird.offsetZ,
       );
       bird.group.rotation.y = Math.atan2(bird.velocityX, bird.velocityZ);
-      const flap = Math.sin(elapsed * bird.flapSpeed + bird.phase) * 0.55;
+      const flapMultiplier = bird.startledFor > 0 ? 1.75 : 1;
+      const flap =
+        Math.sin(elapsed * bird.flapSpeed * flapMultiplier + bird.phase) *
+        (bird.startledFor > 0 ? 0.72 : 0.55);
       bird.leftWing.rotation.z = 0.22 + flap;
       bird.rightWing.rotation.z = -0.22 - flap;
     }
@@ -203,22 +288,38 @@ export class WorldLife {
 
       // Two loose flocks travelling in slightly different directions.
       const flock = index % 2;
-      const velocityX = (flock === 0 ? 1.9 : -1.6) + randomBetween(-0.25, 0.25);
-      const velocityZ = (flock === 0 ? 0.7 : 1.0) + randomBetween(-0.25, 0.25);
+      const velocityX = (flock === 0 ? 1.35 : -1.15) + randomBetween(-0.2, 0.2);
+      const velocityZ = (flock === 0 ? 0.45 : 0.7) + randomBetween(-0.2, 0.2);
+      const groundBird = index < 5;
+      const altitude = groundBird
+        ? randomBetween(0.75, 1.25)
+        : randomBetween(7.5, 10.5);
 
       const bird: Bird = {
         group,
         leftWing,
         rightWing,
-        offsetX: randomBetween(-BIRD_FIELD_X, BIRD_FIELD_X),
-        offsetZ: randomBetween(-BIRD_FIELD_Z, BIRD_FIELD_Z),
+        offsetX: groundBird
+          ? randomBetween(-6.5, 6.5)
+          : randomBetween(-BIRD_FIELD_X, BIRD_FIELD_X),
+        offsetZ: groundBird
+          ? randomBetween(-8.5, -2.2)
+          : randomBetween(-BIRD_FIELD_Z, BIRD_FIELD_Z),
         velocityX,
         velocityZ,
-        altitude: randomBetween(9.5, 12.8),
+        cruiseVelocityX: velocityX,
+        cruiseVelocityZ: velocityZ,
+        baseAltitude: altitude,
+        altitude,
         phase: randomBetween(0, Math.PI * 2),
         flapSpeed: randomBetween(6.5, 9),
+        groundBird,
+        startledFor: 0,
+        frightCooldown: randomBetween(0.4, 1.5),
       };
-      const scale = randomBetween(0.8, 1.15);
+      const scale = groundBird
+        ? randomBetween(0.62, 0.85)
+        : randomBetween(0.8, 1.15);
       group.scale.setScalar(scale);
       this.birds.push(bird);
       this.root.add(group);

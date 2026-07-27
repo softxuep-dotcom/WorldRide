@@ -69,6 +69,21 @@ interface LandmarkEffect {
   quiet: boolean;
 }
 
+interface FieldPatchEffect {
+  readonly x: number;
+  readonly z: number;
+  readonly size: number;
+  readonly rotationY: number;
+  readonly strips: {
+    readonly mesh: THREE.Mesh;
+    readonly baseY: number;
+    readonly baseScaleZ: number;
+  }[];
+  waveTime: number;
+  waveDirection: 1 | -1;
+  cooldown: number;
+}
+
 const shared = {
   grassGeometry: new THREE.ConeGeometry(0.11, 0.3, 5),
   groundPatchGeometry: new THREE.DodecahedronGeometry(0.28, 0),
@@ -93,6 +108,7 @@ export class WorldView {
     [];
   private readonly props = new PropBatcher();
   private readonly life = new WorldLife();
+  private readonly fieldPatches: FieldPatchEffect[] = [];
   private modeBlend = 0;
 
   constructor() {
@@ -118,12 +134,21 @@ export class WorldView {
     elapsed: number,
     delta: number,
     position: { x: number; z: number },
+    velocity: { x: number; z: number },
     heading: number,
     boatMode: boolean,
     overviewBlend = 0,
   ): void {
     this.modeBlend += ((boatMode ? 1 : 0) - this.modeBlend) * (1 - Math.exp(-7 * delta));
-    this.life.update(elapsed, delta, position.x, position.z, overviewBlend);
+    this.life.update(
+      elapsed,
+      delta,
+      position.x,
+      position.z,
+      velocity,
+      overviewBlend,
+    );
+    this.updateFieldPatches(delta, position, velocity, overviewBlend);
     this.vehicle.root.position.x = position.x;
     this.vehicle.root.position.z = position.z;
     this.vehicle.root.position.y = THREE.MathUtils.lerp(0.37, 0.09, this.modeBlend);
@@ -1262,6 +1287,7 @@ export class WorldView {
     country: CountryDefinition,
   ): void {
     const group = new THREE.Group();
+    const strips: FieldPatchEffect["strips"] = [];
     const greenField =
       country.scenery === "green" ||
       country.scenery === "atlantic" ||
@@ -1281,11 +1307,83 @@ export class WorldView {
       strip.castShadow = true;
       strip.receiveShadow = true;
       group.add(strip);
+      strips.push({
+        mesh: strip,
+        baseY: strip.position.y,
+        baseScaleZ: strip.scale.z,
+      });
     }
 
     group.position.set(x, 0.445, z);
     group.rotation.y = x * 0.13 + z * 0.17;
     this.root.add(group);
+    this.fieldPatches.push({
+      x,
+      z,
+      size,
+      rotationY: group.rotation.y,
+      strips,
+      waveTime: -1,
+      waveDirection: 1,
+      cooldown: 0,
+    });
+  }
+
+  /**
+   * Field strips lift in sequence when the vehicle brushes past. This is a
+   * purely visual response: it adds texture to driving without creating a
+   * collectible, prompt, collision, or simulation rule.
+   */
+  private updateFieldPatches(
+    delta: number,
+    position: { x: number; z: number },
+    velocity: { x: number; z: number },
+    overviewBlend: number,
+  ): void {
+    const playerSpeed = Math.hypot(velocity.x, velocity.z);
+    const localView = overviewBlend < 0.35;
+
+    for (const field of this.fieldPatches) {
+      field.cooldown = Math.max(0, field.cooldown - delta);
+      if (field.waveTime >= 0) {
+        field.waveTime += delta;
+        for (let index = 0; index < field.strips.length; index += 1) {
+          const strip = field.strips[index];
+          const order =
+            field.waveDirection === 1
+              ? index
+              : field.strips.length - 1 - index;
+          const phase = field.waveTime * 5.5 - order * 0.42;
+          const wave =
+            phase > 0 && phase < Math.PI ? Math.sin(phase) : 0;
+          strip.mesh.position.y = strip.baseY + wave * 0.13;
+          strip.mesh.scale.z = strip.baseScaleZ * (1 + wave * 0.16);
+        }
+        if (field.waveTime > 1.75) {
+          field.waveTime = -1;
+          for (const strip of field.strips) {
+            strip.mesh.position.y = strip.baseY;
+            strip.mesh.scale.z = strip.baseScaleZ;
+          }
+        }
+        continue;
+      }
+
+      if (!localView || playerSpeed < 0.8 || field.cooldown > 0) {
+        continue;
+      }
+      const dx = position.x - field.x;
+      const dz = position.z - field.z;
+      if (Math.hypot(dx, dz) > Math.max(1.25, field.size * 1.55)) {
+        continue;
+      }
+
+      const localZ =
+        -Math.sin(field.rotationY) * dx + Math.cos(field.rotationY) * dz;
+      field.waveDirection = localZ >= 0 ? -1 : 1;
+      field.waveTime = 0;
+      field.cooldown = 3.2;
+    }
   }
 
   private addMeadowPatch(

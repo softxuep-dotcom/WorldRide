@@ -42,6 +42,8 @@ export interface UiMessages {
   "aria.landmarkDetail": string;
   "toast.discoveredSpot": string;
   "toast.discoveredHistoricalSite": string;
+  "toast.countryEntered": string;
+  "toast.countryReentered": string;
   "toast.boatMode": string;
   "toast.carMode": string;
   "toast.mapEdge": string;
@@ -76,7 +78,9 @@ export interface UiMessages {
   "region.name.south-america": string;
   "compass.heading": string;
   "compass.arrived": string;
-  "compass.distance": string;
+  "compass.distanceNear": string;
+  "compass.distanceMedium": string;
+  "compass.distanceFar": string;
   "wishlist.title": string;
   "wishlist.hint": string;
   "wishlist.here": string;

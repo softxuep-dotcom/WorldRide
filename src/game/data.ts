@@ -1174,7 +1174,8 @@ export const PHOTO_SPOTS: readonly PhotoSpotDefinition[] = [
   },
 ];
 
-export const START_POINT: GeoPoint = [-5.72, 36.52];
+/** New journeys begin at the existing Marseille city anchor in southern France. */
+export const START_POINT: GeoPoint = [5.35, 43.35];
 
 export function geoToWorld(point: GeoPoint): { x: number; z: number } {
   const mercatorLatitude = latitudeToMercator(point[1]);
