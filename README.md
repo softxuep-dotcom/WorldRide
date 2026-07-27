@@ -1,6 +1,6 @@
-# 口袋地球 · 欧洲、亚洲与北非原型
+# Tiny World Roadtrip · 小小世界环游记
 
-一个可直接游玩的 Three.js 最小原型。世界采用真实国家轮廓打底、连续程序化地表覆盖的玩具地图风格。
+一款可直接游玩的 Three.js 世界旅行游戏。世界采用真实国家轮廓打底、连续程序化地表覆盖的玩具地图风格。
 
 世界名胜、自然奇观与历史现场的扩充清单见 [WORLD_SITES_ROADMAP.md](./WORLD_SITES_ROADMAP.md)。
 
@@ -47,7 +47,7 @@ npm run preview
 # GitHub Pages / 普通 Web
 npm run build
 
-# Poki：生成相对路径构建并导出 exports/pocket-earth-poki.zip
+# Poki：生成相对路径构建并导出 exports/tiny-world-roadtrip-poki.zip
 npm run package:poki
 
 # CrazyGames：生成相对路径构建并导出 ZIP
@@ -56,8 +56,8 @@ npm run package:crazygames
 
 Poki 构建会在首次游玩前提供商业广告机会；两个游戏平台都会在知识挑战
 完成这一自然停顿点提供商业广告机会。广告真正开始时，游戏会暂停渲染、
-输入和声音，并在广告结束或无填充时恢复。未来需要设计明确的奖励内容时，
-可调用 `window.__POCKET_EARTH__.rewardedBreak()`，仅在返回 `true` 时发放奖励。
+输入和声音，并在广告结束或无填充时恢复。护照的“旅行车涂装”里提供
+“旅途落日”激励广告入口；只有广告完整播放并返回成功时才会解锁并应用涂装。
 
 各构建输出目录：
 

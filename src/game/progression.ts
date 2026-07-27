@@ -96,6 +96,8 @@ export interface VehiclePaint {
   /** Body colour applied to the travel car and boat hull. */
   readonly color: number;
   readonly requirement?: UnlockRequirement;
+  /** Optional cosmetic unlocked only after a player-requested rewarded ad. */
+  readonly rewarded?: boolean;
 }
 
 /** Progress totals a paint requirement is measured against. */
@@ -114,6 +116,7 @@ export const DEFAULT_PAINT_ID = "coral";
  */
 export const VEHICLE_PAINTS: readonly VehiclePaint[] = [
   { id: DEFAULT_PAINT_ID, color: 0xff6c55 },
+  { id: "sunset", color: 0xf07a3f, rewarded: true },
   { id: "sky", color: 0x4ca8d8, requirement: { type: "trips", count: 1 } },
   { id: "forest", color: 0x3f9a6a, requirement: { type: "landmarks", count: 10 } },
   { id: "sand", color: 0xd8a860, requirement: { type: "countries", count: 15 } },
@@ -140,6 +143,8 @@ export function meetsRequirement(
 /** Every paint whose requirement is satisfied (the default is always in). */
 export function evaluateUnlockedPaints(totals: ProgressTotals): string[] {
   return VEHICLE_PAINTS.filter(
-    (paint) => !paint.requirement || meetsRequirement(paint.requirement, totals),
+    (paint) =>
+      !paint.rewarded &&
+      (!paint.requirement || meetsRequirement(paint.requirement, totals)),
   ).map((paint) => paint.id);
 }

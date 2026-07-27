@@ -130,7 +130,12 @@ export interface UiMessages {
   "garage.req.countries": string;
   "garage.req.specialties": string;
   "garage.paintToast": string;
+  "garage.rewarded.cta": string;
+  "garage.rewarded.pending": string;
+  "garage.rewarded.unavailable": string;
+  "garage.rewarded.unlocked": string;
   "paint.name.coral": string;
+  "paint.name.sunset": string;
   "paint.name.sky": string;
   "paint.name.forest": string;
   "paint.name.sand": string;

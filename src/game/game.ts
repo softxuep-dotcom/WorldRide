@@ -41,6 +41,7 @@ export class PocketEarthGame {
   constructor(
     canvas: HTMLCanvasElement,
     onCommercialBreak: () => void = () => {},
+    onRewardedBreak?: () => Promise<boolean>,
   ) {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -68,6 +69,7 @@ export class PocketEarthGame {
       (color) => this.world.setVehiclePaint(color),
       () => this.persist(true),
       onCommercialBreak,
+      onRewardedBreak,
     );
 
     this.camera.near = 0.1;

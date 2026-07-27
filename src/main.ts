@@ -39,9 +39,13 @@ async function bootstrap(): Promise<void> {
     throw new Error("Missing #game-canvas");
   }
 
-  game = new PocketEarthGame(canvas, () => {
-    void platform.commercialBreak();
-  });
+  game = new PocketEarthGame(
+    canvas,
+    () => {
+      void platform.commercialBreak();
+    },
+    platform.id === "web" ? undefined : () => platform.rewardedBreak(),
+  );
   const requestedStart = new URLSearchParams(window.location.search).get("start");
   const requestedCountry = requestedStart
     ? COUNTRIES.find(
@@ -82,5 +86,5 @@ async function bootstrap(): Promise<void> {
 }
 
 void bootstrap().catch((error: unknown) => {
-  console.error("Pocket Earth failed to start.", error);
+  console.error("Tiny World Roadtrip failed to start.", error);
 });

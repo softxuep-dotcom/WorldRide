@@ -197,6 +197,8 @@ export class GameUI {
   private readonly onPaintChange: (color: number) => void;
   private readonly onProgressionChanged: () => void;
   private readonly onCommercialBreak: () => void;
+  private readonly onRewardedBreak?: () => Promise<boolean>;
+  private rewardPending = false;
   private trip: PhotoSpotId[] = [];
   private completedTrips = 0;
   private readonly unlockedPaints = new Set<string>([DEFAULT_PAINT_ID]);
@@ -211,11 +213,13 @@ export class GameUI {
     onPaintChange: (color: number) => void = () => {},
     onProgressionChanged: () => void = () => {},
     onCommercialBreak: () => void = () => {},
+    onRewardedBreak?: () => Promise<boolean>,
   ) {
     this.onCelebrate = onCelebrate;
     this.onPaintChange = onPaintChange;
     this.onProgressionChanged = onProgressionChanged;
     this.onCommercialBreak = onCommercialBreak;
+    this.onRewardedBreak = onRewardedBreak;
     this.elements = {
       countryReveal: requireElement("country-reveal"),
       countryKicker: requireElement("context-kicker"),
@@ -881,20 +885,31 @@ export class GameUI {
       ? this.progressTotals(this.latestState)
       : undefined;
 
+    const visiblePaints = VEHICLE_PAINTS.filter(
+      (paint) =>
+        !paint.rewarded ||
+        this.onRewardedBreak !== undefined ||
+        this.unlockedPaints.has(paint.id),
+    );
+
     this.elements.garageGrid.replaceChildren(
-      ...VEHICLE_PAINTS.map((paint) => {
+      ...visiblePaints.map((paint) => {
         const unlocked = this.unlockedPaints.has(paint.id);
         const equipped = unlocked && paint.id === this.equippedPaint;
+        const rewarded = Boolean(paint.rewarded && !unlocked);
         const button = document.createElement("button");
         button.type = "button";
         button.className = "paint-chip";
         button.classList.toggle("is-locked", !unlocked);
+        button.classList.toggle("is-rewarded", rewarded);
         button.classList.toggle("is-equipped", equipped);
-        button.disabled = !unlocked;
+        button.disabled = (!unlocked && !rewarded) || this.rewardPending;
         button.setAttribute(
           "aria-label",
           unlocked
             ? t("garage.equip", { name: paintName(paint.id) })
+            : rewarded
+              ? t("garage.rewarded.cta", { name: paintName(paint.id) })
             : requirementText(paint),
         );
 
@@ -905,7 +920,13 @@ export class GameUI {
           `#${paint.color.toString(16).padStart(6, "0")}`,
         );
         swatch.setAttribute("aria-hidden", "true");
-        swatch.textContent = unlocked ? (equipped ? "✓" : "") : "🔒";
+        swatch.textContent = unlocked
+          ? equipped
+            ? "✓"
+            : ""
+          : rewarded
+            ? "▶"
+            : "🔒";
 
         const name = document.createElement("span");
         name.className = "paint-chip__name";
@@ -915,6 +936,10 @@ export class GameUI {
         status.className = "paint-chip__status";
         if (equipped) {
           status.textContent = t("garage.equipped");
+        } else if (rewarded) {
+          status.textContent = this.rewardPending
+            ? t("garage.rewarded.pending")
+            : t("garage.rewarded.cta", { name: paintName(paint.id) });
         } else if (!unlocked) {
           status.textContent = requirementText(paint);
           if (totals && paint.requirement) {
@@ -924,10 +949,48 @@ export class GameUI {
         }
 
         button.append(swatch, name, status);
-        button.addEventListener("click", () => this.equipPaint(paint.id));
+        button.addEventListener("click", () => {
+          if (rewarded) {
+            void this.unlockRewardedPaint(paint);
+          } else {
+            this.equipPaint(paint.id);
+          }
+        });
         return button;
       }),
     );
+  }
+
+  private async unlockRewardedPaint(paint: VehiclePaint): Promise<void> {
+    if (
+      !paint.rewarded ||
+      !this.onRewardedBreak ||
+      this.rewardPending ||
+      this.unlockedPaints.has(paint.id)
+    ) {
+      return;
+    }
+
+    this.rewardPending = true;
+    this.buildGarageGrid();
+    const rewarded = await this.onRewardedBreak();
+    this.rewardPending = false;
+
+    if (!rewarded) {
+      this.buildGarageGrid();
+      this.showToast(t("garage.rewarded.unavailable"));
+      return;
+    }
+
+    this.unlockedPaints.add(paint.id);
+    this.equippedPaint = paint.id;
+    this.onPaintChange(paint.color);
+    this.buildGarageGrid();
+    this.enqueueCelebration(
+      t("garage.rewarded.unlocked", { name: paintName(paint.id) }),
+      t("garage.title"),
+    );
+    this.onProgressionChanged();
   }
 
   private enqueueCelebration(title: string, detail: string): void {
