@@ -142,8 +142,49 @@
           <div id="progress-totals" class="progress-totals"></div>
           <div id="progress-regions" class="progress-regions"></div>
         </section>
+        <button id="album-open" class="album-open" type="button">
+          <span aria-hidden="true">📮</span>
+          <span class="album-open__label" data-i18n="album.open">Open postcard album</span>
+          <span class="album-open__arrow" aria-hidden="true">›</span>
+        </button>
         <div id="stamp-grid" class="stamp-grid"></div>
       </aside>
+
+      <section
+        id="postcard-album"
+        class="postcard-album"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="album-title"
+        aria-hidden="true"
+      >
+        <button
+          id="album-backdrop"
+          class="postcard-album__backdrop"
+          type="button"
+          aria-label="Close postcard album"
+          data-i18n-attr="aria-label:album.close"
+        ></button>
+        <article class="postcard-album__card">
+          <header>
+            <div>
+              <small data-i18n="album.eyebrow">My postcards</small>
+              <h2 id="album-title" data-i18n="album.title">Postcard album</h2>
+            </div>
+            <span id="album-progress" class="postcard-album__progress"></span>
+            <button
+              id="album-close"
+              type="button"
+              aria-label="Close postcard album"
+              data-i18n-attr="aria-label:album.close"
+            >×</button>
+          </header>
+          <p id="album-empty" class="postcard-album__empty" data-i18n="album.empty" hidden>
+            No postcards yet — approach a glowing landmark to check in.
+          </p>
+          <div id="album-grid" class="postcard-album__grid"></div>
+        </article>
+      </section>
 
       <section
         id="landmark-detail"

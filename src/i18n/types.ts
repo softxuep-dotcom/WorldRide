@@ -88,6 +88,13 @@ export interface UiMessages {
   "celebrate.specialtiesAll": string;
   "celebrate.countryCount": string;
   "celebrate.countriesAll": string;
+  "album.open": string;
+  "album.eyebrow": string;
+  "album.title": string;
+  "album.close": string;
+  "album.empty": string;
+  "album.locked": string;
+  "album.flipHint": string;
   "sound.toggle": string;
   "language.label": string;
   "country.genericIntro": string;

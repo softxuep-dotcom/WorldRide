@@ -33,6 +33,16 @@ const GENERATED_LANDMARK_IDS = new Set<PhotoSpotId>([
   "easter-island-moai",
 ]);
 
+/** True when the landmark ships a hand-drawn WebP placard illustration. */
+export function hasLandmarkIllustration(id: PhotoSpotId): boolean {
+  return GENERATED_LANDMARK_IDS.has(id);
+}
+
+/** Base-URL-aware path to a landmark's placard illustration. */
+export function landmarkIllustrationUrl(id: PhotoSpotId): string {
+  return `${import.meta.env.BASE_URL}assets/landmarks/placard/${id}.webp`;
+}
+
 const COUNTRY_FLAGS: Readonly<Record<string, string>> = {
   Australia: "🇦🇺",
   Brazil: "🇧🇷",

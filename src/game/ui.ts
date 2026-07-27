@@ -34,6 +34,10 @@ import {
   type RegionalSpecialtyDefinition,
 } from "./regional-specialties";
 import { getSpecialtyCopy } from "./regional-specialty-copy";
+import {
+  hasLandmarkIllustration,
+  landmarkIllustrationUrl,
+} from "./landmark-standees";
 
 interface QuizSubject {
   quiz: QuizSet;
@@ -93,6 +97,13 @@ interface UIElements {
   celebrationEyebrow: HTMLElement;
   celebrationTitle: HTMLElement;
   celebrationDetail: HTMLElement;
+  albumOpen: HTMLButtonElement;
+  postcardAlbum: HTMLElement;
+  albumBackdrop: HTMLButtonElement;
+  albumClose: HTMLButtonElement;
+  albumProgress: HTMLElement;
+  albumEmpty: HTMLElement;
+  albumGrid: HTMLElement;
 }
 
 interface WishlistRow {
@@ -205,6 +216,13 @@ export class GameUI {
       celebrationEyebrow: requireElement("celebration-eyebrow"),
       celebrationTitle: requireElement("celebration-title"),
       celebrationDetail: requireElement("celebration-detail"),
+      albumOpen: requireButton("album-open"),
+      postcardAlbum: requireElement("postcard-album"),
+      albumBackdrop: requireButton("album-backdrop"),
+      albumClose: requireButton("album-close"),
+      albumProgress: requireElement("album-progress"),
+      albumEmpty: requireElement("album-empty"),
+      albumGrid: requireElement("album-grid"),
     };
 
     this.buildLanguageSelector();
@@ -242,6 +260,13 @@ export class GameUI {
     this.elements.compass.addEventListener("click", () =>
       this.setWishlistOpen(!this.wishlistOpen),
     );
+    this.elements.albumOpen.addEventListener("click", () => this.openAlbum());
+    this.elements.albumBackdrop.addEventListener("click", () =>
+      this.toggleAlbum(false),
+    );
+    this.elements.albumClose.addEventListener("click", () =>
+      this.toggleAlbum(false),
+    );
     document.addEventListener("pointerdown", (event) => {
       if (
         this.wishlistOpen &&
@@ -257,6 +282,7 @@ export class GameUI {
         this.togglePassport(false);
         this.closeQuiz();
         this.setWishlistOpen(false);
+        this.toggleAlbum(false);
       }
     });
 
@@ -915,7 +941,8 @@ export class GameUI {
   isInputBlocked(): boolean {
     return (
       this.elements.landmarkDetail.classList.contains("is-visible") ||
-      this.elements.passportPanel.classList.contains("is-visible")
+      this.elements.passportPanel.classList.contains("is-visible") ||
+      this.elements.postcardAlbum.classList.contains("is-visible")
     );
   }
 
@@ -1053,6 +1080,126 @@ export class GameUI {
     this.elements.passportButton.setAttribute("aria-expanded", String(shouldOpen));
   }
 
+  /**
+   * The album is the collection's payoff: a browsable scrapbook of the
+   * postcards you've earned. Built fresh on open so it always reflects the
+   * live collection and the active locale, and never runs per frame.
+   */
+  private openAlbum(): void {
+    this.togglePassport(false);
+    this.buildAlbumGrid();
+    this.toggleAlbum(true);
+  }
+
+  private toggleAlbum(force?: boolean): void {
+    const shouldOpen =
+      force ?? !this.elements.postcardAlbum.classList.contains("is-visible");
+    this.elements.postcardAlbum.classList.toggle("is-visible", shouldOpen);
+    this.elements.postcardAlbum.setAttribute("aria-hidden", String(!shouldOpen));
+  }
+
+  private buildAlbumGrid(): void {
+    const collected = this.latestState?.collectedPostcards;
+    const collectedCount = collected?.size ?? 0;
+    this.elements.albumProgress.textContent =
+      `${collectedCount} / ${PHOTO_SPOTS.length}`;
+    this.elements.albumEmpty.hidden = collectedCount > 0;
+
+    const kindLabels: Readonly<Record<PhotoSpotDefinition["kind"], string>> = {
+      landmark: t("landmark.kind.landmark"),
+      natural: t("landmark.kind.natural"),
+      wonder: t("landmark.kind.wonder"),
+      historical: t("landmark.kind.historical"),
+    };
+
+    this.elements.albumGrid.replaceChildren(
+      ...PHOTO_SPOTS.map((spot) =>
+        collected?.has(spot.id)
+          ? this.buildCollectedPostcard(spot, kindLabels[spot.kind])
+          : buildLockedPostcard(KIND_ICON[spot.kind]),
+      ),
+    );
+  }
+
+  private buildCollectedPostcard(
+    spot: PhotoSpotDefinition,
+    kindLabel: string,
+  ): HTMLButtonElement {
+    const localized = localizePhotoSpot(spot);
+    const country = this.spotCountry(spot);
+
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "postcard";
+    card.setAttribute("aria-label", localized.name);
+
+    const inner = document.createElement("span");
+    inner.className = "postcard__inner";
+
+    // Front: illustration (or flag card) plus a caption strip.
+    const front = document.createElement("span");
+    front.className = "postcard__face postcard__face--front";
+    front.append(buildPostcardArt(spot, country));
+
+    const caption = document.createElement("span");
+    caption.className = "postcard__caption";
+    const captionIcon = document.createElement("span");
+    captionIcon.className = "kind";
+    captionIcon.setAttribute("aria-hidden", "true");
+    captionIcon.textContent = KIND_ICON[spot.kind];
+    const captionName = document.createElement("span");
+    captionName.className = "name";
+    captionName.textContent = localized.name;
+    caption.append(captionIcon, captionName);
+    front.append(caption);
+
+    const flipHint = document.createElement("span");
+    flipHint.className = "postcard__flip-hint";
+    flipHint.textContent = t("album.flipHint");
+    front.append(flipHint);
+
+    // Back: written details.
+    const back = document.createElement("span");
+    back.className = "postcard__face postcard__face--back";
+    const backKind = document.createElement("span");
+    backKind.className = "postcard__back-kind";
+    backKind.textContent = kindLabel;
+    const backName = document.createElement("strong");
+    backName.className = "postcard__back-name";
+    backName.textContent = localized.name;
+    const backCountry = document.createElement("span");
+    backCountry.className = "postcard__back-country";
+    backCountry.textContent = `${country.flag} ${country.name}`;
+    const backBlurb = document.createElement("p");
+    backBlurb.className = "postcard__back-blurb";
+    backBlurb.textContent = localized.postcard;
+    const backFact = document.createElement("p");
+    backFact.className = "postcard__back-fact";
+    backFact.textContent = localized.fact;
+    back.append(backKind, backName, backCountry, backBlurb, backFact);
+
+    inner.append(front, back);
+    card.append(inner);
+    card.addEventListener("click", () => {
+      card.classList.toggle("is-flipped");
+    });
+    return card;
+  }
+
+  private spotCountry(spot: PhotoSpotDefinition): {
+    flag: string;
+    name: string;
+  } {
+    const atlasCountry = getWorldCountryByName(spot.atlasCountryName);
+    const worldCountry = atlasCountry
+      ? getCountryProfile(atlasCountry)
+      : undefined;
+    return {
+      flag: worldCountry?.flag ?? "◆",
+      name: worldCountry?.name ?? spot.atlasCountryName,
+    };
+  }
+
   private buildMiniMap(): { halo: SVGCircleElement; dot: SVGCircleElement } {
     const namespace = "http://www.w3.org/2000/svg";
 
@@ -1149,6 +1296,9 @@ export class GameUI {
       ? t("worldMap.back")
       : t("worldMap.label");
     this.buildPassport();
+    if (this.elements.postcardAlbum.classList.contains("is-visible")) {
+      this.buildAlbumGrid();
+    }
 
     if (this.selectedPhotoSpot) {
       this.showLandmarkDetail(
@@ -1267,6 +1417,63 @@ function buildProgressRow(
 
   row.append(name, bar, count);
   return row;
+}
+
+function buildPostcardArt(
+  spot: PhotoSpotDefinition,
+  country: { flag: string; name: string },
+): HTMLElement {
+  if (hasLandmarkIllustration(spot.id)) {
+    const img = document.createElement("img");
+    img.className = "postcard__photo";
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.alt = "";
+    img.src = landmarkIllustrationUrl(spot.id);
+    // If an illustration is ever missing, fall back to the flag card in place.
+    img.addEventListener("error", () => {
+      img.replaceWith(buildFlagCard(spot, country));
+    });
+    return img;
+  }
+  return buildFlagCard(spot, country);
+}
+
+function buildFlagCard(
+  spot: PhotoSpotDefinition,
+  country: { flag: string; name: string },
+): HTMLElement {
+  const card = document.createElement("span");
+  card.className = "postcard__flagcard";
+  const flag = document.createElement("span");
+  flag.className = "flag";
+  flag.setAttribute("aria-hidden", "true");
+  flag.textContent = country.flag;
+  const name = document.createElement("span");
+  name.className = "flag-name";
+  name.textContent = localizePhotoSpot(spot).name;
+  card.append(flag, name);
+  return card;
+}
+
+function buildLockedPostcard(icon: string): HTMLElement {
+  const card = document.createElement("div");
+  card.className = "postcard postcard--locked";
+  const inner = document.createElement("span");
+  inner.className = "postcard__inner";
+  const face = document.createElement("span");
+  face.className = "postcard__face";
+  const lock = document.createElement("span");
+  lock.className = "lock-icon";
+  lock.setAttribute("aria-hidden", "true");
+  lock.textContent = icon;
+  const label = document.createElement("span");
+  label.className = "lock-label";
+  label.textContent = t("album.locked");
+  face.append(lock, label);
+  inner.append(face);
+  card.append(inner);
+  return card;
 }
 
 function geoToMiniMap(point: readonly [number, number]): { x: number; y: number } {
