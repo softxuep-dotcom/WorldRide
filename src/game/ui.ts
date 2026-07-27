@@ -2,6 +2,7 @@ import {
   MAP_BOUNDS,
   PHOTO_SPOTS,
   type PhotoSpotDefinition,
+  type PhotoSpotId,
   geoToWorld,
 } from "./data";
 import type { GameEvent, GameState } from "./simulation";
@@ -81,6 +82,30 @@ interface UIElements {
   quizNext: HTMLButtonElement;
   progressTotals: HTMLElement;
   progressRegions: HTMLElement;
+  compassDock: HTMLElement;
+  compass: HTMLButtonElement;
+  compassArrow: HTMLElement;
+  compassTarget: HTMLElement;
+  compassDistance: HTMLElement;
+  wishlist: HTMLElement;
+  wishlistItems: HTMLElement;
+  celebration: HTMLElement;
+  celebrationEyebrow: HTMLElement;
+  celebrationTitle: HTMLElement;
+  celebrationDetail: HTMLElement;
+}
+
+interface WishlistRow {
+  id: PhotoSpotId;
+  li: HTMLLIElement;
+  button: HTMLButtonElement;
+  distance: HTMLElement;
+}
+
+interface CelebrationItem {
+  eyebrow: string;
+  title: string;
+  detail: string;
 }
 
 export class GameUI {
@@ -105,8 +130,28 @@ export class GameUI {
   private quizCorrect = 0;
   private quizAnswered = false;
   private readonly completedQuizzes = new Set<string>();
+  private latestState?: GameState;
+  private selectedTargetId?: PhotoSpotId;
+  private wishlistOpen = false;
+  private wishlistStructureSig?: string;
+  private wishlistRows: WishlistRow[] = [];
+  private compassSignature?: string;
+  private milestoneReady = false;
+  private prevLandmarks = 0;
+  private prevSpecialties = 0;
+  private prevCountries = 0;
+  private prevRegionDone = new Map<string, number>();
+  private readonly celebrationQueue: CelebrationItem[] = [];
+  private celebrationActive = false;
+  private celebrationTimer?: number;
+  private readonly onCelebrate: () => void;
 
-  constructor(onInteract: () => void, onToggleWorldView: () => void) {
+  constructor(
+    onInteract: () => void,
+    onToggleWorldView: () => void,
+    onCelebrate: () => void = () => {},
+  ) {
+    this.onCelebrate = onCelebrate;
     this.elements = {
       countryReveal: requireElement("country-reveal"),
       countryName: requireElement("country-name"),
@@ -149,6 +194,17 @@ export class GameUI {
       quizNext: requireButton("quiz-next"),
       progressTotals: requireElement("progress-totals"),
       progressRegions: requireElement("progress-regions"),
+      compassDock: requireElement("compass-dock"),
+      compass: requireButton("compass"),
+      compassArrow: requireElement("compass-arrow"),
+      compassTarget: requireElement("compass-target"),
+      compassDistance: requireElement("compass-distance"),
+      wishlist: requireElement("wishlist"),
+      wishlistItems: requireElement("wishlist-items"),
+      celebration: requireElement("celebration"),
+      celebrationEyebrow: requireElement("celebration-eyebrow"),
+      celebrationTitle: requireElement("celebration-title"),
+      celebrationDetail: requireElement("celebration-detail"),
     };
 
     this.buildLanguageSelector();
@@ -183,12 +239,24 @@ export class GameUI {
     this.elements.quizClose.addEventListener("click", () => this.closeQuiz());
     this.elements.quizSkip.addEventListener("click", () => this.closeQuiz());
     this.elements.quizNext.addEventListener("click", () => this.advanceQuiz());
+    this.elements.compass.addEventListener("click", () =>
+      this.setWishlistOpen(!this.wishlistOpen),
+    );
+    document.addEventListener("pointerdown", (event) => {
+      if (
+        this.wishlistOpen &&
+        !this.elements.compassDock.contains(event.target as Node)
+      ) {
+        this.setWishlistOpen(false);
+      }
+    });
 
     window.addEventListener("keydown", (event) => {
       if (event.code === "Escape") {
         this.toggleLandmarkDetail(false);
         this.togglePassport(false);
         this.closeQuiz();
+        this.setWishlistOpen(false);
       }
     });
 
@@ -197,6 +265,7 @@ export class GameUI {
   }
 
   update(state: GameState): void {
+    this.latestState = state;
     const geoPosition = getCurrentGeoPosition(state);
     const currentWorldCountry = state.currentCountryProfile
       ? WORLD_COUNTRIES.find(
@@ -260,6 +329,283 @@ export class GameUI {
     }
     this.previousNearestPhotoSpot = nearestId;
     this.refreshQuizAvailability(profile, state.nearestPhotoSpot);
+    this.updateCompass(state);
+    this.checkMilestones(state);
+  }
+
+  /**
+   * The compass turns aimless roaming into a route: it always points at one
+   * uncollected landmark — the player's pick, or the nearest one otherwise —
+   * so every session has an obvious "where to next".
+   */
+  private updateCompass(state: GameState): void {
+    const dock = this.elements.compassDock;
+    const blocked =
+      this.worldOverviewActive ||
+      this.isInputBlocked() ||
+      Boolean(this.activeQuiz);
+    const targets = blocked ? [] : this.uncollectedByDistance(state);
+
+    if (targets.length === 0) {
+      if (!dock.hidden) {
+        dock.hidden = true;
+        this.setWishlistOpen(false);
+      }
+      return;
+    }
+    dock.hidden = false;
+
+    let target = this.selectedTargetId
+      ? targets.find((entry) => entry.spot.id === this.selectedTargetId)
+      : undefined;
+    if (!target) {
+      this.selectedTargetId = undefined;
+      target = targets[0];
+    }
+
+    const targetWorld = geoToWorld(target.spot.point);
+    const dx = wrappedDeltaX(targetWorld.x, state.position.x);
+    const dz = targetWorld.z - state.position.z;
+    const angle = (Math.atan2(dx, -dz) * 180) / Math.PI;
+    this.elements.compassArrow.style.transform =
+      `translate(-50%, -70%) rotate(${angle.toFixed(1)}deg)`;
+
+    const name = localizePhotoSpot(target.spot).name;
+    const distanceText =
+      target.worldDistance < INTERACT_RADIUS
+        ? t("compass.arrived")
+        : t("compass.distance", { km: formatKm(target.geoKm) });
+    const signature = `${target.spot.id}|${name}|${distanceText}`;
+    if (signature !== this.compassSignature) {
+      this.compassSignature = signature;
+      this.elements.compassTarget.textContent = name;
+      this.elements.compassDistance.textContent = distanceText;
+    }
+
+    if (this.wishlistOpen) {
+      this.renderWishlist(targets, target.spot.id);
+    }
+  }
+
+  private uncollectedByDistance(
+    state: GameState,
+  ): { spot: PhotoSpotDefinition; worldDistance: number; geoKm: number }[] {
+    const geo = getCurrentGeoPosition(state);
+    const entries: {
+      spot: PhotoSpotDefinition;
+      worldDistance: number;
+      geoKm: number;
+    }[] = [];
+    for (const spot of PHOTO_SPOTS) {
+      if (state.collectedPostcards.has(spot.id)) {
+        continue;
+      }
+      const world = geoToWorld(spot.point);
+      const dx = wrappedDeltaX(world.x, state.position.x);
+      const dz = world.z - state.position.z;
+      entries.push({
+        spot,
+        worldDistance: Math.hypot(dx, dz),
+        geoKm: haversineKm(geo, spot.point),
+      });
+    }
+    entries.sort((a, b) => a.worldDistance - b.worldDistance);
+    return entries;
+  }
+
+  private setWishlistOpen(open: boolean): void {
+    const next = open && !this.elements.compassDock.hidden;
+    this.wishlistOpen = next;
+    this.elements.wishlist.hidden = !next;
+    this.elements.compass.setAttribute("aria-expanded", String(next));
+    if (next) {
+      this.wishlistStructureSig = undefined;
+      if (this.latestState) {
+        const targets = this.uncollectedByDistance(this.latestState);
+        const targetId =
+          targets.find((entry) => entry.spot.id === this.selectedTargetId)?.spot
+            .id ?? targets[0]?.spot.id;
+        if (targetId) {
+          this.renderWishlist(targets, targetId);
+        }
+      }
+    }
+  }
+
+  private renderWishlist(
+    targets: { spot: PhotoSpotDefinition; worldDistance: number; geoKm: number }[],
+    targetId: PhotoSpotId,
+  ): void {
+    const top = targets.slice(0, 3);
+    const structureSig = `${top.map((entry) => entry.spot.id).join(",")}`;
+    if (structureSig !== this.wishlistStructureSig) {
+      this.wishlistStructureSig = structureSig;
+      this.wishlistRows = top.map((entry) => {
+        const li = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "wishlist__item";
+        const icon = document.createElement("span");
+        icon.className = "wishlist__icon";
+        icon.setAttribute("aria-hidden", "true");
+        icon.textContent = KIND_ICON[entry.spot.kind];
+        const name = document.createElement("span");
+        name.className = "wishlist__name";
+        name.textContent = localizePhotoSpot(entry.spot).name;
+        const distance = document.createElement("span");
+        distance.className = "wishlist__dist";
+        button.append(icon, name, distance);
+        button.addEventListener("click", () => this.selectTarget(entry.spot.id));
+        li.append(button);
+        return { id: entry.spot.id, li, button, distance };
+      });
+      this.elements.wishlistItems.replaceChildren(
+        ...this.wishlistRows.map((row) => row.li),
+      );
+    }
+
+    for (const row of this.wishlistRows) {
+      const entry = top.find((candidate) => candidate.spot.id === row.id);
+      if (!entry) {
+        continue;
+      }
+      row.distance.textContent =
+        entry.worldDistance < INTERACT_RADIUS
+          ? t("wishlist.here")
+          : t("compass.distance", { km: formatKm(entry.geoKm) });
+      row.button.classList.toggle("is-active", row.id === targetId);
+    }
+  }
+
+  private selectTarget(id: PhotoSpotId): void {
+    this.selectedTargetId = id;
+    this.compassSignature = undefined;
+    const spot = PHOTO_SPOTS.find((candidate) => candidate.id === id);
+    if (spot) {
+      this.showToast(
+        t("wishlist.selectedToast", { name: localizePhotoSpot(spot).name }),
+      );
+    }
+    this.setWishlistOpen(false);
+  }
+
+  /**
+   * Milestones are detected from state deltas rather than events so a loaded
+   * save never re-celebrates progress the player already made. The first
+   * update after load just seeds the baselines.
+   */
+  private checkMilestones(state: GameState): void {
+    const landmarks = state.collectedPostcards.size;
+    const specialties = state.discoveredSpecialties.size;
+    const countries = state.visitedCountries.size;
+    const regionDone = new Map<string, number>();
+    for (const specialty of REGIONAL_SPECIALTIES) {
+      if (state.discoveredSpecialties.has(specialty.id)) {
+        regionDone.set(
+          specialty.region,
+          (regionDone.get(specialty.region) ?? 0) + 1,
+        );
+      }
+    }
+
+    if (!this.milestoneReady) {
+      this.milestoneReady = true;
+      this.prevLandmarks = landmarks;
+      this.prevSpecialties = specialties;
+      this.prevCountries = countries;
+      this.prevRegionDone = regionDone;
+      return;
+    }
+
+    if (landmarks > this.prevLandmarks) {
+      if (landmarks === PHOTO_SPOTS.length) {
+        this.enqueueCelebration(
+          t("celebrate.landmarksAll"),
+          `${landmarks}/${PHOTO_SPOTS.length}`,
+        );
+      } else if (crossedStep(this.prevLandmarks, landmarks, LANDMARK_STEPS)) {
+        this.enqueueCelebration(
+          t("celebrate.landmarkCount", { count: landmarks }),
+          `${landmarks}/${PHOTO_SPOTS.length}`,
+        );
+      }
+    }
+
+    if (specialties > this.prevSpecialties) {
+      if (specialties === REGIONAL_SPECIALTIES.length) {
+        this.enqueueCelebration(
+          t("celebrate.specialtiesAll"),
+          `${specialties}/${REGIONAL_SPECIALTIES.length}`,
+        );
+      } else {
+        for (const [region, total] of REGION_TOTALS) {
+          const done = regionDone.get(region) ?? 0;
+          const before = this.prevRegionDone.get(region) ?? 0;
+          if (before < total && done === total) {
+            this.enqueueCelebration(
+              t("celebrate.specialtyRegion", {
+                region: t(`region.name.${region}` as never),
+              }),
+              `${done}/${total}`,
+            );
+          }
+        }
+      }
+    }
+
+    if (countries > this.prevCountries) {
+      const total = getPassportCountryProfiles().length;
+      if (countries === total) {
+        this.enqueueCelebration(
+          t("celebrate.countriesAll"),
+          `${countries}/${total}`,
+        );
+      } else if (crossedStep(this.prevCountries, countries, COUNTRY_STEPS)) {
+        this.enqueueCelebration(
+          t("celebrate.countryCount", { count: countries }),
+          `${countries}/${total}`,
+        );
+      }
+    }
+
+    this.prevLandmarks = landmarks;
+    this.prevSpecialties = specialties;
+    this.prevCountries = countries;
+    this.prevRegionDone = regionDone;
+  }
+
+  private enqueueCelebration(title: string, detail: string): void {
+    this.celebrationQueue.push({
+      eyebrow: t("celebrate.eyebrow"),
+      title,
+      detail,
+    });
+    if (!this.celebrationActive) {
+      this.showNextCelebration();
+    }
+  }
+
+  private showNextCelebration(): void {
+    const next = this.celebrationQueue.shift();
+    if (!next) {
+      this.celebrationActive = false;
+      return;
+    }
+    this.celebrationActive = true;
+    this.elements.celebrationEyebrow.textContent = next.eyebrow;
+    this.elements.celebrationTitle.textContent = next.title;
+    this.elements.celebrationDetail.textContent = next.detail;
+    this.elements.celebration.classList.remove("is-visible");
+    void this.elements.celebration.offsetWidth;
+    this.elements.celebration.classList.add("is-visible");
+    this.elements.celebration.setAttribute("aria-hidden", "false");
+    this.onCelebrate();
+    window.clearTimeout(this.celebrationTimer);
+    this.celebrationTimer = window.setTimeout(() => {
+      this.elements.celebration.classList.remove("is-visible");
+      this.elements.celebration.setAttribute("aria-hidden", "true");
+      window.setTimeout(() => this.showNextCelebration(), 260);
+    }, 2800);
   }
 
   /**
@@ -552,6 +898,9 @@ export class GameUI {
 
   setWorldOverview(active: boolean): void {
     this.worldOverviewActive = active;
+    if (active) {
+      this.setWishlistOpen(false);
+    }
     document.getElementById("game-shell")?.classList.toggle("is-world-overview", active);
     this.elements.worldMapButton.classList.toggle("is-overview", active);
     this.elements.worldMapButton.setAttribute("aria-pressed", String(active));
@@ -668,9 +1017,13 @@ export class GameUI {
     this.elements.landmarkDetailDescription.textContent =
       localizedSpot.description;
     this.elements.landmarkDetailFact.textContent = localizedSpot.fact;
-    this.elements.landmarkDetailStatus.textContent = isReflection
+    const baseStatus = isReflection
       ? t(firstCollection ? "landmark.recorded" : "landmark.alreadyRecorded")
       : t(firstCollection ? "landmark.added" : "landmark.alreadyAdded");
+    const collectedCount = this.latestState?.collectedPostcards.size ?? 0;
+    this.elements.landmarkDetailStatus.textContent = firstCollection
+      ? `${baseStatus} · ${t("progress.landmarks")} ${collectedCount}/${PHOTO_SPOTS.length}`
+      : baseStatus;
     this.elements.landmarkDetailConfirm.textContent = firstCollection
       ? t("action.done")
       : t("action.backToJourney");
@@ -814,6 +1167,76 @@ export class GameUI {
       }
     }
   }
+}
+
+const INTERACT_RADIUS = 2.6;
+const LANDMARK_STEPS = [10, 20, 30] as const;
+const COUNTRY_STEPS = [25, 50, 100] as const;
+
+const COMPASS_MIN_WORLD = geoToWorld([
+  MAP_BOUNDS.minLongitude,
+  MAP_BOUNDS.maxLatitude,
+]);
+const COMPASS_MAX_WORLD = geoToWorld([
+  MAP_BOUNDS.maxLongitude,
+  MAP_BOUNDS.minLatitude,
+]);
+const WORLD_WIDTH = COMPASS_MAX_WORLD.x - COMPASS_MIN_WORLD.x;
+
+const REGION_TOTALS: ReadonlyMap<string, number> = (() => {
+  const totals = new Map<string, number>();
+  for (const specialty of REGIONAL_SPECIALTIES) {
+    totals.set(specialty.region, (totals.get(specialty.region) ?? 0) + 1);
+  }
+  return totals;
+})();
+
+const KIND_ICON: Readonly<Record<PhotoSpotDefinition["kind"], string>> = {
+  landmark: "🏙️",
+  natural: "🏔️",
+  wonder: "🏛️",
+  historical: "🕊️",
+};
+
+/** Shortest signed x offset, accounting for the east–west world wrap. */
+function wrappedDeltaX(targetX: number, playerX: number): number {
+  let dx = targetX - playerX;
+  if (dx > WORLD_WIDTH / 2) {
+    dx -= WORLD_WIDTH;
+  } else if (dx < -WORLD_WIDTH / 2) {
+    dx += WORLD_WIDTH;
+  }
+  return dx;
+}
+
+/** Great-circle distance in kilometres between two [lon, lat] points. */
+function haversineKm(
+  a: readonly [number, number],
+  b: readonly [number, number],
+): number {
+  const radius = 6371;
+  const toRad = (deg: number): number => (deg * Math.PI) / 180;
+  const dLat = toRad(b[1] - a[1]);
+  const dLon = toRad(b[0] - a[0]);
+  const lat1 = toRad(a[1]);
+  const lat2 = toRad(b[1]);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * radius * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function formatKm(km: number): string {
+  const rounded = km >= 100 ? Math.round(km / 10) * 10 : Math.max(1, Math.round(km));
+  return rounded.toLocaleString(getLocale());
+}
+
+function crossedStep(
+  previous: number,
+  current: number,
+  steps: readonly number[],
+): boolean {
+  return steps.some((step) => previous < step && current >= step);
 }
 
 function buildProgressRow(

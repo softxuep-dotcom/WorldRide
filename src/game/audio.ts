@@ -142,6 +142,19 @@ export class GameAudio {
     this.playArpeggio([659.25, 880], 0.085, "sine", 0.1);
   }
 
+  /**
+   * Milestone fanfare: a bright ascending major arpeggio capped by a soft
+   * high shimmer. Reserved for aggregate achievements, so it can sit a notch
+   * above the single-collection cues without becoming a blaring jingle.
+   */
+  onMilestone(): void {
+    this.playArpeggio([523.25, 659.25, 783.99, 1046.5], 0.12, "triangle", 0.16);
+    window.setTimeout(
+      () => this.playTone(1567.98, 0.5, "sine", 0.075),
+      520,
+    );
+  }
+
   onMapEdge(): void {
     this.playTone(150, 0.18, "sine", 0.1);
   }

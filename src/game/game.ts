@@ -56,6 +56,7 @@ export class PocketEarthGame {
     this.ui = new GameUI(
       () => this.simulation.interact(),
       () => this.toggleWorldOverview(),
+      () => this.audio.onMilestone(),
     );
 
     this.camera.near = 0.1;

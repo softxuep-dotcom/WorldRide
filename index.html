@@ -51,8 +51,49 @@
         </button>
       </section>
 
+      <div id="compass-dock" class="compass-dock" hidden>
+        <button
+          id="compass"
+          class="compass"
+          type="button"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-label="Places to go"
+          data-i18n-attr="aria-label:wishlist.title"
+        >
+          <span class="compass__rose" aria-hidden="true">
+            <span id="compass-arrow" class="compass__arrow"></span>
+          </span>
+          <span class="compass__copy">
+            <small class="compass__eyebrow" data-i18n="compass.heading">Heading to</small>
+            <strong id="compass-target" class="compass__target"></strong>
+            <span id="compass-distance" class="compass__distance"></span>
+          </span>
+        </button>
+        <div id="wishlist" class="wishlist" hidden>
+          <h3 class="wishlist__title" data-i18n="wishlist.title">Places to go</h3>
+          <p class="wishlist__hint" data-i18n="wishlist.hint">Pick a destination and follow the compass.</p>
+          <ul id="wishlist-items" class="wishlist__items"></ul>
+        </div>
+      </div>
+
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
       <div id="flash" class="camera-flash" aria-hidden="true"></div>
+
+      <div
+        id="celebration"
+        class="celebration"
+        role="status"
+        aria-live="polite"
+        aria-hidden="true"
+      >
+        <div class="celebration__card">
+          <span class="celebration__spark" aria-hidden="true">✨</span>
+          <small id="celebration-eyebrow" class="celebration__eyebrow"></small>
+          <strong id="celebration-title" class="celebration__title"></strong>
+          <span id="celebration-detail" class="celebration__detail"></span>
+        </div>
+      </div>
 
       <section id="controls-hint" class="controls-hint">
         <span class="desktop-hint" data-i18n="controls.desktop">Move with WASD / arrow keys · M opens the world map · Space explores nearby landmarks</span>

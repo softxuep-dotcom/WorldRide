@@ -1262,3 +1262,308 @@ button {
 .progress-row.is-complete .progress-row__count {
   color: #256d48;
 }
+
+/* ---------- Compass & wishlist ---------- */
+
+.compass-dock {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.compass-dock[hidden] {
+  display: none;
+}
+
+.compass {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(62vw, 260px);
+  padding: 7px 15px 7px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 150ms ease;
+}
+
+.compass:active {
+  transform: scale(0.97);
+}
+
+.compass__rose {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, #fff, #dceff4 72%);
+  box-shadow: inset 0 0 0 2px rgba(83, 186, 216, 0.35);
+}
+
+.compass__arrow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 15px solid var(--coral);
+  transform: translate(-50%, -70%) rotate(0deg);
+  transition: transform 120ms linear;
+}
+
+.compass__copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.compass__eyebrow {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.compass__target {
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compass__distance {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--coral);
+  font-variant-numeric: tabular-nums;
+}
+
+.wishlist {
+  pointer-events: auto;
+  width: min(280px, 78vw);
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 18px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: wishlist-pop 220ms cubic-bezier(0.2, 0.9, 0.2, 1.1);
+}
+
+.wishlist[hidden] {
+  display: none;
+}
+
+.wishlist__title {
+  margin: 0 0 2px;
+  color: var(--coral);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.wishlist__hint {
+  margin: 0 0 11px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.wishlist__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wishlist__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 11px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(83, 186, 216, 0.12);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 130ms ease, background 160ms ease;
+}
+
+.wishlist__item:active {
+  transform: scale(0.98);
+}
+
+.wishlist__item.is-active {
+  background: rgba(255, 112, 88, 0.14);
+  box-shadow: inset 0 0 0 2px var(--coral);
+}
+
+.wishlist__icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.wishlist__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wishlist__dist {
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Milestone celebration ---------- */
+
+.celebration {
+  position: absolute;
+  top: 24%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.celebration.is-visible {
+  opacity: 1;
+}
+
+.celebration__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 18px 30px 20px;
+  border-radius: 22px;
+  background: linear-gradient(155deg, #fff5d4, #ffd977 62%, #ffbe5c);
+  color: #6b3d0f;
+  box-shadow: 0 20px 48px rgba(191, 120, 22, 0.4);
+  text-align: center;
+}
+
+.celebration.is-visible .celebration__card {
+  animation: celebrate-pop 460ms cubic-bezier(0.2, 0.9, 0.25, 1.3);
+}
+
+.celebration__spark {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.celebration.is-visible .celebration__spark {
+  animation: celebrate-spark 900ms ease-in-out;
+}
+
+.celebration__eyebrow {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #b9740f;
+}
+
+.celebration__title {
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.celebration__detail {
+  font-size: 12px;
+  font-weight: 800;
+  color: #90591a;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes wishlist-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes celebrate-pop {
+  0% {
+    transform: scale(0.7);
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes celebrate-spark {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  40% {
+    transform: scale(1.25) rotate(-12deg);
+  }
+  70% {
+    transform: scale(1.1) rotate(10deg);
+  }
+}
+
+@media (max-width: 430px) {
+  .compass {
+    max-width: 54vw;
+    padding: 6px 12px 6px 7px;
+  }
+
+  .compass__rose {
+    width: 30px;
+    height: 30px;
+  }
+
+  .compass__target {
+    font-size: 13px;
+  }
+
+  .celebration__card {
+    padding: 15px 22px 17px;
+  }
+
+  .celebration__title {
+    font-size: 17px;
+  }
+}
