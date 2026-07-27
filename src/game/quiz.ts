@@ -33,7 +33,7 @@ export interface QuizSet {
 }
 
 const FALLBACK_LOCALE = "en";
-const QUIZ_BANK_VERSION = 2;
+const QUIZ_BANK_VERSION = 3;
 
 export function localizeText(text: LocalizedText, locale: string): string {
   const fallback = text[FALLBACK_LOCALE] ?? Object.values(text)[0] ?? "";
@@ -41,39 +41,19 @@ export function localizeText(text: LocalizedText, locale: string): string {
 }
 
 type TierACountryName = (typeof TIER_A_COUNTRY_NAMES)[number];
-type ContinentKey =
-  | "africa"
-  | "asia"
-  | "europe"
-  | "europe-asia"
-  | "north-america"
-  | "oceania"
-  | "south-america";
 
 interface CountryQuizSeed {
   label: BilingualCopy;
-  capital: BilingualCopy;
-  continent: ContinentKey;
+  landscape: BilingualCopy;
+  signature: BilingualCopy;
   feature: QuizQuestion;
 }
-
-const CONTINENT_LABELS: Readonly<Record<ContinentKey, BilingualCopy>> = {
-  africa: ["Africa", "非洲"],
-  asia: ["Asia", "亚洲"],
-  europe: ["Europe", "欧洲"],
-  "europe-asia": ["Europe and Asia", "欧洲与亚洲"],
-  "north-america": ["North America", "北美洲"],
-  oceania: ["Oceania", "大洋洲"],
-  "south-america": ["South America", "南美洲"],
-};
-
-const CONTINENT_KEYS = Object.keys(CONTINENT_LABELS) as ContinentKey[];
 
 const COUNTRY_QUIZ_SEEDS = {
   Argentina: {
     label: ["Argentina", "阿根廷"],
-    capital: ["Buenos Aires", "布宜诺斯艾利斯"],
-    continent: "south-america",
+    landscape: ["Patagonian glaciers and grasslands", "巴塔哥尼亚的冰川与草原"],
+    signature: ["Tango music and dance", "探戈音乐与舞蹈"],
     feature: quizQuestion(
       "argentina-andes",
       ["Which mountain range follows Argentina's western edge?", "哪条山脉沿阿根廷西部边缘延伸？"],
@@ -84,8 +64,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Australia: {
     label: ["Australia", "澳大利亚"],
-    capital: ["Canberra", "堪培拉"],
-    continent: "oceania",
+    landscape: ["Uluru and the red Outback", "乌鲁鲁与红色内陆荒原"],
+    signature: ["Kangaroos and eucalyptus woodland", "袋鼠与桉树林"],
     feature: quizQuestion(
       "australia-reef",
       ["Which great reef system lies off northeastern Australia?", "澳大利亚东北海岸外分布着哪一大型珊瑚礁系统？"],
@@ -96,8 +76,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Brazil: {
     label: ["Brazil", "巴西"],
-    capital: ["Brasília", "巴西利亚"],
-    continent: "south-america",
+    landscape: ["The Amazon rainforest and broad rivers", "亚马孙雨林与宽阔河流"],
+    signature: ["Carnival parades and samba", "狂欢节巡游与桑巴"],
     feature: quizQuestion(
       "brazil-basin",
       ["Which vast river basin covers much of northern Brazil?", "哪个巨大的河流流域覆盖巴西北部大片地区？"],
@@ -108,8 +88,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Canada: {
     label: ["Canada", "加拿大"],
-    capital: ["Ottawa", "渥太华"],
-    continent: "north-america",
+    landscape: ["Rocky Mountain lakes and boreal forests", "落基山湖泊与北方森林"],
+    signature: ["The maple leaf", "枫叶"],
     feature: quizQuestion(
       "canada-rockies",
       ["Which major mountain range rises in western Canada?", "加拿大西部耸立着哪条主要山脉？"],
@@ -120,8 +100,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   China: {
     label: ["China", "中国"],
-    capital: ["Beijing", "北京"],
-    continent: "asia",
+    landscape: ["The Great Wall crossing northern mountains", "横越北方山地的长城"],
+    signature: ["Giant pandas and bamboo forests", "大熊猫与竹林"],
     feature: quizQuestion(
       "china-river",
       ["Which is the longest river in China?", "中国最长的河流是哪一条？"],
@@ -132,8 +112,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Egypt: {
     label: ["Egypt", "埃及"],
-    capital: ["Cairo", "开罗"],
-    continent: "africa",
+    landscape: ["Pyramids beside the Nile valley", "尼罗河谷旁的金字塔"],
+    signature: ["Hieroglyphs and ancient temples", "象形文字与古代神庙"],
     feature: quizQuestion(
       "egypt-nile",
       ["Which direction does the Nile flow through Egypt?", "尼罗河在埃及境内向哪个方向流？"],
@@ -144,8 +124,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   France: {
     label: ["France", "法国"],
-    capital: ["Paris", "巴黎"],
-    continent: "europe",
+    landscape: ["Lavender fields and Mediterranean villages", "薰衣草田与地中海村镇"],
+    signature: ["Café culture, bread and cheese", "咖啡馆文化、面包与奶酪"],
     feature: quizQuestion(
       "france-sea",
       ["Southern France faces which sea?", "法国南部面向哪片海？"],
@@ -156,8 +136,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Germany: {
     label: ["Germany", "德国"],
-    capital: ["Berlin", "柏林"],
-    continent: "europe",
+    landscape: ["Rhine castles and forested valleys", "莱茵河城堡与森林山谷"],
+    signature: ["Christmas markets and precision engineering", "圣诞市集与精密工程"],
     feature: quizQuestion(
       "germany-rhine",
       ["Which major river flows through western Germany?", "哪条重要河流流经德国西部？"],
@@ -168,8 +148,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   India: {
     label: ["India", "印度"],
-    capital: ["New Delhi", "新德里"],
-    continent: "asia",
+    landscape: ["The Taj Mahal and the Ganges plain", "泰姬陵与恒河平原"],
+    signature: ["Diwali lamps and aromatic spices", "排灯节灯火与香料"],
     feature: quizQuestion(
       "india-monsoon",
       ["Which seasonal weather system strongly shapes India's rainfall?", "哪种季节性天气系统强烈影响印度降水？"],
@@ -180,8 +160,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Indonesia: {
     label: ["Indonesia", "印度尼西亚"],
-    capital: ["Jakarta", "雅加达"],
-    continent: "asia",
+    landscape: ["Volcanic islands and rice terraces", "火山岛屿与水稻梯田"],
+    signature: ["Batik textile patterns", "蜡染布纹样"],
     feature: quizQuestion(
       "indonesia-islands",
       ["What kind of country is Indonesia geographically?", "从地理上看，印度尼西亚属于哪种国家？"],
@@ -192,8 +172,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Iran: {
     label: ["Iran", "伊朗"],
-    capital: ["Tehran", "德黑兰"],
-    continent: "asia",
+    landscape: ["Persian gardens and the Zagros Mountains", "波斯花园与扎格罗斯山脉"],
+    signature: ["Persian carpets and intricate tilework", "波斯地毯与精细瓷砖装饰"],
     feature: quizQuestion(
       "iran-zagros",
       ["Which mountain range runs through western Iran?", "哪条山脉贯穿伊朗西部？"],
@@ -204,8 +184,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Italy: {
     label: ["Italy", "意大利"],
-    capital: ["Rome", "罗马"],
-    continent: "europe",
+    landscape: ["Tuscan hills and historic stone cities", "托斯卡纳丘陵与历史石城"],
+    signature: ["Renaissance art and regional pasta", "文艺复兴艺术与地方意面"],
     feature: quizQuestion(
       "italy-shape",
       ["The Italian peninsula is often said to look like what?", "意大利半岛的轮廓常被形容成什么？"],
@@ -216,8 +196,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Japan: {
     label: ["Japan", "日本"],
-    capital: ["Tokyo", "东京"],
-    continent: "asia",
+    landscape: ["Mount Fuji and cherry blossoms", "富士山与樱花"],
+    signature: ["Shinkansen trains and traditional temples", "新干线与传统寺院"],
     feature: quizQuestion(
       "japan-islands",
       ["Japan is made up of what kind of land?", "日本的国土主要由什么构成？"],
@@ -228,8 +208,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Mexico: {
     label: ["Mexico", "墨西哥"],
-    capital: ["Mexico City", "墨西哥城"],
-    continent: "north-america",
+    landscape: ["Cenotes and Maya pyramids", "天然井与玛雅金字塔"],
+    signature: ["Day of the Dead marigolds", "亡灵节与万寿菊"],
     feature: quizQuestion(
       "mexico-yucatan",
       ["Which peninsula contains the Maya site of Chichén Itzá?", "玛雅遗址奇琴伊察位于哪个半岛？"],
@@ -240,8 +220,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Netherlands: {
     label: ["The Netherlands", "荷兰"],
-    capital: ["Amsterdam", "阿姆斯特丹"],
-    continent: "europe",
+    landscape: ["Canals, windmills and flat polders", "运河、风车与平坦圩田"],
+    signature: ["Tulips and everyday cycling", "郁金香与日常骑行"],
     feature: quizQuestion(
       "netherlands-water",
       ["What helps protect low-lying land in the Netherlands from water?", "什么设施帮助荷兰保护低洼土地免受水患？"],
@@ -252,8 +232,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Russia: {
     label: ["Russia", "俄罗斯"],
-    capital: ["Moscow", "莫斯科"],
-    continent: "europe-asia",
+    landscape: ["Siberian taiga and Lake Baikal", "西伯利亚针叶林与贝加尔湖"],
+    signature: ["Onion domes and matryoshka dolls", "洋葱穹顶与套娃"],
     feature: quizQuestion(
       "russia-span",
       ["Russia stretches across which two continents?", "俄罗斯横跨哪两个大洲？"],
@@ -264,8 +244,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   "Saudi Arabia": {
     label: ["Saudi Arabia", "沙特阿拉伯"],
-    capital: ["Riyadh", "利雅得"],
-    continent: "asia",
+    landscape: ["Arabian dunes and the Red Sea coast", "阿拉伯沙丘与红海海岸"],
+    signature: ["Arabic coffee and desert hospitality", "阿拉伯咖啡与沙漠待客传统"],
     feature: quizQuestion(
       "saudi-red-sea",
       ["Which sea borders western Saudi Arabia?", "沙特阿拉伯西部濒临哪片海？"],
@@ -276,8 +256,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Singapore: {
     label: ["Singapore", "新加坡"],
-    capital: ["Singapore", "新加坡"],
-    continent: "asia",
+    landscape: ["Tropical gardens beside a modern skyline", "现代天际线旁的热带花园"],
+    signature: ["Hawker centres and multicultural food", "小贩中心与多元美食"],
     feature: quizQuestion(
       "singapore-location",
       ["Singapore lies just south of which peninsula?", "新加坡位于哪个半岛南端附近？"],
@@ -288,8 +268,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   "South Africa": {
     label: ["South Africa", "南非"],
-    capital: ["Pretoria", "比勒陀利亚"],
-    continent: "africa",
+    landscape: ["Savanna, the Drakensberg and Cape coast", "草原、德拉肯斯堡与开普海岸"],
+    signature: ["Rooibos tea and diverse wildlife", "路易波士茶与多样野生动物"],
     feature: quizQuestion(
       "south-africa-oceans",
       ["Which two oceans meet around South Africa's long coastline?", "南非漫长海岸周围是哪两大洋？"],
@@ -300,8 +280,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   "South Korea": {
     label: ["South Korea", "韩国"],
-    capital: ["Seoul", "首尔"],
-    continent: "asia",
+    landscape: ["Mountain temples beside modern cities", "现代城市旁的山地寺院"],
+    signature: ["Kimchi and contemporary pop culture", "泡菜与当代流行文化"],
     feature: quizQuestion(
       "south-korea-peninsula",
       ["South Korea occupies the southern part of which peninsula?", "韩国位于哪个半岛的南部？"],
@@ -312,8 +292,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Spain: {
     label: ["Spain", "西班牙"],
-    capital: ["Madrid", "马德里"],
-    continent: "europe",
+    landscape: ["Mediterranean coasts and Moorish palaces", "地中海海岸与摩尔式宫殿"],
+    signature: ["Flamenco music and dance", "弗拉门戈音乐与舞蹈"],
     feature: quizQuestion(
       "spain-peninsula",
       ["Spain shares which peninsula mainly with Portugal?", "西班牙与葡萄牙主要共同位于哪个半岛？"],
@@ -324,8 +304,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Switzerland: {
     label: ["Switzerland", "瑞士"],
-    capital: ["Bern", "伯尔尼"],
-    continent: "europe",
+    landscape: ["Alpine peaks, glaciers and clear lakes", "阿尔卑斯山峰、冰川与清澈湖泊"],
+    signature: ["Watchmaking and chocolate", "钟表制造与巧克力"],
     feature: quizQuestion(
       "switzerland-landlocked",
       ["Which statement about Switzerland is correct?", "关于瑞士，哪项说法正确？"],
@@ -336,8 +316,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Thailand: {
     label: ["Thailand", "泰国"],
-    capital: ["Bangkok", "曼谷"],
-    continent: "asia",
+    landscape: ["Limestone islands and golden temples", "石灰岩岛屿与金色寺庙"],
+    signature: ["Songkran celebrations and street food", "宋干节与街头美食"],
     feature: quizQuestion(
       "thailand-river",
       ["Which river crosses Thailand's central plain and Bangkok?", "哪条河流经泰国中部平原和曼谷？"],
@@ -348,8 +328,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Turkey: {
     label: ["Turkey", "土耳其"],
-    capital: ["Ankara", "安卡拉"],
-    continent: "europe-asia",
+    landscape: ["Cappadocia valleys and the Bosporus", "卡帕多奇亚山谷与博斯普鲁斯海峡"],
+    signature: ["Carpets, tea and covered bazaars", "地毯、红茶与有顶集市"],
     feature: quizQuestion(
       "turkey-bosporus",
       ["Which strait divides the European and Asian sides of Istanbul?", "哪条海峡分隔伊斯坦布尔的欧洲部分与亚洲部分？"],
@@ -360,8 +340,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   "United Arab Emirates": {
     label: ["The United Arab Emirates", "阿联酋"],
-    capital: ["Abu Dhabi", "阿布扎比"],
-    continent: "asia",
+    landscape: ["Desert dunes beside futuristic skylines", "沙漠沙丘与未来感天际线"],
+    signature: ["Falconry and traditional souks", "猎鹰传统与传统市集"],
     feature: quizQuestion(
       "uae-emirates",
       ["How many emirates form the United Arab Emirates?", "阿联酋由多少个酋长国组成？"],
@@ -372,8 +352,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   "United Kingdom": {
     label: ["The United Kingdom", "英国"],
-    capital: ["London", "伦敦"],
-    continent: "europe",
+    landscape: ["Green hills, sea cliffs and historic castles", "绿色丘陵、海崖与历史城堡"],
+    signature: ["Afternoon tea and red double-decker buses", "下午茶与红色双层巴士"],
     feature: quizQuestion(
       "uk-parts",
       ["Which four parts make up the United Kingdom?", "英国由哪四个部分组成？"],
@@ -384,8 +364,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   "United States of America": {
     label: ["The United States", "美国"],
-    capital: ["Washington, D.C.", "华盛顿哥伦比亚特区"],
-    continent: "north-america",
+    landscape: ["The Grand Canyon and varied national parks", "大峡谷与多样国家公园"],
+    signature: ["Jazz music and Hollywood cinema", "爵士乐与好莱坞电影"],
     feature: quizQuestion(
       "usa-oceans",
       ["The mainland United States lies between which two oceans?", "美国本土位于哪两大洋之间？"],
@@ -396,8 +376,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Algeria: {
     label: ["Algeria", "阿尔及利亚"],
-    capital: ["Algiers", "阿尔及尔"],
-    continent: "africa",
+    landscape: ["Sahara dunes and Tassili rock formations", "撒哈拉沙丘与塔西利岩层"],
+    signature: ["Raï music and desert tea", "拉伊音乐与沙漠茶饮"],
     feature: quizQuestion(
       "algeria-sahara",
       ["Which vast desert covers most of Algeria?", "哪片广阔的沙漠覆盖了阿尔及利亚大部分国土？"],
@@ -408,8 +388,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Chile: {
     label: ["Chile", "智利"],
-    capital: ["Santiago", "圣地亚哥"],
-    continent: "south-america",
+    landscape: ["The Atacama Desert stretching toward Patagonia", "从阿塔卡马沙漠延伸至巴塔哥尼亚"],
+    signature: ["Copper mining and Pacific-coast wine regions", "铜矿业与太平洋沿岸葡萄酒产区"],
     feature: quizQuestion(
       "chile-shape",
       ["Which landscape best describes mainland Chile?", "哪种地理形态最符合智利本土？"],
@@ -420,8 +400,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Ethiopia: {
     label: ["Ethiopia", "埃塞俄比亚"],
-    capital: ["Addis Ababa", "亚的斯亚贝巴"],
-    continent: "africa",
+    landscape: ["The Simien Mountains and Great Rift Valley", "塞米恩山脉与东非大裂谷"],
+    signature: ["The traditional coffee ceremony", "传统咖啡仪式"],
     feature: quizQuestion(
       "ethiopia-highlands",
       ["Which landform dominates much of central and northern Ethiopia?", "埃塞俄比亚中北部主要由哪种地貌构成？"],
@@ -432,8 +412,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Greece: {
     label: ["Greece", "希腊"],
-    capital: ["Athens", "雅典"],
-    continent: "europe",
+    landscape: ["Whitewashed villages on Aegean islands", "爱琴海岛屿上的白色村镇"],
+    signature: ["Ancient theatres and olive oil", "古代剧场与橄榄油"],
     feature: quizQuestion(
       "greece-aegean",
       ["Which sea contains many of Greece's famous islands?", "希腊许多著名岛屿分布在哪片海域？"],
@@ -444,8 +424,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Kazakhstan: {
     label: ["Kazakhstan", "哈萨克斯坦"],
-    capital: ["Astana", "阿斯塔纳"],
-    continent: "asia",
+    landscape: ["Open steppe and Charyn Canyon", "辽阔草原与恰伦峡谷"],
+    signature: ["Eagle hunting and yurt traditions", "猎鹰与毡房传统"],
     feature: quizQuestion(
       "kazakhstan-landlocked",
       ["What geographic distinction does Kazakhstan hold?", "哈萨克斯坦拥有哪项地理特征？"],
@@ -456,8 +436,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Mongolia: {
     label: ["Mongolia", "蒙古国"],
-    capital: ["Ulaanbaatar", "乌兰巴托"],
-    continent: "asia",
+    landscape: ["Open grassland steppe and the Gobi", "辽阔草原与戈壁"],
+    signature: ["Naadam games and the ger", "那达慕与蒙古包"],
     feature: quizQuestion(
       "mongolia-gobi",
       ["Which desert extends across southern Mongolia?", "哪片沙漠横跨蒙古国南部？"],
@@ -468,8 +448,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Morocco: {
     label: ["Morocco", "摩洛哥"],
-    capital: ["Rabat", "拉巴特"],
-    continent: "africa",
+    landscape: ["Atlas valleys, medinas and Sahara edges", "阿特拉斯山谷、老城与撒哈拉边缘"],
+    signature: ["Zellige tilework and mint tea", "泽利杰马赛克与薄荷茶"],
     feature: quizQuestion(
       "morocco-atlas",
       ["Which mountain system crosses Morocco?", "哪条山脉横贯摩洛哥？"],
@@ -480,8 +460,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Norway: {
     label: ["Norway", "挪威"],
-    capital: ["Oslo", "奥斯陆"],
-    continent: "europe",
+    landscape: ["Deep fjords and the Arctic coast", "幽深峡湾与北极海岸"],
+    signature: ["Viking heritage and stave churches", "维京遗产与木板教堂"],
     feature: quizQuestion(
       "norway-fjords",
       ["How were Norway's deep fjords mainly formed?", "挪威幽深的峡湾主要如何形成？"],
@@ -492,8 +472,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Pakistan: {
     label: ["Pakistan", "巴基斯坦"],
-    capital: ["Islamabad", "伊斯兰堡"],
-    continent: "asia",
+    landscape: ["Karakoram peaks and the Indus plain", "喀喇昆仑山峰与印度河平原"],
+    signature: ["Colourful truck art and woven textiles", "彩绘卡车艺术与织物"],
     feature: quizQuestion(
       "pakistan-indus",
       ["Which major river runs through Pakistan toward the Arabian Sea?", "哪条大河流经巴基斯坦并注入阿拉伯海？"],
@@ -504,8 +484,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Peru: {
     label: ["Peru", "秘鲁"],
-    capital: ["Lima", "利马"],
-    continent: "south-america",
+    landscape: ["Machu Picchu above the Andes", "安第斯山中的马丘比丘"],
+    signature: ["Woven textiles and ceviche", "编织物与酸橘汁腌鱼"],
     feature: quizQuestion(
       "peru-andes",
       ["Which mountain range crosses Peru from north to south?", "哪条山脉纵贯秘鲁南北？"],
@@ -516,8 +496,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Poland: {
     label: ["Poland", "波兰"],
-    capital: ["Warsaw", "华沙"],
-    continent: "europe",
+    landscape: ["Baltic shores and medieval old towns", "波罗的海岸与中世纪老城"],
+    signature: ["Pierogi and amber craftsmanship", "波兰饺子与琥珀工艺"],
     feature: quizQuestion(
       "poland-baltic",
       ["Which sea borders northern Poland?", "波兰北部濒临哪片海？"],
@@ -528,8 +508,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Portugal: {
     label: ["Portugal", "葡萄牙"],
-    capital: ["Lisbon", "里斯本"],
-    continent: "europe",
+    landscape: ["Atlantic cliffs and tiled city streets", "大西洋海崖与瓷砖街巷"],
+    signature: ["Azulejo tiles and fado music", "阿兹勒赫瓷砖与法多音乐"],
     feature: quizQuestion(
       "portugal-atlantic",
       ["Which ocean borders mainland Portugal to the west?", "葡萄牙本土西侧濒临哪片海洋？"],
@@ -540,8 +520,8 @@ const COUNTRY_QUIZ_SEEDS = {
   },
   Vietnam: {
     label: ["Vietnam", "越南"],
-    capital: ["Hanoi", "河内"],
-    continent: "asia",
+    landscape: ["Hạ Long limestone islands and rice terraces", "下龙湾石灰岩岛屿与水稻梯田"],
+    signature: ["Water puppetry and phở", "水上木偶戏与越南粉"],
     feature: quizQuestion(
       "vietnam-mekong",
       ["Which major river forms a broad delta in southern Vietnam?", "哪条大河在越南南部形成广阔三角洲？"],
@@ -568,55 +548,54 @@ function buildCountryQuizBank(): Readonly<Record<TierACountryName, QuizSet>> {
     const seed = COUNTRY_QUIZ_SEEDS[name];
     const slug = name.toLowerCase().replaceAll(/[^a-z]+/g, "-");
     const answerIndex = index % 3;
-    const capitalDistractors = [
+    const landscapeDistractors = [
       COUNTRY_QUIZ_SEEDS[
         TIER_A_COUNTRY_NAMES[(index + 7) % TIER_A_COUNTRY_NAMES.length]
-      ].capital,
+      ].landscape,
       COUNTRY_QUIZ_SEEDS[
         TIER_A_COUNTRY_NAMES[(index + 17) % TIER_A_COUNTRY_NAMES.length]
-      ].capital,
+      ].landscape,
     ];
-    const otherContinents = CONTINENT_KEYS.filter(
-      (continent) => continent !== seed.continent,
-    );
-    const continentDistractors = [
-      CONTINENT_LABELS[otherContinents[index % otherContinents.length]],
-      CONTINENT_LABELS[
-        otherContinents[(index + 2) % otherContinents.length]
-      ],
+    const signatureDistractors = [
+      COUNTRY_QUIZ_SEEDS[
+        TIER_A_COUNTRY_NAMES[(index + 11) % TIER_A_COUNTRY_NAMES.length]
+      ].signature,
+      COUNTRY_QUIZ_SEEDS[
+        TIER_A_COUNTRY_NAMES[(index + 23) % TIER_A_COUNTRY_NAMES.length]
+      ].signature,
     ];
     const questions = [
+      seed.feature,
       quizQuestion(
-        `${slug}-capital`,
+        `${slug}-landscape`,
         [
-          `Which city serves as a capital or national seat of government for ${seed.label[0]}?`,
-          `哪座城市是${seed.label[1]}的首都或中央政府所在地？`,
+          `Which landscape is most strongly associated with ${seed.label[0]}?`,
+          `以下哪种景观最能代表${seed.label[1]}？`,
         ],
-        insertCorrectOption(seed.capital, capitalDistractors, answerIndex),
+        insertCorrectOption(seed.landscape, landscapeDistractors, answerIndex),
         answerIndex,
         [
-          `${seed.capital[0]} serves as a capital or national seat of government for ${seed.label[0]}.`,
-          `${seed.capital[1]}是${seed.label[1]}的首都或中央政府所在地。`,
+          `${seed.landscape[0]} is a characteristic scene of ${seed.label[0]}.`,
+          `${seed.landscape[1]}是${seed.label[1]}具有代表性的景观。`,
         ],
       ),
       quizQuestion(
-        `${slug}-continent`,
+        `${slug}-signature`,
         [
-          `On which continent or continents is ${seed.label[0]} located?`,
-          `${seed.label[1]}位于哪个大洲？`,
+          `Which cultural or natural signature is closely associated with ${seed.label[0]}?`,
+          `以下哪项文化或自然标志与${seed.label[1]}关系最密切？`,
         ],
         insertCorrectOption(
-          CONTINENT_LABELS[seed.continent],
-          continentDistractors,
+          seed.signature,
+          signatureDistractors,
           (answerIndex + 1) % 3,
         ),
         (answerIndex + 1) % 3,
         [
-          `${seed.label[0]} is located in ${CONTINENT_LABELS[seed.continent][0]}.`,
-          `${seed.label[1]}位于${CONTINENT_LABELS[seed.continent][1]}。`,
+          `${seed.signature[0]} is closely associated with ${seed.label[0]}.`,
+          `${seed.signature[1]}是${seed.label[1]}具有辨识度的文化或自然标志。`,
         ],
       ),
-      seed.feature,
     ];
     bank[name] = {
       id: `country:v${QUIZ_BANK_VERSION}:${name}`,
@@ -1860,24 +1839,137 @@ const WORLD_QUIZ_POOL: readonly QuizSet[] = [
   ...Object.values(SPOT_QUIZZES),
 ];
 
+const WORLD_CHALLENGE_QUESTION_COUNT = 3;
+interface WorldChallengeSource {
+  key: string;
+  countryName: string;
+  quiz: QuizSet;
+}
+
+const WORLD_COUNTRY_CHALLENGE_SOURCES: readonly WorldChallengeSource[] =
+  TIER_A_COUNTRY_NAMES.map((countryName) => ({
+    key: `country-${slugify(countryName)}`,
+    countryName,
+    quiz: COUNTRY_QUIZZES[countryName],
+  }));
+const WORLD_LANDMARK_CHALLENGE_SOURCES: readonly WorldChallengeSource[] =
+  PHOTO_SPOTS.map((spot) => ({
+    key: `landmark-${spot.id}`,
+    countryName: spot.atlasCountryName,
+    quiz: SPOT_QUIZZES[spot.id],
+  }));
+const WORLD_CHALLENGE_SOURCES = interleaveWorldChallengeSources(
+  WORLD_COUNTRY_CHALLENGE_SOURCES,
+  WORLD_LANDMARK_CHALLENGE_SOURCES,
+);
+const WORLD_CHALLENGE_ROUNDS = buildWorldChallengeRounds();
+
 export function getAllQuizSets(): readonly QuizSet[] {
   return WORLD_QUIZ_POOL;
 }
 
 /**
  * Keeps the persistent challenge entry useful away from authored locations.
- * Unfinished sets are exhausted in a stable order so progress survives reloads;
- * once the whole bank is complete, the first set remains available for replay.
+ * Each round draws one question from three different countries. Rounds are
+ * stable so progress survives reloads; after all rounds are complete, the
+ * first mixed-country round remains available for replay.
  */
 export function getWorldQuiz(
   completedQuizIds: ReadonlySet<string>,
 ): QuizSet {
-  const unfinished = WORLD_QUIZ_POOL.find(
+  const unfinished = WORLD_CHALLENGE_ROUNDS.find(
     (quiz) => !completedQuizIds.has(quiz.id),
   );
-  const fallback = WORLD_QUIZ_POOL[0];
+  const fallback = WORLD_CHALLENGE_ROUNDS[0];
   if (!fallback) {
-    throw new Error("The world quiz pool must contain at least one quiz.");
+    throw new Error("The world challenge must contain at least one round.");
   }
   return unfinished ?? fallback;
+}
+
+function buildWorldChallengeRounds(): readonly QuizSet[] {
+  const availableCountries = new Set(
+    WORLD_CHALLENGE_SOURCES.map((source) => source.countryName),
+  );
+  if (availableCountries.size < WORLD_CHALLENGE_QUESTION_COUNT) {
+    throw new Error(
+      `World challenges require content from at least ${WORLD_CHALLENGE_QUESTION_COUNT} countries.`,
+    );
+  }
+
+  const remaining = [...WORLD_CHALLENGE_SOURCES];
+  const rounds: QuizSet[] = [];
+  while (remaining.length > 0) {
+    const sources: WorldChallengeSource[] = [];
+    const countryNames = new Set<string>();
+
+    while (
+      sources.length < WORLD_CHALLENGE_QUESTION_COUNT &&
+      remaining.length > 0
+    ) {
+      const sourceIndex = remaining.findIndex(
+        (source) => !countryNames.has(source.countryName),
+      );
+      if (sourceIndex < 0) {
+        break;
+      }
+      const [source] = remaining.splice(sourceIndex, 1);
+      sources.push(source);
+      countryNames.add(source.countryName);
+    }
+
+    for (const source of WORLD_CHALLENGE_SOURCES) {
+      if (sources.length >= WORLD_CHALLENGE_QUESTION_COUNT) {
+        break;
+      }
+      if (countryNames.has(source.countryName)) {
+        continue;
+      }
+      sources.push(source);
+      countryNames.add(source.countryName);
+    }
+
+    const roundIndex = rounds.length;
+    if (new Set(countryNames).size !== WORLD_CHALLENGE_QUESTION_COUNT) {
+      throw new Error(
+        `World challenge round ${roundIndex + 1} repeated a country.`,
+      );
+    }
+    const questions = sources.map((source, offset) =>
+      source.quiz.questions[
+        (roundIndex + offset) % source.quiz.questions.length
+      ],
+    );
+
+    rounds.push({
+      id: `world:v${QUIZ_BANK_VERSION}:${sources
+        .map((source) => source.key)
+        .join("+")}`,
+      questions,
+    });
+  }
+  return rounds;
+}
+
+function interleaveWorldChallengeSources(
+  countries: readonly WorldChallengeSource[],
+  landmarks: readonly WorldChallengeSource[],
+): readonly WorldChallengeSource[] {
+  const sources: WorldChallengeSource[] = [];
+  const maximumLength = Math.max(countries.length, landmarks.length);
+  for (let index = 0; index < maximumLength; index += 1) {
+    const country = countries[index];
+    const landmark = landmarks[index];
+    if (country) {
+      sources.push(country);
+    }
+    if (landmark) {
+      sources.push(landmark);
+    }
+  }
+  return sources;
+}
+
+function slugify(value: string): string {
+  return value.toLowerCase().replaceAll(/[^a-z]+/g, "-");
 }
