@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
@@ -10,6 +10,7 @@ if (platform !== "poki" && platform !== "crazygames") {
 const source = resolve(`dist-${platform}`);
 const exportsDirectory = resolve("exports");
 const archive = resolve(exportsDirectory, `pocket-planet-${platform}.zip`);
+const archiveEntries = readdirSync(source);
 
 mkdirSync(exportsDirectory, { recursive: true });
 rmSync(archive, { force: true });
@@ -18,16 +19,29 @@ const result =
   process.platform === "win32"
     ? spawnSync(
         "tar",
-        ["-a", "-c", "-f", archive, "-C", source, "."],
+        ["-a", "-c", "-f", archive, "-C", source, ...archiveEntries],
         { stdio: "inherit" },
       )
-    : spawnSync("zip", ["-q", "-r", archive, "."], {
+    : spawnSync("zip", ["-q", "-r", archive, ...archiveEntries], {
         cwd: source,
         stdio: "inherit",
       });
 
 if (result.status !== 0) {
   throw new Error(`Unable to create ${archive}`);
+}
+
+const listing =
+  process.platform === "win32"
+    ? spawnSync("tar", ["-tf", archive], { encoding: "utf8" })
+    : spawnSync("unzip", ["-Z1", archive], { encoding: "utf8" });
+
+if (
+  listing.status !== 0 ||
+  !listing.stdout.split(/\r?\n/).includes("index.html")
+) {
+  rmSync(archive, { force: true });
+  throw new Error(`Archive must contain index.html at its root: ${archive}`);
 }
 
 console.log(archive);
