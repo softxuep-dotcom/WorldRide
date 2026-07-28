@@ -38,6 +38,8 @@ export type GameEvent =
       firstCollection: boolean;
       /** True when arriving collected it, rather than a deliberate press. */
       automatic?: boolean;
+      /** True once this session has accumulated enough active driving time. */
+      arrivalQuizEligible?: boolean;
     }
   | {
       type: "specialty-discovered";
@@ -98,6 +100,7 @@ export class GameSimulation {
   private edgeCooldown = 0;
   private cruiseFlowActive = false;
   private cruiseFlowCueCooldown = 0;
+  private activeDrivingSeconds = 0;
 
   update(deltaSeconds: number, input: MovementInput): void {
     const dt = Math.min(deltaSeconds, 0.05);
@@ -208,6 +211,12 @@ export class GameSimulation {
     }
 
     const velocityLength = Math.hypot(this.state.velocity.x, this.state.velocity.z);
+    if (
+      inputLength > ACTIVE_DRIVING_INPUT_THRESHOLD &&
+      velocityLength > ACTIVE_DRIVING_SPEED_THRESHOLD
+    ) {
+      this.activeDrivingSeconds += dt;
+    }
     if (velocityLength > 0.12) {
       const targetHeading = Math.atan2(-this.state.velocity.x, -this.state.velocity.z);
       this.state.heading = dampAngle(this.state.heading, targetHeading, 1 - Math.exp(-10 * dt));
@@ -261,6 +270,9 @@ export class GameSimulation {
     this.state.modeTransition = 0;
     this.cruiseFlowActive = false;
     this.cruiseFlowCueCooldown = 0;
+    // The arrival quiz gate is session onboarding, not saved progression.
+    // Returning players get a short uninterrupted drive again after reloading.
+    this.activeDrivingSeconds = 0;
 
     this.state.visitedCountries = new Set(snapshot.visitedCountries);
     this.state.collectedPostcards = new Set(
@@ -376,6 +388,8 @@ export class GameSimulation {
         spot: nearest,
         firstCollection: true,
         automatic: true,
+        arrivalQuizEligible:
+          this.activeDrivingSeconds >= ARRIVAL_QUIZ_DRIVING_SECONDS,
       });
     }
   }
@@ -426,6 +440,10 @@ export class GameSimulation {
 const LANDMARK_INTERACT_RADIUS = 3.5;
 
 const SPECIALTY_DISCOVERY_RADIUS = 1.9;
+/** Delay route-triggered questions until the player has learned the drive. */
+const ARRIVAL_QUIZ_DRIVING_SECONDS = 25;
+const ACTIVE_DRIVING_INPUT_THRESHOLD = 0.1;
+const ACTIVE_DRIVING_SPEED_THRESHOLD = 0.65;
 /**
  * Cruise flow is the one driving skill the game has: hold a steady line and
  * the vehicle winds up, turn and it collapses. It shipped almost invisible —

@@ -1459,9 +1459,12 @@ export class GameUI {
   }
 
   private syncQuizOnboardingState(): void {
-    // Keep the primary challenge CTA visually active after onboarding too.
-    // The CSS still pauses it while disabled or when reduced motion is enabled.
-    this.elements.quizButton.classList.add("is-onboarding");
+    // Arrival questions are deliberately lightweight; keep inviting the player
+    // to try a full challenge until one of those flows has been completed.
+    this.elements.quizButton.classList.toggle(
+      "is-onboarding",
+      this.completedQuizzes.size === 0,
+    );
   }
 
   private getQuizQuestion(active: QuizSubject) {
@@ -1512,6 +1515,7 @@ export class GameUI {
           event.spot,
           event.firstCollection,
           event.automatic ?? false,
+          event.arrivalQuizEligible ?? false,
         );
         break;
       case "specialty-discovered":
@@ -1692,6 +1696,7 @@ export class GameUI {
     spot: PhotoSpotDefinition,
     firstCollection: boolean,
     automatic: boolean,
+    arrivalQuizEligible: boolean,
   ): void {
     if (spot.visitMode !== "reflection") {
       this.elements.flash.classList.remove("is-active");
@@ -1699,15 +1704,17 @@ export class GameUI {
       this.elements.flash.classList.add("is-active");
     }
 
-    // Arriving is the beat the whole loop hangs on, so it asks a question
-    // about the place instead of handing over a postcard silently. Ten-plus
-    // playtesters never once opened the challenge from its corner button;
-    // putting it on the route means the decision becomes "answer or skip"
-    // rather than "notice a button". Players who would rather not be asked can
-    // steer around the landmark: the marker glows about 2.5 seconds ahead at
-    // cruise speed, and dodging it costs roughly half a second.
-    if (automatic) {
+    // New players spawn directly on the Eiffel Tower, so automatic collection
+    // must remain a lightweight first win. Route questions only begin after
+    // enough active driving time has accumulated; before then the postcard
+    // animation plays without blocking the car.
+    if (automatic && arrivalQuizEligible) {
       void this.startArrivalQuiz(spot);
+      return;
+    }
+
+    if (automatic) {
+      this.revealPostcard(spot, "plain");
       return;
     }
 
@@ -1824,6 +1831,23 @@ export class GameUI {
     spot: PhotoSpotDefinition,
     stampKind: "gold" | "plain" = "plain",
   ): void {
+    const loadingScreen = document.getElementById("loading-screen");
+    const loadingParent = loadingScreen?.parentElement;
+    if (loadingScreen && loadingParent) {
+      // The spawn collection happens while bootstrap still owns the screen.
+      // Wait for the loading veil to be removed before creating the card so
+      // its entire animation is visible rather than expiring underneath it.
+      const observer = new MutationObserver(() => {
+        if (loadingScreen.isConnected) {
+          return;
+        }
+        observer.disconnect();
+        this.revealPostcard(spot, stampKind);
+      });
+      observer.observe(loadingParent, { childList: true });
+      return;
+    }
+
     const localized = localizePhotoSpot(spot);
     const card = document.createElement("div");
     card.className = "postcard-reveal";
