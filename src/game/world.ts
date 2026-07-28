@@ -80,6 +80,8 @@ type CreateRegionalSpecialtyStandee =
   typeof import("./regional-specialty-standees").createRegionalSpecialtyStandee;
 type UpdateRegionalSpecialtyStandeeOverview =
   typeof import("./regional-specialty-standees").updateRegionalSpecialtyStandeeOverview;
+type CreateOceanSurfaceMaterial =
+  typeof import("./ocean-life").createOceanSurfaceMaterial;
 
 export class WorldView {
   readonly root = new THREE.Group();
@@ -93,6 +95,7 @@ export class WorldView {
   private life?: WorldLife;
   private oceanLife?: OceanLife;
   private ocean?: THREE.Mesh;
+  private createOceanSurfaceMaterial?: CreateOceanSurfaceMaterial;
   private updateLandmarkStandeeOverview?: UpdateLandmarkStandeeOverview;
   private updateRegionalSpecialtyStandeeOverview?: UpdateRegionalSpecialtyStandeeOverview;
   private deferredLoad?: Promise<void>;
@@ -145,6 +148,7 @@ export class WorldView {
       landmarkModule.updateLandmarkStandeeOverview;
     this.updateRegionalSpecialtyStandeeOverview =
       specialtyModule.updateRegionalSpecialtyStandeeOverview;
+    this.createOceanSurfaceMaterial = oceanModule.createOceanSurfaceMaterial;
     this.addCountries(
       landmarkModule.createLandmarkStandee,
       specialtyModule.createRegionalSpecialtyStandee,
@@ -170,6 +174,23 @@ export class WorldView {
     }
     onProgress("texture");
     await loadWorldTerrainTexture();
+  }
+
+  /**
+   * Mobile browsers may discard a CanvasTexture's GPU contents while the page
+   * is in the background without losing the rest of the WebGL scene. Rebuild
+   * only the generated ocean texture when play resumes.
+   */
+  refreshOceanSurface(): void {
+    if (!this.ocean || !this.createOceanSurfaceMaterial) {
+      return;
+    }
+    const previousMaterial = this.ocean.material;
+    this.ocean.material = this.createOceanSurfaceMaterial();
+    if (previousMaterial instanceof THREE.MeshStandardMaterial) {
+      previousMaterial.map?.dispose();
+      previousMaterial.dispose();
+    }
   }
 
   update(

@@ -2117,6 +2117,17 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
   pointer-events: none;
 }
 
+/*
+ * Poki adds a roughly 64px square back/control button over the top-left of
+ * mobile games. Reserve only the first HUD cell for it; the compass row can
+ * still use the full width once it is below the platform control.
+ */
+@media (pointer: coarse), (max-width: 760px) {
+  html[data-game-platform="poki"] .travel-hud .country-reveal {
+    margin-left: 64px;
+  }
+}
+
 .travel-hud .country-reveal {
   position: static;
   grid-column: 1;

@@ -38,6 +38,7 @@ export class PocketEarthGame {
   private compassMovementSeconds = 0;
   private platformSuspended = false;
   private contextLost = false;
+  private backgrounded = false;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -85,6 +86,7 @@ export class PocketEarthGame {
     canvas.addEventListener("webglcontextlost", this.onContextLost);
     canvas.addEventListener("webglcontextrestored", this.onContextRestored);
     window.addEventListener("pagehide", this.onPageHide);
+    window.addEventListener("pageshow", this.onPageShow);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
     window.addEventListener("pointerdown", this.onFirstGesture);
     window.addEventListener("keydown", this.onFirstGesture);
@@ -505,21 +507,44 @@ export class PocketEarthGame {
   }
 
   private readonly onPageHide = (): void => {
+    this.backgrounded = true;
     this.persist(true);
     this.saveStore.flush();
+    this.audio.suspend();
+    this.stop();
+  };
+
+  private readonly onPageShow = (): void => {
+    this.resumeFromBackground();
   };
 
   private readonly onVisibilityChange = (): void => {
     if (document.visibilityState === "hidden") {
+      this.backgrounded = true;
       this.persist(true);
       this.saveStore.flush();
       this.audio.suspend();
       this.stop();
     } else {
-      this.audio.resume();
-      this.start();
+      this.resumeFromBackground();
     }
   };
+
+  private resumeFromBackground(): void {
+    if (
+      document.visibilityState === "hidden" ||
+      this.contextLost ||
+      this.platformSuspended
+    ) {
+      return;
+    }
+    if (this.backgrounded) {
+      this.world.refreshOceanSurface();
+      this.backgrounded = false;
+    }
+    this.audio.resume();
+    this.start();
+  }
 
   private readonly onContextLost = (event: Event): void => {
     event.preventDefault();
@@ -530,6 +555,7 @@ export class PocketEarthGame {
 
   private readonly onContextRestored = (): void => {
     this.contextLost = false;
+    this.world.refreshOceanSurface();
     this.ui.showToast(t("toast.contextRestored"));
     this.start();
   };
