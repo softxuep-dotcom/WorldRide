@@ -2903,3 +2903,56 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
     bottom: calc(max(14px, env(safe-area-inset-bottom)) + 104px);
   }
 }
+
+/* ---------- Cruise flow veil (speed readout) ---------- */
+
+/*
+ * Driven from --cruise (0..1). Rim streaks plus a soft vignette read as wind
+ * without touching the 3D scene, which keeps the cost to one composited layer
+ * and works the same on a low-end phone.
+ */
+.cruise-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 220ms ease;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.5) 0 2px,
+      transparent 2px 26px
+    ),
+    radial-gradient(
+      ellipse 62% 78% at 50% 50%,
+      transparent 55%,
+      rgba(120, 196, 220, 0.34) 100%
+    );
+  -webkit-mask-image: radial-gradient(
+    ellipse 58% 72% at 50% 50%,
+    transparent 46%,
+    #000 92%
+  );
+  mask-image: radial-gradient(
+    ellipse 58% 72% at 50% 50%,
+    transparent 46%,
+    #000 92%
+  );
+}
+
+/* The veil's opacity is written inline each frame, so the overview state has
+   to override it explicitly. */
+.is-world-overview .cruise-veil {
+  opacity: 0 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cruise-veil {
+    background: radial-gradient(
+      ellipse 62% 78% at 50% 50%,
+      transparent 60%,
+      rgba(120, 196, 220, 0.28) 100%
+    );
+  }
+}
