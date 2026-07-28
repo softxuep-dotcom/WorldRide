@@ -15,6 +15,7 @@ const QUIZ_AD_COOLDOWN_MS = 3 * 60 * 1000;
 
 export class GamePlatform {
   readonly id: GamePlatformId;
+  private loadingFinished = false;
   private gameplayActive = false;
   private adPending = false;
   private gameplayStartedAt?: number;
@@ -32,8 +33,18 @@ export class GamePlatform {
     this.adapter.loadingStart();
   }
 
-  async beginGameplay(): Promise<void> {
+  finishLoading(): void {
+    if (this.loadingFinished) {
+      return;
+    }
+    this.loadingFinished = true;
     this.adapter.loadingFinished();
+  }
+
+  beginGameplay(): void {
+    if (!this.loadingFinished || this.gameplayActive) {
+      return;
+    }
     this.gameplayStartedAt = performance.now();
     this.gameplayActive = true;
     this.adapter.gameplayStart();

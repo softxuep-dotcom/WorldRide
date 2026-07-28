@@ -9,7 +9,11 @@ if (platform !== "poki" && platform !== "crazygames") {
 
 const source = resolve(`dist-${platform}`);
 const exportsDirectory = resolve("exports");
-const archive = resolve(exportsDirectory, `pocket-planet-${platform}.zip`);
+const timestamp = formatDateHour(new Date());
+const archive = resolve(
+  exportsDirectory,
+  `pocket-planet-${platform}-${timestamp}.zip`,
+);
 const archiveEntries = readdirSync(source);
 
 mkdirSync(exportsDirectory, { recursive: true });
@@ -45,3 +49,14 @@ if (
 }
 
 console.log(archive);
+
+function formatDateHour(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    "-",
+    pad(date.getHours()),
+  ].join("");
+}

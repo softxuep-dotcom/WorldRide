@@ -104,10 +104,16 @@ function parseSnapshot(raw: string): SaveSnapshot | undefined {
 }
 
 export class SaveStore {
-  private readonly storage = probeStorage();
+  private readonly storage: Storage | undefined;
   private lastWriteAt = 0;
   private pendingSnapshot?: SaveSnapshot;
   private flushTimer?: number;
+  private recordPresent = false;
+  private writesSuspended = false;
+
+  constructor() {
+    this.storage = probeStorage();
+  }
 
   get available(): boolean {
     return this.storage !== undefined;
@@ -124,8 +130,10 @@ export class SaveStore {
       return undefined;
     }
     if (!raw) {
+      this.recordPresent = false;
       return undefined;
     }
+    this.recordPresent = true;
 
     const snapshot = parseSnapshot(raw);
     if (!snapshot) {
@@ -142,7 +150,7 @@ export class SaveStore {
    * write to storage every frame.
    */
   save(snapshot: Omit<SaveSnapshot, "version" | "savedAt">, immediate = false): void {
-    if (!this.storage) {
+    if (!this.canWrite()) {
       return;
     }
 
@@ -176,32 +184,70 @@ export class SaveStore {
       window.clearTimeout(this.flushTimer);
       this.flushTimer = undefined;
     }
+    if (!this.canWrite()) {
+      this.pendingSnapshot = undefined;
+      return;
+    }
     if (this.pendingSnapshot) {
       this.writeNow(this.pendingSnapshot);
     }
   }
 
   clear(): void {
-    if (!this.storage) {
-      return;
+    if (this.storage) {
+      try {
+        this.storage.removeItem(STORAGE_KEY);
+      } catch {
+        // Nothing further to do; the game keeps running without a save.
+      }
     }
-    try {
-      this.storage.removeItem(STORAGE_KEY);
-    } catch {
-      // Nothing further to do; the game keeps running without a save.
-    }
+    this.suspendWrites();
   }
 
   private writeNow(record: SaveSnapshot): void {
-    if (!this.storage) {
+    const storage = this.storage;
+    if (!storage || !this.canWrite()) {
       return;
     }
     try {
-      this.storage.setItem(STORAGE_KEY, JSON.stringify(record));
+      storage.setItem(STORAGE_KEY, JSON.stringify(record));
       this.lastWriteAt = Date.now();
       this.pendingSnapshot = undefined;
+      this.recordPresent = true;
     } catch {
       // Quota exceeded or storage revoked mid-session: keep playing unsaved.
+    }
+  }
+
+  private canWrite(): boolean {
+    const storage = this.storage;
+    if (!storage || this.writesSuspended) {
+      return false;
+    }
+    if (!this.recordPresent) {
+      return true;
+    }
+    try {
+      if (storage.getItem(STORAGE_KEY) !== null) {
+        return true;
+      }
+    } catch {
+      return false;
+    }
+
+    // Poki's developer toolbar clears storage outside the game's own reset
+    // flow. Do not let routine or pagehide saves recreate that deleted record.
+    this.suspendWrites();
+    return false;
+  }
+
+  private suspendWrites(): void {
+    this.writesSuspended = true;
+    this.recordPresent = false;
+    this.pendingSnapshot = undefined;
+    if (this.flushTimer !== undefined) {
+      window.clearTimeout(this.flushTimer);
+      this.flushTimer = undefined;
     }
   }
 }

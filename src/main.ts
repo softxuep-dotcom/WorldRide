@@ -97,8 +97,9 @@ async function bootstrap(): Promise<void> {
 
   game.renderInitialFrame();
   loading.update(0.86, t("loading.ready"));
-  await platform.beginGameplay();
+  platform.finishLoading();
   game.start();
+  beginGameplayOnFirstInput(() => platform.beginGameplay());
   document.documentElement.dataset.gameReady = "true";
   loading.complete();
 
@@ -120,6 +121,23 @@ async function bootstrap(): Promise<void> {
     getLocale,
     setLocale,
   };
+}
+
+function beginGameplayOnFirstInput(beginGameplay: () => void): void {
+  const onFirstInput = (event: PointerEvent | KeyboardEvent): void => {
+    if (
+      (event instanceof PointerEvent && !event.isPrimary) ||
+      (event instanceof KeyboardEvent && event.repeat)
+    ) {
+      return;
+    }
+    window.removeEventListener("pointerdown", onFirstInput);
+    window.removeEventListener("keydown", onFirstInput);
+    beginGameplay();
+  };
+
+  window.addEventListener("pointerdown", onFirstInput);
+  window.addEventListener("keydown", onFirstInput);
 }
 
 function createLoadingScreen(): {

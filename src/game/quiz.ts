@@ -37,8 +37,26 @@ export interface QuizSet {
 }
 
 const FALLBACK_LOCALE = "en";
-const QUIZ_BANK_VERSION = 5;
-const SPOT_QUIZ_BANK_VERSION = 5;
+const QUIZ_BANK_VERSION = 6;
+const SPOT_QUIZ_BANK_VERSION = 6;
+
+const COUNTRY_ANSWER_PATTERNS = [
+  [0, 2, 1, 0, 1],
+  [1, 0, 2, 1, 2],
+  [2, 1, 0, 2, 0],
+  [1, 2, 0, 0, 1],
+  [2, 0, 1, 1, 2],
+  [0, 1, 2, 2, 0],
+] as const;
+
+const LANDMARK_ANSWER_PATTERNS = [
+  [0, 1, 2],
+  [1, 2, 0],
+  [2, 0, 1],
+  [0, 2, 1],
+  [2, 1, 0],
+  [1, 0, 2],
+] as const;
 
 export function localizeText(text: LocalizedText, locale: string): string {
   const fallback = text[FALLBACK_LOCALE] ?? Object.values(text)[0] ?? "";
@@ -612,7 +630,10 @@ function buildCountryQuizBank(): Readonly<Record<TierACountryName, QuizSet>> {
     ];
     bank[name] = {
       id: `country:v${QUIZ_BANK_VERSION}:${name}`,
-      questions,
+      questions: rebalanceAnswerPositions(
+        questions,
+        COUNTRY_ANSWER_PATTERNS[index % COUNTRY_ANSWER_PATTERNS.length],
+      ),
     };
   });
   return bank;
@@ -643,6 +664,33 @@ function quizQuestion(
   };
 }
 
+function rebalanceAnswerPositions(
+  questions: readonly QuizQuestion[],
+  targetPositions: readonly number[],
+): readonly QuizQuestion[] {
+  if (questions.length !== targetPositions.length) {
+    throw new Error(
+      `Answer pattern has ${targetPositions.length} positions for ${questions.length} questions.`,
+    );
+  }
+  return questions.map((question, index) => {
+    const targetIndex = targetPositions[index];
+    if (question.answerIndex === targetIndex) {
+      return question;
+    }
+    const correct = question.options[question.answerIndex];
+    const options = question.options.filter(
+      (_option, optionIndex) => optionIndex !== question.answerIndex,
+    );
+    options.splice(targetIndex, 0, correct);
+    return {
+      ...question,
+      options,
+      answerIndex: targetIndex,
+    };
+  });
+}
+
 const spotQuestion = quizQuestion;
 
 function spotQuiz(
@@ -669,9 +717,15 @@ function spotQuiz(
     ...question,
     prompt: bilingual(corePrompts[index]),
   }));
+  const spotIndex = PHOTO_SPOTS.findIndex((candidate) => candidate.id === id);
   return {
     id: `spot:v${SPOT_QUIZ_BANK_VERSION}:${id}`,
-    questions: [...revisedCoreQuestions, thirdQuestion],
+    questions: rebalanceAnswerPositions(
+      [...revisedCoreQuestions, thirdQuestion],
+      LANDMARK_ANSWER_PATTERNS[
+        spotIndex % LANDMARK_ANSWER_PATTERNS.length
+      ],
+    ),
   };
 }
 
@@ -1837,7 +1891,7 @@ const WORLD_QUIZ_POOL: readonly QuizSet[] = [
   ...Object.values(SPOT_QUIZZES),
 ];
 
-const WORLD_CHALLENGE_VERSION = 6;
+const WORLD_CHALLENGE_VERSION = 7;
 interface WorldChallengeSource {
   countryName: string;
   quiz: QuizSet;
