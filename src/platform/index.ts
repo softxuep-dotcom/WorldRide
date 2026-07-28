@@ -10,16 +10,15 @@ import { WebPlatformAdapter } from "./web";
 
 export type { GamePlatformId } from "./types";
 
-const FIRST_QUIZ_AD_DELAY_MS = 2 * 60 * 1000;
-const QUIZ_AD_COOLDOWN_MS = 3 * 60 * 1000;
+type GameplayPauseReason = "surface" | "visibility" | "page" | "context";
 
 export class GamePlatform {
   readonly id: GamePlatformId;
   private loadingFinished = false;
+  private gameplayRequested = false;
   private gameplayActive = false;
   private adPending = false;
-  private gameplayStartedAt?: number;
-  private lastQuizCommercialAt?: number;
+  private readonly gameplayPauseReasons = new Set<GameplayPauseReason>();
 
   constructor(
     private readonly adapter: PlatformAdapter,
@@ -42,12 +41,20 @@ export class GamePlatform {
   }
 
   beginGameplay(): void {
-    if (!this.loadingFinished || this.gameplayActive) {
+    if (!this.loadingFinished || this.gameplayRequested) {
       return;
     }
-    this.gameplayStartedAt = performance.now();
-    this.gameplayActive = true;
-    this.adapter.gameplayStart();
+    this.gameplayRequested = true;
+    this.syncGameplayState();
+  }
+
+  setGameplayPaused(reason: GameplayPauseReason, paused: boolean): void {
+    if (paused) {
+      this.gameplayPauseReasons.add(reason);
+    } else {
+      this.gameplayPauseReasons.delete(reason);
+    }
+    this.syncGameplayState();
   }
 
   async commercialBreak(): Promise<void> {
@@ -55,23 +62,7 @@ export class GamePlatform {
   }
 
   async quizCommercialBreak(): Promise<boolean> {
-    if (this.gameplayStartedAt === undefined) {
-      return false;
-    }
-    const now = performance.now();
-    const earliestAt =
-      this.lastQuizCommercialAt === undefined
-        ? this.gameplayStartedAt + FIRST_QUIZ_AD_DELAY_MS
-        : this.lastQuizCommercialAt + QUIZ_AD_COOLDOWN_MS;
-    if (now < earliestAt) {
-      return false;
-    }
-
-    const shown = await this.runAd("commercial");
-    if (shown) {
-      this.lastQuizCommercialAt = performance.now();
-    }
-    return shown;
+    return this.runAd("commercial");
   }
 
   async rewardedBreak(): Promise<boolean> {
@@ -83,11 +74,7 @@ export class GamePlatform {
       return false;
     }
     this.adPending = true;
-    const resumeGameplay = this.gameplayActive;
-    if (resumeGameplay) {
-      this.gameplayActive = false;
-      this.adapter.gameplayStop();
-    }
+    this.syncGameplayState();
 
     let paused = false;
     const pause = () => {
@@ -104,11 +91,25 @@ export class GamePlatform {
       if (paused) {
         this.hooks.resume();
       }
-      if (resumeGameplay) {
-        this.gameplayActive = true;
-        this.adapter.gameplayStart();
-      }
       this.adPending = false;
+      this.syncGameplayState();
+    }
+  }
+
+  private syncGameplayState(): void {
+    const shouldBeActive =
+      this.loadingFinished &&
+      this.gameplayRequested &&
+      !this.adPending &&
+      this.gameplayPauseReasons.size === 0;
+    if (shouldBeActive === this.gameplayActive) {
+      return;
+    }
+    this.gameplayActive = shouldBeActive;
+    if (shouldBeActive) {
+      this.adapter.gameplayStart();
+    } else {
+      this.adapter.gameplayStop();
     }
   }
 }

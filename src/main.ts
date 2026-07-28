@@ -60,7 +60,9 @@ async function bootstrap(): Promise<void> {
     canvas,
     () => platform.quizCommercialBreak(),
     platform.id === "web" ? undefined : () => platform.rewardedBreak(),
+    (paused) => platform.setGameplayPaused("surface", paused),
   );
+  bindPlatformLifecycle(platform, canvas);
 
   const requestedStart = pageParams.get("start");
   const requestedLongitude = Number(pageParams.get("longitude"));
@@ -136,6 +138,31 @@ function beginGameplayOnFirstInput(beginGameplay: () => void): void {
 
   window.addEventListener("pointerdown", onFirstInput);
   window.addEventListener("keydown", onFirstInput);
+}
+
+function bindPlatformLifecycle(
+  platform: ReturnType<typeof createGamePlatform>,
+  canvas: HTMLCanvasElement,
+): void {
+  const syncVisibility = () =>
+    platform.setGameplayPaused(
+      "visibility",
+      document.visibilityState === "hidden",
+    );
+  document.addEventListener("visibilitychange", syncVisibility);
+  window.addEventListener("pagehide", () =>
+    platform.setGameplayPaused("page", true),
+  );
+  window.addEventListener("pageshow", () =>
+    platform.setGameplayPaused("page", false),
+  );
+  canvas.addEventListener("webglcontextlost", () =>
+    platform.setGameplayPaused("context", true),
+  );
+  canvas.addEventListener("webglcontextrestored", () =>
+    platform.setGameplayPaused("context", false),
+  );
+  syncVisibility();
 }
 
 function createLoadingScreen(): {

@@ -2703,6 +2703,155 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
   }
 }
 
+/*
+ * Phones in landscape have desktop-like width but very little usable height,
+ * especially while the browser toolbar is visible. Keep both HUD clusters to
+ * one compact row and move the action dock into a corner so the world remains
+ * the dominant surface.
+ */
+@media (orientation: landscape) and (max-height: 540px) {
+  .travel-hud {
+    top: max(6px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    left: max(8px, env(safe-area-inset-left));
+    grid-template-columns: minmax(156px, 240px) minmax(156px, 220px) 42px;
+    grid-template-rows: 42px;
+    gap: 6px;
+    align-items: stretch;
+    justify-content: space-between;
+  }
+
+  .travel-hud .country-reveal {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .travel-hud .travel-info {
+    min-height: 42px;
+    height: 42px;
+    padding: 5px 9px 6px;
+    border-radius: 14px;
+  }
+
+  .travel-hud .country-reveal strong {
+    font-size: 14px;
+  }
+
+  .travel-hud .travel-info__kicker {
+    min-height: 10px;
+    font-size: 8px;
+  }
+
+  .travel-hud .travel-info__intro {
+    display: none;
+  }
+
+  .travel-hud .mini-map {
+    grid-column: 3;
+    grid-row: 1;
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+  }
+
+  .travel-hud .mini-map__icon {
+    font-size: 19px;
+  }
+
+  .travel-hud .compass-dock {
+    grid-column: 2;
+    grid-row: 1;
+    align-items: stretch;
+  }
+
+  .travel-hud .compass {
+    width: 100%;
+    min-height: 42px;
+    padding: 4px 9px 4px 5px;
+    border-radius: 14px;
+  }
+
+  .travel-hud .compass__rose {
+    width: 28px;
+    height: 28px;
+  }
+
+  .travel-hud .compass__target {
+    font-size: 12px;
+  }
+
+  .feedback-zone {
+    right: max(8px, env(safe-area-inset-right));
+    bottom: calc(max(8px, env(safe-area-inset-bottom)) + 54px);
+    left: auto;
+    width: min(300px, calc(100vw - 16px));
+  }
+
+  .action-dock {
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: auto;
+    grid-template-columns: 46px minmax(0, 1fr) 46px;
+    width: min(300px, calc(100vw - 16px));
+    height: 46px;
+    padding: 3px;
+    border-radius: 16px;
+  }
+
+  .action-dock__button,
+  .action-dock .passport-button,
+  .action-dock .quiz-button {
+    border-radius: 12px;
+  }
+
+  .action-dock__button--compact {
+    gap: 1px;
+    font-size: 8px;
+  }
+
+  .action-dock__icon {
+    font-size: 16px;
+  }
+
+  .action-dock .quiz-button {
+    gap: 5px;
+    padding-inline: 8px;
+  }
+
+  .action-dock .quiz-button small {
+    font-size: 8px;
+  }
+
+  .action-dock .quiz-button strong {
+    font-size: 11px;
+  }
+
+  .wishlist {
+    position: absolute;
+    top: 50px;
+    right: 50px;
+    bottom: auto;
+    left: auto;
+    width: min(250px, calc(100vw - 24px));
+    max-height: min(58dvh, 250px);
+  }
+
+  .passport-panel {
+    right: max(8px, env(safe-area-inset-right));
+    bottom: calc(max(8px, env(safe-area-inset-bottom)) + 54px);
+    left: auto;
+    width: min(320px, calc(100vw - 24px));
+    max-height: min(76dvh, 320px);
+    padding: 14px;
+    border-radius: 20px;
+    transform-origin: bottom right;
+  }
+
+  .postcard-reveals {
+    bottom: calc(max(8px, env(safe-area-inset-bottom)) + 62px);
+  }
+}
+
 /* ---------- Travel car paints (collection payoff) ---------- */
 
 .garage-panel {

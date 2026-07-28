@@ -44,6 +44,7 @@ export class PocketEarthGame {
     canvas: HTMLCanvasElement,
     onCommercialBreak: () => Promise<boolean> = async () => false,
     onRewardedBreak?: () => Promise<boolean>,
+    onGameplayPauseChange: (paused: boolean) => void = () => {},
   ) {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -72,6 +73,7 @@ export class PocketEarthGame {
       () => this.persist(true),
       onCommercialBreak,
       onRewardedBreak,
+      onGameplayPauseChange,
     );
 
     this.camera.near = 0.1;

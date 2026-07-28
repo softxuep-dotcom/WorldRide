@@ -211,6 +211,9 @@ export class GameUI {
   private readonly onProgressionChanged: () => void;
   private readonly onCommercialBreak: () => Promise<boolean>;
   private readonly onRewardedBreak?: () => Promise<boolean>;
+  private readonly onGameplayPauseChange: (paused: boolean) => void;
+  private gameplayPaused = false;
+  private gameplayPauseSyncQueued = false;
   private rewardPending = false;
   private trip: PhotoSpotId[] = [];
   private completedTrips = 0;
@@ -232,12 +235,14 @@ export class GameUI {
     onProgressionChanged: () => void = () => {},
     onCommercialBreak: () => Promise<boolean> = async () => false,
     onRewardedBreak?: () => Promise<boolean>,
+    onGameplayPauseChange: (paused: boolean) => void = () => {},
   ) {
     this.onCelebrate = onCelebrate;
     this.onPaintChange = onPaintChange;
     this.onProgressionChanged = onProgressionChanged;
     this.onCommercialBreak = onCommercialBreak;
     this.onRewardedBreak = onRewardedBreak;
+    this.onGameplayPauseChange = onGameplayPauseChange;
     this.elements = {
       countryReveal: requireElement("country-reveal"),
       countryKicker: requireElement("context-kicker"),
@@ -1454,10 +1459,9 @@ export class GameUI {
   }
 
   private syncQuizOnboardingState(): void {
-    this.elements.quizButton.classList.toggle(
-      "is-onboarding",
-      this.completedQuizzes.size === 0,
-    );
+    // Keep the primary challenge CTA visually active after onboarding too.
+    // The CSS still pauses it while disabled or when reduced motion is enabled.
+    this.elements.quizButton.classList.add("is-onboarding");
   }
 
   private getQuizQuestion(active: QuizSubject) {
@@ -1557,6 +1561,7 @@ export class GameUI {
       this.currentCountry,
       this.currentNearestPhotoSpot,
     );
+    this.syncSurfaceState();
   }
 
   isInputBlocked(): boolean {
@@ -1587,6 +1592,19 @@ export class GameUI {
       "has-secondary-surface",
       this.wishlistOpen || this.settingsOpen,
     );
+    if (this.gameplayPauseSyncQueued) {
+      return;
+    }
+    this.gameplayPauseSyncQueued = true;
+    queueMicrotask(() => {
+      this.gameplayPauseSyncQueued = false;
+      const paused = this.worldOverviewActive || this.isInputBlocked();
+      if (paused === this.gameplayPaused) {
+        return;
+      }
+      this.gameplayPaused = paused;
+      this.onGameplayPauseChange(paused);
+    });
   }
 
   private updateTravelInfo(
