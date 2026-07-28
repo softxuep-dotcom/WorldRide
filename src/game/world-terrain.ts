@@ -7,7 +7,7 @@ import {
 
 type Rgb = readonly [red: number, green: number, blue: number];
 
-const WORLD_TERRAIN_TEXTURE_SIZE = 1536;
+const WORLD_TERRAIN_TEXTURE_SIZE = 1024;
 let worldTerrainMaterial: THREE.MeshStandardMaterial | undefined;
 let worldTerrainTexturePromise: Promise<void> | undefined;
 
@@ -31,7 +31,7 @@ export function loadWorldTerrainTexture(): Promise<void> {
   }
 
   const material = getWorldTerrainMaterial();
-  const url = `${import.meta.env.BASE_URL}assets/generated/world-terrain.png`;
+  const url = `${import.meta.env.BASE_URL}assets/generated/world-terrain.webp`;
   worldTerrainTexturePromise = new Promise((resolve) => {
     new THREE.TextureLoader().load(
       url,
