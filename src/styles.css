@@ -2918,9 +2918,9 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
 /* ---------- Cruise flow veil (speed readout) ---------- */
 
 /*
- * Driven from --cruise (0..1). Rim streaks plus a soft vignette read as wind
- * without touching the 3D scene, which keeps the cost to one composited layer
- * and works the same on a low-end phone.
+ * Driven from cruiseFlow (0..1). A soft rim vignette reads as wind without
+ * drawing distracting speed lines over the playfield. Keeping it outside the
+ * 3D scene limits the cost to one composited layer on low-end phones.
  */
 .cruise-veil {
   position: absolute;
@@ -2929,17 +2929,11 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
   pointer-events: none;
   opacity: 0;
   transition: opacity 220ms ease;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.5) 0 2px,
-      transparent 2px 26px
-    ),
-    radial-gradient(
-      ellipse 62% 78% at 50% 50%,
-      transparent 55%,
-      rgba(120, 196, 220, 0.34) 100%
-    );
+  background: radial-gradient(
+    ellipse 62% 78% at 50% 50%,
+    transparent 55%,
+    rgba(120, 196, 220, 0.34) 100%
+  );
   -webkit-mask-image: radial-gradient(
     ellipse 58% 72% at 50% 50%,
     transparent 46%,
