@@ -41,3 +41,6 @@ Desktop.ini
 
 # Source art intermediates (large; final assets live in public/)
 assets-source/
+
+# Claude Code local files (worktrees, preview config)
+.claude/
