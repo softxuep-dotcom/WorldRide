@@ -76,6 +76,14 @@ const messages = {
   "quiz.world": "Culture du monde",
   "quiz.challenge": "Défi",
   "quiz.start": "Commencer le quiz",
+
+  "quiz.arrivalSkip": "Passer",
+
+  "quiz.arrivalContinue": "Reprendre la route",
+
+  "quiz.arrivalGold": "★ Cachet d'or",
+
+  "quiz.arrivalStreak": "★ {count} d'affilée",
   "quiz.close": "Fermer le défi",
   "quiz.leave": "Quitter",
   "quiz.next": "Question suivante",

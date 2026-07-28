@@ -76,6 +76,14 @@ const messages = {
   "quiz.world": "Conhecimentos do mundo",
   "quiz.challenge": "Desafio",
   "quiz.start": "Iniciar desafio",
+
+  "quiz.arrivalSkip": "Pular",
+
+  "quiz.arrivalContinue": "Voltar à estrada",
+
+  "quiz.arrivalGold": "★ Selo de ouro",
+
+  "quiz.arrivalStreak": "★ {count} seguidas",
   "quiz.close": "Fechar o desafio",
   "quiz.leave": "Sair",
   "quiz.next": "Próxima pergunta",
