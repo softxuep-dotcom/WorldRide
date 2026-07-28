@@ -12,6 +12,29 @@
   </head>
   <body>
     <main id="game-shell">
+      <section
+        id="loading-screen"
+        class="loading-screen"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <div class="loading-screen__planet" aria-hidden="true">
+          <span>🌍</span>
+          <i></i>
+        </div>
+        <strong class="loading-screen__title">Pocket Planet</strong>
+        <p
+          id="loading-label"
+          class="loading-screen__label"
+          data-i18n="loading.preparing"
+        >
+          Preparing your trip…
+        </p>
+        <div class="loading-screen__track" aria-hidden="true">
+          <span id="loading-progress-bar"></span>
+        </div>
+      </section>
       <canvas
         id="game-canvas"
         aria-label="Pocket Planet 3D game view"

@@ -25,13 +25,7 @@ import {
   setLocale,
   t,
 } from "../i18n";
-import {
-  getCountryQuiz,
-  getSpotQuiz,
-  getWorldQuiz,
-  localizeText,
-  type QuizSet,
-} from "./quiz";
+import type { QuizSet } from "./quiz";
 import {
   REGIONAL_SPECIALTIES,
   type RegionalSpecialtyDefinition,
@@ -40,7 +34,7 @@ import { getSpecialtyCopy } from "./regional-specialty-copy";
 import {
   hasLandmarkIllustration,
   landmarkIllustrationUrl,
-} from "./landmark-standees";
+} from "./landmark-assets";
 import {
   DEFAULT_PAINT_ID,
   VEHICLE_PAINTS,
@@ -57,6 +51,8 @@ interface QuizSubject {
   quiz: QuizSet;
   label: string;
 }
+
+type QuizModule = typeof import("./quiz");
 
 interface UIElements {
   countryReveal: HTMLElement;
@@ -177,6 +173,9 @@ export class GameUI {
   private quizIndex = 0;
   private quizCorrect = 0;
   private quizAnswered = false;
+  private quizQuestionsAnswered = 0;
+  private quizFlowCompleted = false;
+  private quizFinishTimer?: number;
   private readonly completedQuizzes = new Set<string>();
   private latestState?: GameState;
   private selectedTargetId?: PhotoSpotId;
@@ -205,6 +204,11 @@ export class GameUI {
   private equippedPaint = DEFAULT_PAINT_ID;
   private progressionReady = false;
   private tripStructureSig?: string;
+  private quizModule?: QuizModule;
+  private quizLoad?: Promise<void>;
+  private deferredLoad?: Promise<void>;
+  private miniMapCountriesBuilt = false;
+  private passportBuilt = false;
 
   constructor(
     onInteract: () => void,
@@ -294,7 +298,6 @@ export class GameUI {
     const { halo, dot } = this.buildMiniMap();
     this.playerHalo = halo;
     this.playerDot = dot;
-    this.buildPassport();
 
     this.elements.interactButton.addEventListener("click", () => {
       if (this.currentNearestPhotoSpot) {
@@ -323,7 +326,9 @@ export class GameUI {
     this.elements.landmarkDetailConfirm.addEventListener("click", () =>
       this.toggleLandmarkDetail(false),
     );
-    this.elements.quizButton.addEventListener("click", () => this.openQuiz());
+    this.elements.quizButton.addEventListener("click", () => {
+      void this.openQuiz();
+    });
     this.elements.quizBackdrop.addEventListener("click", () => this.closeQuiz());
     this.elements.quizClose.addEventListener("click", () => this.closeQuiz());
     this.elements.quizSkip.addEventListener("click", () => this.closeQuiz());
@@ -368,6 +373,18 @@ export class GameUI {
 
     window.setTimeout(() => this.elements.controlsHint.classList.add("is-faded"), 7000);
     onLocaleChange(() => this.refreshLocale());
+  }
+
+  loadDeferredContent(): Promise<void> {
+    this.deferredLoad ??= this.loadDeferredContentOnce();
+    return this.deferredLoad;
+  }
+
+  private async loadDeferredContentOnce(): Promise<void> {
+    await nextFrame();
+    this.buildMiniMapCountries();
+    await nextFrame();
+    await this.ensureQuizLoaded();
   }
 
   update(state: GameState): void {
@@ -1126,20 +1143,28 @@ export class GameUI {
     profile: CountryProfile | undefined,
     spot: PhotoSpotDefinition | undefined,
   ): void {
+    const quizModule = this.quizModule;
+    if (!quizModule) {
+      this.availableQuiz = undefined;
+      this.elements.quizButton.disabled = true;
+      this.elements.quizButtonSubject.textContent = t("quiz.world");
+      this.elements.quizButtonAction.textContent = "…";
+      return;
+    }
     let subject: QuizSubject | undefined;
 
-    const spotQuiz = getSpotQuiz(spot?.id);
+    const spotQuiz = quizModule.getSpotQuiz(spot?.id);
     if (spot && spotQuiz) {
       subject = { quiz: spotQuiz, label: localizePhotoSpot(spot).name };
     } else if (profile) {
-      const countryQuiz = getCountryQuiz(profile.atlasName);
+      const countryQuiz = quizModule.getCountryQuiz(profile.atlasName);
       if (countryQuiz) {
         subject = { quiz: countryQuiz, label: profile.name };
       }
     }
 
     subject ??= {
-      quiz: getWorldQuiz(this.completedQuizzes),
+      quiz: quizModule.getWorldQuiz(this.completedQuizzes),
       label: t("quiz.world"),
     };
     this.availableQuiz = subject;
@@ -1158,7 +1183,12 @@ export class GameUI {
     );
   }
 
-  private openQuiz(): void {
+  private async openQuiz(): Promise<void> {
+    await this.ensureQuizLoaded();
+    this.refreshQuizAvailability(
+      this.currentCountry,
+      this.currentNearestPhotoSpot,
+    );
     if (!this.availableQuiz) {
       return;
     }
@@ -1170,6 +1200,9 @@ export class GameUI {
     this.activeQuiz = this.availableQuiz;
     this.quizIndex = 0;
     this.quizCorrect = 0;
+    this.quizQuestionsAnswered = 0;
+    this.quizFlowCompleted = false;
+    this.elements.quizSkip.textContent = t("quiz.leave");
     this.elements.quizPanel.classList.add("is-visible");
     this.elements.quizPanel.setAttribute("aria-hidden", "false");
     this.syncSurfaceState();
@@ -1177,10 +1210,21 @@ export class GameUI {
   }
 
   private closeQuiz(): void {
-    if (!this.activeQuiz) {
+    const active = this.activeQuiz;
+    if (!active) {
       return;
     }
+    const completedFlow =
+      this.quizFlowCompleted ||
+      (this.isWorldQuiz(active) && this.quizQuestionsAnswered > 0);
+    if (this.quizFinishTimer !== undefined) {
+      window.clearTimeout(this.quizFinishTimer);
+      this.quizFinishTimer = undefined;
+    }
     this.activeQuiz = undefined;
+    this.quizFlowCompleted = false;
+    this.quizQuestionsAnswered = 0;
+    this.elements.quizSkip.textContent = t("quiz.leave");
     this.elements.quizPanel.classList.remove("is-visible");
     this.elements.quizPanel.setAttribute("aria-hidden", "true");
     this.syncSurfaceState();
@@ -1188,6 +1232,9 @@ export class GameUI {
       this.currentCountry,
       this.currentNearestPhotoSpot,
     );
+    if (completedFlow) {
+      this.onCommercialBreak();
+    }
   }
 
   private renderQuizQuestion(): void {
@@ -1197,15 +1244,18 @@ export class GameUI {
     }
 
     const locale = getLocale();
-    const question = active.quiz.questions[this.quizIndex];
+    const question = this.getQuizQuestion(active);
     this.quizAnswered = false;
 
     this.elements.quizSubject.textContent = active.label;
-    this.elements.quizProgress.textContent = t("quiz.progress", {
-      current: this.quizIndex + 1,
-      total: active.quiz.questions.length,
-    });
-    this.elements.quizPrompt.textContent = localizeText(question.prompt, locale);
+    this.elements.quizProgress.textContent = this.isWorldQuiz(active)
+      ? t("quiz.progressEndless", { current: this.quizIndex + 1 })
+      : t("quiz.progress", {
+          current: this.quizIndex + 1,
+          total: active.quiz.questions.length,
+        });
+    this.elements.quizPrompt.textContent =
+      this.quizModule?.localizeText(question.prompt, locale) ?? "";
     this.elements.quizFeedback.hidden = true;
     this.elements.quizNext.hidden = true;
     this.elements.quizSkip.hidden = false;
@@ -1215,7 +1265,7 @@ export class GameUI {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "quiz-option";
-      button.textContent = localizeText(option, locale);
+      button.textContent = this.quizModule?.localizeText(option, locale) ?? "";
       button.addEventListener("click", () => this.answerQuiz(index));
       this.elements.quizOptions.append(button);
     });
@@ -1227,9 +1277,10 @@ export class GameUI {
       return;
     }
     this.quizAnswered = true;
+    this.quizQuestionsAnswered += 1;
 
     const locale = getLocale();
-    const question = active.quiz.questions[this.quizIndex];
+    const question = this.getQuizQuestion(active);
     const correct = index === question.answerIndex;
     if (correct) {
       this.quizCorrect += 1;
@@ -1252,9 +1303,11 @@ export class GameUI {
     this.elements.quizFeedback.classList.toggle("is-wrong", !correct);
     this.elements.quizFeedback.textContent = `${
       correct ? t("quiz.correct") : t("quiz.wrong")
-    } ${localizeText(question.explain, locale)}`;
+    } ${this.quizModule?.localizeText(question.explain, locale) ?? ""}`;
 
-    const isLast = this.quizIndex >= active.quiz.questions.length - 1;
+    const isLast =
+      !this.isWorldQuiz(active) &&
+      this.quizIndex >= active.quiz.questions.length - 1;
     this.elements.quizNext.hidden = false;
     this.elements.quizNext.textContent = isLast
       ? t("quiz.finish")
@@ -1264,6 +1317,12 @@ export class GameUI {
   private advanceQuiz(): void {
     const active = this.activeQuiz;
     if (!active) {
+      return;
+    }
+
+    if (this.isWorldQuiz(active)) {
+      this.quizIndex += 1;
+      this.renderQuizQuestion();
       return;
     }
 
@@ -1280,6 +1339,7 @@ export class GameUI {
     const total = active.quiz.questions.length;
     const perfect = this.quizCorrect === total;
     this.completedQuizzes.add(active.quiz.id);
+    this.quizFlowCompleted = true;
 
     this.elements.quizOptions.replaceChildren();
     this.elements.quizPrompt.textContent = perfect
@@ -1292,11 +1352,24 @@ export class GameUI {
     this.elements.quizSkip.textContent = t("action.done");
 
     this.showToast(t("quiz.completedToast", { subject: active.label }));
-    window.setTimeout(() => {
-      this.elements.quizSkip.textContent = t("quiz.leave");
+    this.quizFinishTimer = window.setTimeout(() => {
+      this.quizFinishTimer = undefined;
       this.closeQuiz();
-      this.onCommercialBreak();
     }, 1800);
+  }
+
+  private getQuizQuestion(active: QuizSubject) {
+    const questionCount = active.quiz.questions.length;
+    if (questionCount === 0) {
+      throw new Error(`Quiz "${active.quiz.id}" has no questions.`);
+    }
+    return active.quiz.questions[
+      this.isWorldQuiz(active) ? this.quizIndex % questionCount : this.quizIndex
+    ];
+  }
+
+  private isWorldQuiz(active: QuizSubject): boolean {
+    return active.quiz.id.startsWith("world:");
   }
 
   handleEvent(event: GameEvent): void {
@@ -1571,6 +1644,7 @@ export class GameUI {
     const shouldOpen =
       force ?? !this.elements.passportPanel.classList.contains("is-visible");
     if (shouldOpen) {
+      this.ensurePassportBuilt();
       this.setSettingsOpen(false);
       this.setWishlistOpen(false);
       this.toggleLandmarkDetail(false);
@@ -1720,6 +1794,25 @@ export class GameUI {
   private buildMiniMap(): { halo: SVGCircleElement; dot: SVGCircleElement } {
     const namespace = "http://www.w3.org/2000/svg";
 
+    const halo = document.createElementNS(namespace, "circle");
+    halo.setAttribute("r", "5.5");
+    halo.setAttribute("class", "map-player-halo");
+    this.elements.miniMapSvg.append(halo);
+
+    const dot = document.createElementNS(namespace, "circle");
+    dot.setAttribute("r", "3.2");
+    dot.setAttribute("class", "map-player");
+    this.elements.miniMapSvg.append(dot);
+
+    return { halo, dot };
+  }
+
+  private buildMiniMapCountries(): void {
+    if (this.miniMapCountriesBuilt) {
+      return;
+    }
+    this.miniMapCountriesBuilt = true;
+    const namespace = "http://www.w3.org/2000/svg";
     for (const country of WORLD_COUNTRIES) {
       const profile = getCountryProfile(country);
       const path = document.createElementNS(namespace, "path");
@@ -1742,20 +1835,16 @@ export class GameUI {
       if (profile.passportEligible) {
         path.dataset.countryMap = profile.id;
       }
-      this.elements.miniMapSvg.append(path);
+      this.elements.miniMapSvg.insertBefore(path, this.playerHalo);
     }
+  }
 
-    const halo = document.createElementNS(namespace, "circle");
-    halo.setAttribute("r", "5.5");
-    halo.setAttribute("class", "map-player-halo");
-    this.elements.miniMapSvg.append(halo);
-
-    const dot = document.createElementNS(namespace, "circle");
-    dot.setAttribute("r", "3.2");
-    dot.setAttribute("class", "map-player");
-    this.elements.miniMapSvg.append(dot);
-
-    return { halo, dot };
+  private ensurePassportBuilt(): void {
+    if (this.passportBuilt) {
+      return;
+    }
+    this.passportBuilt = true;
+    this.buildPassport();
   }
 
   private buildPassport(): void {
@@ -1796,10 +1885,12 @@ export class GameUI {
       option.selected = locale.code === getLocale();
       this.elements.languageSelect.append(option);
     }
-    this.elements.languageSelect.addEventListener("change", () => {
-      if (!setLocale(this.elements.languageSelect.value)) {
+    this.elements.languageSelect.addEventListener("change", async () => {
+      this.elements.languageSelect.disabled = true;
+      if (!(await setLocale(this.elements.languageSelect.value))) {
         this.elements.languageSelect.value = getLocale();
       }
+      this.elements.languageSelect.disabled = false;
     });
   }
 
@@ -1812,7 +1903,9 @@ export class GameUI {
     this.elements.mapViewLabel.textContent = this.worldOverviewActive
       ? t("worldMap.back")
       : t("worldMap.label");
-    this.buildPassport();
+    if (this.passportBuilt) {
+      this.buildPassport();
+    }
     this.buildGarageGrid();
     this.tripStructureSig = undefined;
     this.compassSignature = undefined;
@@ -1836,6 +1929,17 @@ export class GameUI {
         this.showCountryDetail(getCountryProfile(country));
       }
     }
+  }
+
+  private async ensureQuizLoaded(): Promise<void> {
+    this.quizLoad ??= import("./quiz").then((module) => {
+      this.quizModule = module;
+      this.refreshQuizAvailability(
+        this.currentCountry,
+        this.currentNearestPhotoSpot,
+      );
+    });
+    await this.quizLoad;
   }
 }
 
@@ -2023,4 +2127,8 @@ function requireSelect(id: string): HTMLSelectElement {
     throw new Error(`Missing select #${id}`);
   }
   return element;
+}
+
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }

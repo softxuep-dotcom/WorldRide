@@ -16,28 +16,18 @@ import {
 import {
   getMapDimensions,
   getWorldTerrainMaterial,
+  loadWorldTerrainTexture,
   prepareWorldTerrainGeometry,
 } from "./world-terrain";
-import {
-  createLandmarkStandee,
-  updateLandmarkStandeeOverview,
-  type LandmarkStandeeView,
-} from "./landmark-standees";
+import type { LandmarkStandeeView } from "./landmark-standees";
 import {
   REGIONAL_SPECIALTIES,
   type RegionalSpecialtyDefinition,
 } from "./regional-specialties";
-import {
-  createRegionalSpecialtyStandee,
-  updateRegionalSpecialtyStandeeOverview,
-  type RegionalSpecialtyStandeeView,
-} from "./regional-specialty-standees";
-import { WorldEcology } from "./world-ecology";
-import { WorldLife } from "./world-life";
-import {
-  OceanLife,
-  createOceanSurfaceMaterial,
-} from "./ocean-life";
+import type { RegionalSpecialtyStandeeView } from "./regional-specialty-standees";
+import type { WorldEcology } from "./world-ecology";
+import type { WorldLife } from "./world-life";
+import type { OceanLife } from "./ocean-life";
 import { wrappedDeltaX } from "./progression";
 
 const RESERVED_MAP_MARKER_POSITIONS = [
@@ -82,6 +72,15 @@ interface LandmarkEffect {
   quiet: boolean;
 }
 
+type CreateLandmarkStandee =
+  typeof import("./landmark-standees").createLandmarkStandee;
+type UpdateLandmarkStandeeOverview =
+  typeof import("./landmark-standees").updateLandmarkStandeeOverview;
+type CreateRegionalSpecialtyStandee =
+  typeof import("./regional-specialty-standees").createRegionalSpecialtyStandee;
+type UpdateRegionalSpecialtyStandeeOverview =
+  typeof import("./regional-specialty-standees").updateRegionalSpecialtyStandeeOverview;
+
 export class WorldView {
   readonly root = new THREE.Group();
   readonly vehicle: VehicleView;
@@ -90,9 +89,13 @@ export class WorldView {
   private readonly landmarkStandees: LandmarkStandeeView[] = [];
   private readonly regionalSpecialtyStandees: RegionalSpecialtyStandeeView[] =
     [];
-  private readonly ecology = new WorldEcology(RESERVED_MAP_MARKER_POSITIONS);
-  private readonly life = new WorldLife();
-  private readonly oceanLife = new OceanLife();
+  private ecology?: WorldEcology;
+  private life?: WorldLife;
+  private oceanLife?: OceanLife;
+  private ocean?: THREE.Mesh;
+  private updateLandmarkStandeeOverview?: UpdateLandmarkStandeeOverview;
+  private updateRegionalSpecialtyStandeeOverview?: UpdateRegionalSpecialtyStandeeOverview;
+  private deferredLoad?: Promise<void>;
   private readonly vehicleTrail: VehicleTrailParticle[] = [];
   private modeBlend = 0;
   private vehicleLean = 0;
@@ -104,16 +107,69 @@ export class WorldView {
   constructor() {
     this.root.name = "Pocket Planet world";
     this.addBoard();
-    this.addWorldCountries();
-    this.addCountries();
-    this.addGeographyFeatures();
-    this.addOceanDetails();
     this.vehicle = this.createVehicle();
     this.root.add(this.vehicle.root);
     this.buildVehicleTrail();
-    this.root.add(this.ecology.root);
-    this.root.add(this.life.root);
-    this.root.add(this.oceanLife.root);
+  }
+
+  loadDeferredContent(
+    onProgress: (phase: string) => void = () => {},
+  ): Promise<void> {
+    this.deferredLoad ??= this.loadDeferredContentOnce(onProgress);
+    return this.deferredLoad;
+  }
+
+  private async loadDeferredContentOnce(
+    onProgress: (phase: string) => void,
+  ): Promise<void> {
+    onProgress("world");
+    await nextFrame();
+    this.addWorldCountries();
+
+    onProgress("places");
+    await nextFrame();
+    const [
+      landmarkModule,
+      specialtyModule,
+      ecologyModule,
+      lifeModule,
+      oceanModule,
+    ] = await Promise.all([
+      import("./landmark-standees"),
+      import("./regional-specialty-standees"),
+      import("./world-ecology"),
+      import("./world-life"),
+      import("./ocean-life"),
+    ]);
+    this.updateLandmarkStandeeOverview =
+      landmarkModule.updateLandmarkStandeeOverview;
+    this.updateRegionalSpecialtyStandeeOverview =
+      specialtyModule.updateRegionalSpecialtyStandeeOverview;
+    this.addCountries(
+      landmarkModule.createLandmarkStandee,
+      specialtyModule.createRegionalSpecialtyStandee,
+    );
+
+    onProgress("details");
+    await nextFrame();
+    this.addGeographyFeatures();
+    this.addOceanDetails();
+    this.ecology = new ecologyModule.WorldEcology(
+      RESERVED_MAP_MARKER_POSITIONS,
+    );
+    this.life = new lifeModule.WorldLife();
+    this.oceanLife = new oceanModule.OceanLife();
+    this.root.add(this.ecology.root, this.life.root, this.oceanLife.root);
+
+    if (this.ocean) {
+      const previousMaterial = this.ocean.material;
+      this.ocean.material = oceanModule.createOceanSurfaceMaterial();
+      if (previousMaterial instanceof THREE.Material) {
+        previousMaterial.dispose();
+      }
+    }
+    onProgress("texture");
+    await loadWorldTerrainTexture();
   }
 
   update(
@@ -128,7 +184,7 @@ export class WorldView {
     overviewBlend = 0,
   ): void {
     this.modeBlend += ((boatMode ? 1 : 0) - this.modeBlend) * (1 - Math.exp(-7 * delta));
-    this.life.update(
+    this.life?.update(
       elapsed,
       delta,
       position.x,
@@ -136,7 +192,7 @@ export class WorldView {
       velocity,
       overviewBlend,
     );
-    this.oceanLife.update(
+    this.oceanLife?.update(
       elapsed,
       delta,
       position,
@@ -145,7 +201,7 @@ export class WorldView {
       boatMode,
       overviewBlend,
     );
-    this.ecology.update(delta, position, velocity, overviewBlend);
+    this.ecology?.update(delta, position, velocity, overviewBlend);
     const speed = Math.hypot(velocity.x, velocity.z);
     const headingDelta =
       this.previousVehicleHeading === undefined
@@ -218,7 +274,7 @@ export class WorldView {
         wrappedDeltaX(standee.anchorX, position.x),
         standee.anchorZ - position.z,
       );
-      updateLandmarkStandeeOverview(
+      this.updateLandmarkStandeeOverview?.(
         standee,
         overviewBlend,
         elapsed,
@@ -231,7 +287,7 @@ export class WorldView {
         wrappedDeltaX(standee.anchorX, position.x),
         standee.anchorZ - position.z,
       );
-      updateRegionalSpecialtyStandeeOverview(
+      this.updateRegionalSpecialtyStandeeOverview?.(
         standee,
         overviewBlend,
         elapsed,
@@ -316,8 +372,13 @@ export class WorldView {
 
     const ocean = new THREE.Mesh(
       new THREE.BoxGeometry(width, 0.34, depth),
-      createOceanSurfaceMaterial(),
+      new THREE.MeshStandardMaterial({
+        color: 0x53bad8,
+        roughness: 0.42,
+        metalness: 0.04,
+      }),
     );
+    this.ocean = ocean;
     ocean.position.y = -0.18;
     ocean.receiveShadow = true;
     this.root.add(ocean);
@@ -439,18 +500,22 @@ export class WorldView {
     this.root.add(borders);
   }
 
-  private addCountries(): void {
+  private addCountries(
+    createLandmarkStandee: CreateLandmarkStandee,
+    createRegionalSpecialtyStandee: CreateRegionalSpecialtyStandee,
+  ): void {
     for (const spot of PHOTO_SPOTS) {
-      this.addPhotoSpot(spot);
+      this.addPhotoSpot(spot, createLandmarkStandee);
     }
 
     for (const specialty of REGIONAL_SPECIALTIES) {
-      this.addRegionalSpecialty(specialty);
+      this.addRegionalSpecialty(specialty, createRegionalSpecialtyStandee);
     }
   }
 
   private addRegionalSpecialty(
     specialty: RegionalSpecialtyDefinition,
+    createRegionalSpecialtyStandee: CreateRegionalSpecialtyStandee,
   ): void {
     const world = geoToWorld(specialty.point);
     const group = new THREE.Group();
@@ -463,7 +528,10 @@ export class WorldView {
     this.root.add(group);
   }
 
-  private addPhotoSpot(spot: PhotoSpotDefinition): void {
+  private addPhotoSpot(
+    spot: PhotoSpotDefinition,
+    createLandmarkStandee: CreateLandmarkStandee,
+  ): void {
     const country = getCountryContentForAtlas(
       getWorldCountryByName(spot.atlasCountryName),
     );
@@ -1305,4 +1373,8 @@ function mulberry32(seed: number): () => number {
     value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
     return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }

@@ -6,6 +6,11 @@ import type {
 export interface UiMessages {
   "meta.title": string;
   "meta.description": string;
+  "loading.preparing": string;
+  "loading.map": string;
+  "loading.engine": string;
+  "loading.ready": string;
+  "loading.error": string;
   "canvas.label": string;
   "worldMap.toggle": string;
   "worldMap.playerPosition": string;
@@ -76,6 +81,7 @@ export interface UiMessages {
   "quiz.next": string;
   "quiz.finish": string;
   "quiz.progress": string;
+  "quiz.progressEndless": string;
   "quiz.correct": string;
   "quiz.wrong": string;
   "quiz.result": string;

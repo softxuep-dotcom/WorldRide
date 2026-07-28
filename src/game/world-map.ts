@@ -1,36 +1,15 @@
-import type {
-  FeatureCollection,
-  Geometry,
-  MultiPolygon,
-  Polygon,
-} from "geojson";
-import { feature } from "topojson-client";
-import type {
-  GeometryCollection,
-  Objects,
-  Topology,
-} from "topojson-specification";
-import worldAtlas from "world-atlas/countries-50m.json";
 import {
   COUNTRIES,
   type CountryDefinition,
   type GeoPoint,
 } from "./data";
+import { WORLD_COUNTRY_DATA } from "./generated/world-country-data";
 import {
   getLocale,
   getWorldCountryTranslation,
   localizeCountry,
   t,
 } from "../i18n";
-
-interface AtlasProperties {
-  name?: string;
-}
-
-interface AtlasObjects extends Objects<AtlasProperties> {
-  countries: GeometryCollection<AtlasProperties>;
-  land: GeometryCollection<AtlasProperties>;
-}
 
 export interface WorldCountry {
   id: string;
@@ -66,38 +45,15 @@ export interface CountryProfile {
   content?: CountryDefinition;
 }
 
-const topology = worldAtlas as unknown as Topology<AtlasObjects>;
-const countriesGeoJson = feature<AtlasProperties>(
-  topology,
-  topology.objects.countries,
-) as unknown as FeatureCollection<Geometry, AtlasProperties>;
-
-export const WORLD_COUNTRIES: readonly WorldCountry[] = countriesGeoJson.features
-  .map((countryFeature, index) => {
-    const polygons = geometryToOuterRings(countryFeature.geometry);
-    const points = polygons.flat();
-
-    if (points.length === 0) {
-      return undefined;
-    }
-
-    const longitudes = points.map((point) => point[0]);
-    const latitudes = points.map((point) => point[1]);
-
+export const WORLD_COUNTRIES: readonly WorldCountry[] =
+  WORLD_COUNTRY_DATA.map((country) => {
+    const polygons = country.polygons as readonly (readonly GeoPoint[])[];
     return {
-      id: String(countryFeature.id ?? index),
-      name: countryFeature.properties?.name ?? `Country ${index + 1}`,
+      ...country,
       polygons,
       renderPolygons: polygons.flatMap(createRenderableRings),
-      bounds: {
-        minLongitude: Math.min(...longitudes),
-        maxLongitude: Math.max(...longitudes),
-        minLatitude: Math.min(...latitudes),
-        maxLatitude: Math.max(...latitudes),
-      },
-    } satisfies WorldCountry;
-  })
-  .filter((country): country is WorldCountry => country !== undefined);
+    };
+  });
 
 const worldCountriesByName = new Map(
   WORLD_COUNTRIES.map((country) => [country.name.toLowerCase(), country]),
@@ -554,40 +510,6 @@ export function getWorldCountryAtGeo(point: GeoPoint): WorldCountry | undefined 
   }
 
   return undefined;
-}
-
-function geometryToOuterRings(geometry: Geometry | null): readonly (readonly GeoPoint[])[] {
-  if (!geometry) {
-    return [];
-  }
-
-  if (geometry.type === "Polygon") {
-    return polygonToOuterRing(geometry);
-  }
-
-  if (geometry.type === "MultiPolygon") {
-    return multiPolygonToOuterRings(geometry);
-  }
-
-  return [];
-}
-
-function polygonToOuterRing(polygon: Polygon): readonly (readonly GeoPoint[])[] {
-  const outerRing = polygon.coordinates[0];
-  return outerRing ? [outerRing.map(toGeoPoint)] : [];
-}
-
-function multiPolygonToOuterRings(
-  multiPolygon: MultiPolygon,
-): readonly (readonly GeoPoint[])[] {
-  return multiPolygon.coordinates
-    .map((polygon) => polygon[0])
-    .filter((outerRing) => Boolean(outerRing))
-    .map((outerRing) => outerRing.map(toGeoPoint));
-}
-
-function toGeoPoint(position: number[]): GeoPoint {
-  return [position[0], position[1]];
 }
 
 function isPointInsideRing(point: GeoPoint, ring: readonly GeoPoint[]): boolean {

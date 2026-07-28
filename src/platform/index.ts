@@ -10,10 +10,15 @@ import { WebPlatformAdapter } from "./web";
 
 export type { GamePlatformId } from "./types";
 
+const FIRST_QUIZ_AD_DELAY_MS = 2 * 60 * 1000;
+const QUIZ_AD_COOLDOWN_MS = 3 * 60 * 1000;
+
 export class GamePlatform {
   readonly id: GamePlatformId;
   private gameplayActive = false;
   private adPending = false;
+  private gameplayStartedAt?: number;
+  private lastQuizCommercialAt?: number;
 
   constructor(
     private readonly adapter: PlatformAdapter,
@@ -29,15 +34,33 @@ export class GamePlatform {
 
   async beginGameplay(): Promise<void> {
     this.adapter.loadingFinished();
-    if (this.adapter.startupCommercial) {
-      await this.adapter.requestAd("commercial", () => {});
-    }
+    this.gameplayStartedAt = performance.now();
     this.gameplayActive = true;
     this.adapter.gameplayStart();
   }
 
   async commercialBreak(): Promise<void> {
     await this.runAd("commercial");
+  }
+
+  async quizCommercialBreak(): Promise<boolean> {
+    if (this.gameplayStartedAt === undefined) {
+      return false;
+    }
+    const now = performance.now();
+    const earliestAt =
+      this.lastQuizCommercialAt === undefined
+        ? this.gameplayStartedAt + FIRST_QUIZ_AD_DELAY_MS
+        : this.lastQuizCommercialAt + QUIZ_AD_COOLDOWN_MS;
+    if (now < earliestAt) {
+      return false;
+    }
+
+    const shown = await this.runAd("commercial");
+    if (shown) {
+      this.lastQuizCommercialAt = performance.now();
+    }
+    return shown;
   }
 
   async rewardedBreak(): Promise<boolean> {

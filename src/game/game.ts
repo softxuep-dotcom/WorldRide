@@ -168,6 +168,32 @@ export class PocketEarthGame {
     this.restoredFromSave = false;
   }
 
+  renderInitialFrame(): void {
+    const { state } = this.simulation;
+    this.world.update(
+      state.elapsed,
+      0,
+      state.position,
+      state.velocity,
+      state.heading,
+      state.vehicleMode === "boat",
+      state.cruiseFlow,
+      state.modeTransition,
+      this.overviewBlend,
+    );
+    this.updateCamera(1);
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  async loadDeferredContent(
+    onProgress: (phase: string) => void = () => {},
+  ): Promise<void> {
+    await Promise.all([
+      this.world.loadDeferredContent(onProgress),
+      this.ui.loadDeferredContent(),
+    ]);
+  }
+
   start(): void {
     if (
       this.animationFrame !== undefined ||

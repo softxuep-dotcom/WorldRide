@@ -2,7 +2,6 @@ import type { AdKind, PlatformAdapter } from "./types";
 
 export class WebPlatformAdapter implements PlatformAdapter {
   readonly id = "web";
-  readonly startupCommercial = false;
 
   async initialize(): Promise<void> {}
 

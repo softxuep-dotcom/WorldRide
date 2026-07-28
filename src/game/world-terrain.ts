@@ -9,16 +9,15 @@ type Rgb = readonly [red: number, green: number, blue: number];
 
 const WORLD_TERRAIN_TEXTURE_SIZE = 1536;
 let worldTerrainMaterial: THREE.MeshStandardMaterial | undefined;
+let worldTerrainTexturePromise: Promise<void> | undefined;
 
 export function getWorldTerrainMaterial(): THREE.MeshStandardMaterial {
   if (worldTerrainMaterial) {
     return worldTerrainMaterial;
   }
 
-  const texture = createWorldTerrainTexture();
   worldTerrainMaterial = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    map: texture,
+    color: 0x83a86f,
     vertexColors: true,
     roughness: 0.96,
     metalness: 0,
@@ -26,7 +25,39 @@ export function getWorldTerrainMaterial(): THREE.MeshStandardMaterial {
   return worldTerrainMaterial;
 }
 
-function createWorldTerrainTexture(): THREE.CanvasTexture {
+export function loadWorldTerrainTexture(): Promise<void> {
+  if (worldTerrainTexturePromise) {
+    return worldTerrainTexturePromise;
+  }
+
+  const material = getWorldTerrainMaterial();
+  const url = `${import.meta.env.BASE_URL}assets/generated/world-terrain.png`;
+  worldTerrainTexturePromise = new Promise((resolve) => {
+    new THREE.TextureLoader().load(
+      url,
+      (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.anisotropy = 8;
+        material.map = texture;
+        material.color.set(0xffffff);
+        material.needsUpdate = true;
+        resolve();
+      },
+      undefined,
+      (error) => {
+        console.warn("[assets] World terrain texture could not be loaded.", error);
+        resolve();
+      },
+    );
+  });
+  return worldTerrainTexturePromise;
+}
+
+export function createWorldTerrainTexture(): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = WORLD_TERRAIN_TEXTURE_SIZE;
   canvas.height = WORLD_TERRAIN_TEXTURE_SIZE;

@@ -1,0 +1,66 @@
+import type { PhotoSpotId } from "./data";
+
+const GENERATED_LANDMARK_IDS = new Set<PhotoSpotId>([
+  "gibraltar-strait",
+  "big-ben",
+  "brandenburg-gate",
+  "colosseum",
+  "acropolis",
+  "swiss-alps",
+  "norway-fjord",
+  "giza-pyramids",
+  "hagia-sophia",
+  "great-wall",
+  "fuji-view",
+  "taj-mahal",
+  "java-volcano",
+  "moscow-domes",
+  "eiffel-tower",
+  "statue-of-liberty",
+  "machu-picchu",
+  "christ-the-redeemer",
+  "chichen-itza",
+  "petra",
+  "angkor-wat",
+  "sydney-opera-house",
+  "grand-canyon",
+  "mount-everest",
+  "niagara-falls",
+  "easter-island-moai",
+  "pompeii",
+  "burj-khalifa",
+  "sagrada-familia",
+  "leaning-tower-of-pisa",
+  "stonehenge",
+  "golden-gate-bridge",
+  "uluru",
+  "grand-prismatic-spring",
+  "victoria-falls",
+  "great-barrier-reef",
+  "pointe-du-hoc",
+  "hiroshima-peace-memorial",
+  "lake-baikal",
+  "lena-pillars",
+  "persepolis",
+  "hegra",
+  "samarra-minaret",
+  "lake-louise",
+  "teotihuacan",
+  "panama-canal",
+  "iguazu-falls",
+  "salar-de-uyuni",
+  "torres-del-paine",
+  "fish-river-canyon",
+  "drakensberg",
+  "lalibela",
+  "great-mosque-djenne",
+  "registan",
+]);
+
+export function hasLandmarkIllustration(id: PhotoSpotId): boolean {
+  return GENERATED_LANDMARK_IDS.has(id);
+}
+
+export function landmarkIllustrationUrl(id: PhotoSpotId): string {
+  return `${import.meta.env.BASE_URL}assets/landmarks/placard/${id}.webp`;
+}

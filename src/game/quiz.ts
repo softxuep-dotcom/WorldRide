@@ -1,8 +1,8 @@
 import {
   PHOTO_SPOTS,
-  type PhotoSpotDefinition,
   type PhotoSpotId,
 } from "./data";
+import { LANDMARK_THIRD_QUESTIONS } from "./landmark-third-questions";
 import { localizeAuthoredText } from "../i18n/content";
 import { TIER_A_COUNTRY_NAMES } from "./world-map";
 
@@ -34,6 +34,7 @@ export interface QuizSet {
 
 const FALLBACK_LOCALE = "en";
 const QUIZ_BANK_VERSION = 3;
+const SPOT_QUIZ_BANK_VERSION = 4;
 
 export function localizeText(text: LocalizedText, locale: string): string {
   const fallback = text[FALLBACK_LOCALE] ?? Object.values(text)[0] ?? "";
@@ -632,15 +633,6 @@ function quizQuestion(
 
 const spotQuestion = quizQuestion;
 
-const SPOT_KIND_LABELS: Readonly<
-  Record<PhotoSpotDefinition["kind"], BilingualCopy>
-> = {
-  wonder: ["World wonder", "世界奇观"],
-  landmark: ["Cultural landmark", "人文地标"],
-  natural: ["Natural sight", "自然名胜"],
-  historical: ["Historical reflection site", "历史反思地点"],
-};
-
 function spotQuiz(
   id: PhotoSpotId,
   questions: readonly QuizQuestion[],
@@ -652,28 +644,17 @@ function spotQuiz(
   if (!spot) {
     throw new Error(`Spot quiz "${id}" has no matching photo spot.`);
   }
-  const kinds = Object.keys(SPOT_KIND_LABELS) as PhotoSpotDefinition["kind"][];
-  const distractors = kinds.filter((kind) => kind !== spot.kind).slice(0, 2);
-  const answerIndex = kinds.indexOf(spot.kind) % 3;
-  const optionKinds = [...distractors];
-  optionKinds.splice(answerIndex, 0, spot.kind);
-  const kindLabel = SPOT_KIND_LABELS[spot.kind];
-  const kindQuestion = quizQuestion(
-    `${id}-kind`,
-    [
-      "How is this place classified in the travel collection?",
-      "这个地点在旅行图鉴中属于哪一类？",
-    ],
-    optionKinds.map((kind) => SPOT_KIND_LABELS[kind]),
-    answerIndex,
-    [
-      `The travel collection groups this place as a ${kindLabel[0].toLowerCase()}.`,
-      `旅行图鉴将这里归为“${kindLabel[1]}”。`,
-    ],
+  const third = LANDMARK_THIRD_QUESTIONS[id];
+  const thirdQuestion = quizQuestion(
+    `${id}-third-v2`,
+    third.prompt,
+    third.options,
+    third.answerIndex,
+    third.explain,
   );
   return {
-    id: `spot:v${QUIZ_BANK_VERSION}:${id}`,
-    questions: [...questions, kindQuestion],
+    id: `spot:v${SPOT_QUIZ_BANK_VERSION}:${id}`,
+    questions: [...questions, thirdQuestion],
   };
 }
 
@@ -1839,22 +1820,19 @@ const WORLD_QUIZ_POOL: readonly QuizSet[] = [
   ...Object.values(SPOT_QUIZZES),
 ];
 
-const WORLD_CHALLENGE_QUESTION_COUNT = 3;
+const WORLD_CHALLENGE_VERSION = 4;
 interface WorldChallengeSource {
-  key: string;
   countryName: string;
   quiz: QuizSet;
 }
 
 const WORLD_COUNTRY_CHALLENGE_SOURCES: readonly WorldChallengeSource[] =
   TIER_A_COUNTRY_NAMES.map((countryName) => ({
-    key: `country-${slugify(countryName)}`,
     countryName,
     quiz: COUNTRY_QUIZZES[countryName],
   }));
 const WORLD_LANDMARK_CHALLENGE_SOURCES: readonly WorldChallengeSource[] =
   PHOTO_SPOTS.map((spot) => ({
-    key: `landmark-${spot.id}`,
     countryName: spot.atlasCountryName,
     quiz: SPOT_QUIZZES[spot.id],
   }));
@@ -1862,7 +1840,17 @@ const WORLD_CHALLENGE_SOURCES = interleaveWorldChallengeSources(
   WORLD_COUNTRY_CHALLENGE_SOURCES,
   WORLD_LANDMARK_CHALLENGE_SOURCES,
 );
-const WORLD_CHALLENGE_ROUNDS = buildWorldChallengeRounds();
+const WORLD_CHALLENGE_QUESTION_SOURCES = WORLD_CHALLENGE_SOURCES.flatMap(
+  (source) =>
+    source.quiz.questions.map((question) => ({
+      countryName: source.countryName,
+      question,
+    })),
+);
+const WORLD_CHALLENGE_QUIZ: QuizSet = {
+  id: `world:v${WORLD_CHALLENGE_VERSION}:endless`,
+  questions: buildWorldChallengeQuestions(),
+};
 
 export function getAllQuizSets(): readonly QuizSet[] {
   return WORLD_QUIZ_POOL;
@@ -1870,85 +1858,29 @@ export function getAllQuizSets(): readonly QuizSet[] {
 
 /**
  * Keeps the persistent challenge entry useful away from authored locations.
- * Each round draws one question from three different countries. Rounds are
- * stable so progress survives reloads; after all rounds are complete, the
- * first mixed-country round remains available for replay.
+ * The UI treats this stable, mixed-country pool as an endless stream and wraps
+ * back to the beginning only after every authored question has been shown.
  */
 export function getWorldQuiz(
-  completedQuizIds: ReadonlySet<string>,
+  _completedQuizIds: ReadonlySet<string>,
 ): QuizSet {
-  const unfinished = WORLD_CHALLENGE_ROUNDS.find(
-    (quiz) => !completedQuizIds.has(quiz.id),
-  );
-  const fallback = WORLD_CHALLENGE_ROUNDS[0];
-  if (!fallback) {
-    throw new Error("The world challenge must contain at least one round.");
-  }
-  return unfinished ?? fallback;
+  return WORLD_CHALLENGE_QUIZ;
 }
 
-function buildWorldChallengeRounds(): readonly QuizSet[] {
-  const availableCountries = new Set(
-    WORLD_CHALLENGE_SOURCES.map((source) => source.countryName),
-  );
-  if (availableCountries.size < WORLD_CHALLENGE_QUESTION_COUNT) {
-    throw new Error(
-      `World challenges require content from at least ${WORLD_CHALLENGE_QUESTION_COUNT} countries.`,
-    );
-  }
-
-  const remaining = [...WORLD_CHALLENGE_SOURCES];
-  const rounds: QuizSet[] = [];
+function buildWorldChallengeQuestions(): readonly QuizQuestion[] {
+  const remaining = [...WORLD_CHALLENGE_QUESTION_SOURCES];
+  const questions: QuizQuestion[] = [];
+  let previousCountry: string | undefined;
   while (remaining.length > 0) {
-    const sources: WorldChallengeSource[] = [];
-    const countryNames = new Set<string>();
-
-    while (
-      sources.length < WORLD_CHALLENGE_QUESTION_COUNT &&
-      remaining.length > 0
-    ) {
-      const sourceIndex = remaining.findIndex(
-        (source) => !countryNames.has(source.countryName),
-      );
-      if (sourceIndex < 0) {
-        break;
-      }
-      const [source] = remaining.splice(sourceIndex, 1);
-      sources.push(source);
-      countryNames.add(source.countryName);
-    }
-
-    for (const source of WORLD_CHALLENGE_SOURCES) {
-      if (sources.length >= WORLD_CHALLENGE_QUESTION_COUNT) {
-        break;
-      }
-      if (countryNames.has(source.countryName)) {
-        continue;
-      }
-      sources.push(source);
-      countryNames.add(source.countryName);
-    }
-
-    const roundIndex = rounds.length;
-    if (new Set(countryNames).size !== WORLD_CHALLENGE_QUESTION_COUNT) {
-      throw new Error(
-        `World challenge round ${roundIndex + 1} repeated a country.`,
-      );
-    }
-    const questions = sources.map((source, offset) =>
-      source.quiz.questions[
-        (roundIndex + offset) % source.quiz.questions.length
-      ],
+    const differentCountryIndex = remaining.findIndex(
+      (source) => source.countryName !== previousCountry,
     );
-
-    rounds.push({
-      id: `world:v${QUIZ_BANK_VERSION}:${sources
-        .map((source) => source.key)
-        .join("+")}`,
-      questions,
-    });
+    const sourceIndex = differentCountryIndex >= 0 ? differentCountryIndex : 0;
+    const [source] = remaining.splice(sourceIndex, 1);
+    questions.push(source.question);
+    previousCountry = source.countryName;
   }
-  return rounds;
+  return questions;
 }
 
 function interleaveWorldChallengeSources(
@@ -1968,8 +1900,4 @@ function interleaveWorldChallengeSources(
     }
   }
   return sources;
-}
-
-function slugify(value: string): string {
-  return value.toLowerCase().replaceAll(/[^a-z]+/g, "-");
 }

@@ -20,6 +20,20 @@ const MANUAL_OVERRIDES = {
     "Big Ben": "Big Ben",
     "Yellowstone · Grand Prismatic Spring":
       "Yellowstone · Grand Prismatic Spring",
+    "In classical tradition, what name was given to the headlands flanking the strait?":
+      "Dans la tradition classique, quel nom donnait-on aux promontoires qui bordent le détroit ?",
+    "What pulls the Quadriga sculpture on top of the Brandenburg Gate?":
+      "Quels animaux tirent le quadrige sculpté au sommet de la porte de Brandebourg ?",
+    "How did garrisons use beacon towers to send warnings quickly along the Great Wall?":
+      "Comment les garnisons utilisaient-elles les tours à signaux pour transmettre rapidement des alertes le long de la Grande Muraille ?",
+    "What was Shah Jahan's central purpose in commissioning the Taj Mahal?":
+      "Quel était l’objectif principal de Shah Jahan lorsqu’il fit construire le Taj Mahal ?",
+    "Where and from what rock were most moai carved?":
+      "Où et dans quelle roche la plupart des moaï ont-ils été sculptés ?",
+    "The ninth-century minaret chiefly bears witness to which dynasty's period of building Samarra as a capital?":
+      "Le minaret du IXe siècle témoigne surtout de l’époque où quelle dynastie fit de Samarra sa capitale ?",
+    "Which South American camelid are travellers most likely to see on the grasslands of Torres del Paine?":
+      "Quel camélidé sud-américain les voyageurs ont-ils le plus de chances d’observer dans les prairies de Torres del Paine ?",
   },
   "pt-BR": {
     "Big Ben": "Big Ben",
@@ -32,6 +46,12 @@ const MANUAL_OVERRIDES = {
       "O rio Niágara faz parte da fronteira entre o Canadá e os Estados Unidos.",
     "Why does Java have many volcanoes?":
       "Por que Java tem tantos vulcões?",
+    "Which event is represented by the date on the tablet in the Statue of Liberty's left hand?":
+      "Que evento é representado pela data na tábua segurada pela mão esquerda da Estátua da Liberdade?",
+    "Where and from what rock were most moai carved?":
+      "Onde e em que tipo de rocha foi esculpida a maioria dos moai?",
+    "The ninth-century minaret chiefly bears witness to which dynasty's period of building Samarra as a capital?":
+      "O minarete do século IX testemunha sobretudo o período em que qual dinastia fez de Samarra a sua capital?",
   },
   it: {
     "Big Ben": "Big Ben",
@@ -48,6 +68,16 @@ const MANUAL_OVERRIDES = {
     "Fr. S. Antarctic Lands":
       "Terre australi e antartiche francesi",
     "Uruguay": "Uruguay",
+    "What pulls the Quadriga sculpture on top of the Brandenburg Gate?":
+      "Che cosa traina la Quadriga scolpita in cima alla Porta di Brandeburgo?",
+    "Beyond its physical landscape, which combination has strongly shaped Mount Fuji's cultural influence?":
+      "Oltre al paesaggio naturale, quale combinazione ha contribuito maggiormente all’importanza culturale del Monte Fuji?",
+    "What do Angkor's vast reservoirs and canals show was especially important to the Khmer city?":
+      "Che cosa dimostrano i vasti bacini e canali di Angkor riguardo alle priorità della città khmer?",
+    "Where and from what rock were most moai carved?":
+      "Dove e in quale roccia fu scolpita la maggior parte dei moai?",
+    "The ninth-century minaret chiefly bears witness to which dynasty's period of building Samarra as a capital?":
+      "Il minareto del IX secolo testimonia soprattutto il periodo in cui quale dinastia fece di Samarra la propria capitale?",
   },
   es: {
     "Big Ben": "Big Ben",
@@ -72,6 +102,14 @@ const MANUAL_OVERRIDES = {
     "The Sonoran": "El desierto de Sonora",
     "Turkey": "Turquía",
     "Yellowstone": "Yellowstone",
+    "What pulls the Quadriga sculpture on top of the Brandenburg Gate?":
+      "¿Qué animales tiran de la Cuadriga situada en lo alto de la Puerta de Brandeburgo?",
+    "What combination of purposes did Machu Picchu's terraces serve?":
+      "¿Qué combinación de funciones cumplían las terrazas de Machu Picchu?",
+    "The ninth-century minaret chiefly bears witness to which dynasty's period of building Samarra as a capital?":
+      "¿De qué dinastía, que hizo de Samarra su capital, da testimonio principalmente este minarete del siglo IX?",
+    "Which South American camelid are travellers most likely to see on the grasslands of Torres del Paine?":
+      "¿Qué camélido sudamericano es más probable observar en las praderas de Torres del Paine?",
   },
 };
 const SPLIT_MARKER = "[[[SPLIT_7F3A]]]";

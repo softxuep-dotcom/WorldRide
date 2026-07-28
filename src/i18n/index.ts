@@ -2,13 +2,11 @@ import type {
   CountryDefinition,
   PhotoSpotDefinition,
 } from "../game/data";
-import { localizeAuthoredText } from "./content";
+import {
+  loadAuthoredTextLocale,
+  localizeAuthoredText,
+} from "./content";
 import { en } from "./locales/en";
-import { es } from "./locales/es";
-import { fr } from "./locales/fr";
-import { it } from "./locales/it";
-import { ptBR } from "./locales/pt-BR";
-import { zhCN } from "./locales/zh-CN";
 import type {
   LocaleDefinition,
   MessageKey,
@@ -20,21 +18,42 @@ const DEFAULT_LOCALE = "en";
 const SOURCE_LOCALE = "zh-CN";
 const STORAGE_KEY = "worldride.locale";
 
-const localeRegistry = {
-  "zh-CN": zhCN as LocaleDefinition,
-  en: en as LocaleDefinition,
-  fr: fr as LocaleDefinition,
-  "pt-BR": ptBR as LocaleDefinition,
-  it: it as LocaleDefinition,
-  es: es as LocaleDefinition,
+const localeMetadata = {
+  "zh-CN": { code: "zh-CN", htmlLang: "zh-CN", label: "中文" },
+  en: { code: "en", htmlLang: "en", label: "English" },
+  fr: { code: "fr", htmlLang: "fr", label: "Français" },
+  "pt-BR": {
+    code: "pt-BR",
+    htmlLang: "pt-BR",
+    label: "Português (Brasil)",
+  },
+  it: { code: "it", htmlLang: "it", label: "Italiano" },
+  es: { code: "es", htmlLang: "es", label: "Español" },
 };
 
-export type LocaleCode = keyof typeof localeRegistry;
+export type LocaleCode = keyof typeof localeMetadata;
+export type LocaleSummary = (typeof localeMetadata)[LocaleCode];
 
-let activeLocale: LocaleCode = detectInitialLocale();
+const localeRegistry: Partial<Record<LocaleCode, LocaleDefinition>> = {
+  en: en as LocaleDefinition,
+};
+const localeLoaders: Record<LocaleCode, () => Promise<LocaleDefinition>> = {
+  en: async () => en,
+  "zh-CN": () =>
+    import("./locales/zh-CN").then((module) => module.zhCN),
+  fr: () => import("./locales/fr").then((module) => module.fr),
+  "pt-BR": () =>
+    import("./locales/pt-BR").then((module) => module.ptBR),
+  it: () => import("./locales/it").then((module) => module.it),
+  es: () => import("./locales/es").then((module) => module.es),
+};
+
+let activeLocale: LocaleCode = DEFAULT_LOCALE;
 const listeners = new Set<(locale: LocaleCode) => void>();
 
-export function initializeI18n(): void {
+export async function initializeI18n(): Promise<void> {
+  activeLocale = detectInitialLocale();
+  await ensureLocaleLoaded(activeLocale);
   applyDocumentLanguage();
 }
 
@@ -42,16 +61,17 @@ export function getLocale(): LocaleCode {
   return activeLocale;
 }
 
-export function getSupportedLocales(): readonly LocaleDefinition[] {
-  return Object.values(localeRegistry);
+export function getSupportedLocales(): readonly LocaleSummary[] {
+  return Object.values(localeMetadata);
 }
 
-export function setLocale(locale: string): boolean {
+export async function setLocale(locale: string): Promise<boolean> {
   const resolved = resolveLocale(locale);
   if (!resolved || resolved === activeLocale) {
     return Boolean(resolved);
   }
 
+  await ensureLocaleLoaded(resolved);
   activeLocale = resolved;
   try {
     window.localStorage.setItem(STORAGE_KEY, resolved);
@@ -73,9 +93,11 @@ export function onLocaleChange(
 }
 
 export function t(key: MessageKey, params?: MessageParams): string {
+  const active =
+    localeRegistry[activeLocale] ?? (en as LocaleDefinition);
   const message =
-    localeRegistry[activeLocale].messages[key] ??
-    localeRegistry[DEFAULT_LOCALE].messages[key];
+    active.messages[key] ??
+    (en as LocaleDefinition).messages[key];
   return formatMessage(message, params);
 }
 
@@ -102,11 +124,13 @@ export function translateDocument(root: ParentNode = document): void {
 export function localizeCountry(
   country: CountryDefinition,
 ): CountryDefinition {
+  const active =
+    localeRegistry[activeLocale] ?? (en as LocaleDefinition);
   const translation =
-    localeRegistry[activeLocale].countries[country.id] ??
+    active.countries[country.id] ??
     (activeLocale === SOURCE_LOCALE
       ? undefined
-      : localeRegistry[DEFAULT_LOCALE].countries[country.id]);
+      : (en as LocaleDefinition).countries[country.id]);
   if (!translation) {
     return country;
   }
@@ -132,11 +156,13 @@ export function localizeCountry(
 export function localizePhotoSpot(
   spot: PhotoSpotDefinition,
 ): PhotoSpotDefinition {
+  const active =
+    localeRegistry[activeLocale] ?? (en as LocaleDefinition);
   const translation =
-    localeRegistry[activeLocale].photoSpots[spot.id] ??
+    active.photoSpots[spot.id] ??
     (activeLocale === SOURCE_LOCALE
       ? undefined
-      : localeRegistry[DEFAULT_LOCALE].photoSpots[spot.id]);
+      : (en as LocaleDefinition).photoSpots[spot.id]);
   return translation
     ? {
         ...spot,
@@ -154,11 +180,13 @@ export function localizePhotoSpot(
 export function getWorldCountryTranslation(
   atlasName: string,
 ): WorldCountryTranslation {
+  const active =
+    localeRegistry[activeLocale] ?? (en as LocaleDefinition);
   const translation =
-    localeRegistry[activeLocale].worldCountries[atlasName] ??
+    active.worldCountries[atlasName] ??
     (activeLocale === SOURCE_LOCALE
       ? {}
-      : localeRegistry[DEFAULT_LOCALE].worldCountries[atlasName]);
+      : (en as LocaleDefinition).worldCountries[atlasName]);
   if (activeLocale === SOURCE_LOCALE) {
     return translation ?? {};
   }
@@ -177,7 +205,8 @@ export function getWorldCountryTranslation(
 }
 
 function applyDocumentLanguage(): void {
-  const locale = localeRegistry[activeLocale];
+  const locale =
+    localeRegistry[activeLocale] ?? (en as LocaleDefinition);
   document.documentElement.lang = locale.htmlLang;
   document.documentElement.dir = locale.direction ?? "ltr";
   document.title = t("meta.title");
@@ -215,9 +244,9 @@ function detectInitialLocale(): LocaleCode {
 
 function resolveLocale(locale: string): LocaleCode | undefined {
   const normalized = locale.trim().toLowerCase();
-  const entries = Object.entries(localeRegistry) as readonly [
+  const entries = Object.entries(localeMetadata) as readonly [
     LocaleCode,
-    LocaleDefinition,
+    LocaleSummary,
   ][];
 
   for (const [code, definition] of entries) {
@@ -236,6 +265,13 @@ function resolveLocale(locale: string): LocaleCode | undefined {
     }
   }
   return undefined;
+}
+
+async function ensureLocaleLoaded(locale: LocaleCode): Promise<void> {
+  if (!localeRegistry[locale]) {
+    localeRegistry[locale] = await localeLoaders[locale]();
+  }
+  await loadAuthoredTextLocale(locale);
 }
 
 function formatMessage(message: string, params?: MessageParams): string {

@@ -20,7 +20,6 @@ declare global {
 
 export class PokiPlatformAdapter implements PlatformAdapter {
   readonly id = "poki";
-  readonly startupCommercial = true;
   private sdk?: PokiSdk;
 
   async initialize(): Promise<void> {

@@ -5,24 +5,25 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "generate:runtime-assets": "node scripts/generate-runtime-assets.mjs",
     "generate:ecology": "node scripts/generate-world-ecology.mjs",
     "generate:i18n-content": "node scripts/generate-content-translations.mjs",
     "check:i18n-content": "node scripts/generate-content-translations.mjs --check",
-    "build": "npm run check:i18n-content && tsc && vite build",
-    "build:poki": "npm run check:i18n-content && tsc && vite build --mode poki",
-    "build:crazygames": "npm run check:i18n-content && tsc && vite build --mode crazygames",
+    "build": "npm run generate:runtime-assets && npm run check:i18n-content && tsc && vite build",
+    "build:poki": "npm run generate:runtime-assets && npm run check:i18n-content && tsc && vite build --mode poki",
+    "build:crazygames": "npm run generate:runtime-assets && npm run check:i18n-content && tsc && vite build --mode crazygames",
     "package:poki": "npm run build:poki && node scripts/package-platform.mjs poki",
     "package:crazygames": "npm run build:crazygames && node scripts/package-platform.mjs crazygames",
     "preview": "vite preview"
   },
   "dependencies": {
-    "three": "^0.178.0",
-    "topojson-client": "^3.1.0",
-    "world-atlas": "^2.0.2"
+    "three": "^0.178.0"
   },
   "devDependencies": {
     "@types/geojson": "^7946.0.16",
     "@types/three": "^0.178.1",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2",
     "@types/topojson-client": "^3.1.5",
     "i18n-iso-countries": "^7.14.0",
     "typescript": "^5.8.3",

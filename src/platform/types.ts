@@ -3,7 +3,6 @@ export type AdKind = "commercial" | "rewarded";
 
 export interface PlatformAdapter {
   readonly id: GamePlatformId;
-  readonly startupCommercial: boolean;
   initialize(): Promise<void>;
   loadingStart(): void;
   loadingFinished(): void;

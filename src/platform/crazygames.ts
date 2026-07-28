@@ -33,7 +33,6 @@ declare global {
 
 export class CrazyGamesPlatformAdapter implements PlatformAdapter {
   readonly id = "crazygames";
-  readonly startupCommercial = false;
   private sdk?: CrazyGamesSdk;
 
   async initialize(): Promise<void> {
