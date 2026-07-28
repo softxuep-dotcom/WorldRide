@@ -132,6 +132,7 @@ export interface ProgressionSnapshot {
   completedTrips: number;
   unlockedPaints: string[];
   equippedPaint: string;
+  goldStamps: string[];
 }
 
 interface WishlistRow {
@@ -173,6 +174,15 @@ export class GameUI {
   private worldOverviewActive = false;
   private availableQuiz?: QuizSubject;
   private activeQuiz?: QuizSubject;
+  /** Set while the open panel is an arrival question rather than a full set. */
+  private arrivalQuizSpot?: PhotoSpotDefinition;
+  private arrivalQuizCorrect = false;
+  /** Held across the lazy quiz-module load so arrivals cannot race. */
+  private arrivalQuizPending = false;
+  /** Landmarks whose arrival question was answered correctly. Persisted. */
+  private readonly goldStamps = new Set<string>();
+  /** Consecutive correct arrivals; session-only, resets on a wrong answer. */
+  private arrivalStreak = 0;
   private quizIndex = 0;
   private quizCorrect = 0;
   private quizAnswered = false;
@@ -880,6 +890,12 @@ export class GameUI {
     if (this.unlockedPaints.has(snapshot.equippedPaint)) {
       this.equippedPaint = snapshot.equippedPaint;
     }
+    const knownSpots = new Set<string>(PHOTO_SPOTS.map((spot) => spot.id));
+    for (const id of snapshot.goldStamps ?? []) {
+      if (knownSpots.has(id)) {
+        this.goldStamps.add(id);
+      }
+    }
     this.tripStructureSig = undefined;
     this.onPaintChange(getPaint(this.equippedPaint).color);
     this.buildGarageGrid();
@@ -891,6 +907,7 @@ export class GameUI {
       completedTrips: this.completedTrips,
       unlockedPaints: [...this.unlockedPaints],
       equippedPaint: this.equippedPaint,
+      goldStamps: [...this.goldStamps],
     };
   }
 
@@ -1229,6 +1246,15 @@ export class GameUI {
     if (!active) {
       return;
     }
+    // Skipping an arrival question still hands over the postcard; it just
+    // forfeits the stamp. It must not run the normal completion bookkeeping,
+    // which would mark the landmark's whole quiz set as done.
+    if (this.arrivalQuizSpot) {
+      this.arrivalQuizCorrect = false;
+      this.elements.quizSkip.hidden = false;
+      this.finishArrivalQuiz();
+      return;
+    }
     const worldFlowCompleted =
       this.isWorldQuiz(active) && this.quizQuestionsAnswered > 0;
     const completedFlow =
@@ -1357,6 +1383,14 @@ export class GameUI {
       correct ? t("quiz.correct") : t("quiz.wrong")
     } ${this.quizModule?.localizeText(question.explain, locale) ?? ""}`;
 
+    if (this.arrivalQuizSpot) {
+      this.arrivalQuizCorrect = correct;
+      this.elements.quizSkip.hidden = true;
+      this.elements.quizNext.hidden = false;
+      this.elements.quizNext.textContent = t("quiz.arrivalContinue");
+      return;
+    }
+
     const isLast =
       !this.isWorldQuiz(active) &&
       this.quizIndex >= active.quiz.questions.length - 1;
@@ -1369,6 +1403,11 @@ export class GameUI {
   private advanceQuiz(): void {
     const active = this.activeQuiz;
     if (!active) {
+      return;
+    }
+
+    if (this.arrivalQuizSpot) {
+      this.finishArrivalQuiz();
       return;
     }
 
@@ -1533,7 +1572,11 @@ export class GameUI {
       this.elements.landmarkDetail.classList.contains("is-visible") ||
       this.elements.passportPanel.classList.contains("is-visible") ||
       this.elements.postcardAlbum.classList.contains("is-visible") ||
-      Boolean(this.activeQuiz)
+      Boolean(this.activeQuiz) ||
+      // Hold the car the moment an arrival begins, not once the lazily loaded
+      // quiz module finally resolves: otherwise it coasts on through the next
+      // landmarks and hands out their postcards unasked.
+      this.arrivalQuizPending
     );
   }
 
@@ -1638,16 +1681,102 @@ export class GameUI {
       this.elements.flash.classList.add("is-active");
     }
 
-    // An automatic pickup happens mid-drive, so it must never open the modal:
-    // that blocks movement and would interrupt the player every time they pass
-    // a landmark. The postcard reveal is non-blocking instead, and the full
-    // write-up stays one tap away on the place card.
+    // Arriving is the beat the whole loop hangs on, so it asks a question
+    // about the place instead of handing over a postcard silently. Ten-plus
+    // playtesters never once opened the challenge from its corner button;
+    // putting it on the route means the decision becomes "answer or skip"
+    // rather than "notice a button". Players who would rather not be asked can
+    // steer around the landmark: the marker glows about 2.5 seconds ahead at
+    // cruise speed, and dodging it costs roughly half a second.
     if (automatic) {
-      this.revealPostcard(spot);
+      void this.startArrivalQuiz(spot);
       return;
     }
 
     this.showLandmarkDetail(spot, firstCollection);
+  }
+
+  /**
+   * One question, never a whole set: the arrival has to stay swallowable, and
+   * 54 landmarks already supply a long tail. The postcard is granted no matter
+   * what — being weak at geography must not block collection — so a correct
+   * answer buys the gold stamp and the streak, not the card itself.
+   */
+  private async startArrivalQuiz(spot: PhotoSpotDefinition): Promise<void> {
+    // The guard has to be set synchronously: the quiz module loads lazily, and
+    // the car keeps driving across that await, so a second landmark can arrive
+    // before `activeQuiz` exists and open a competing question.
+    if (this.activeQuiz || this.arrivalQuizPending || spot.visitMode === "reflection") {
+      this.revealPostcard(spot, "plain");
+      return;
+    }
+    this.arrivalQuizPending = true;
+
+    await this.ensureQuizLoaded();
+    this.arrivalQuizPending = false;
+    const module = this.quizModule;
+    const set = module?.getSpotQuiz(spot.id);
+    const question = set?.questions.length
+      ? set.questions[Math.floor(Math.random() * set.questions.length)]
+      : undefined;
+    if (!module || !question) {
+      this.revealPostcard(spot, "plain");
+      return;
+    }
+
+    this.setSettingsOpen(false);
+    this.setWishlistOpen(false);
+    this.togglePassport(false);
+    this.toggleLandmarkDetail(false);
+    this.toggleAlbum(false);
+
+    this.arrivalQuizSpot = spot;
+    this.arrivalQuizCorrect = false;
+    this.activeQuiz = {
+      quiz: { id: `arrival:${spot.id}`, questions: [question] },
+      label: localizePhotoSpot(spot).name,
+    };
+    this.quizIndex = 0;
+    this.quizCorrect = 0;
+    this.quizQuestionsAnswered = 0;
+    this.quizFlowCompleted = false;
+    this.elements.quizSkip.textContent = t("quiz.arrivalSkip");
+    this.elements.quizPanel.classList.add("is-visible");
+    this.elements.quizPanel.setAttribute("aria-hidden", "false");
+    this.syncSurfaceState();
+    this.renderQuizQuestion();
+  }
+
+  /** Closes an arrival question and hands over the postcard it was gating. */
+  private finishArrivalQuiz(): void {
+    const spot = this.arrivalQuizSpot;
+    if (!spot) {
+      return;
+    }
+    const correct = this.arrivalQuizCorrect;
+    this.arrivalQuizSpot = undefined;
+    this.arrivalQuizCorrect = false;
+
+    if (correct) {
+      this.goldStamps.add(spot.id);
+      this.arrivalStreak += 1;
+      this.onProgressionChanged();
+    } else {
+      this.arrivalStreak = 0;
+    }
+
+    this.activeQuiz = undefined;
+    this.quizFlowCompleted = false;
+    this.quizQuestionsAnswered = 0;
+    this.elements.quizSkip.textContent = t("quiz.leave");
+    this.elements.quizPanel.classList.remove("is-visible");
+    this.elements.quizPanel.setAttribute("aria-hidden", "true");
+    this.syncSurfaceState();
+    this.refreshQuizAvailability(
+      this.currentCountry,
+      this.currentNearestPhotoSpot,
+    );
+    this.revealPostcard(spot, correct ? "gold" : "plain");
   }
 
   /**
@@ -1673,10 +1802,14 @@ export class GameUI {
     this.elements.cruiseVeil.style.opacity = (level * 0.9).toFixed(2);
   }
 
-  private revealPostcard(spot: PhotoSpotDefinition): void {
+  private revealPostcard(
+    spot: PhotoSpotDefinition,
+    stampKind: "gold" | "plain" = "plain",
+  ): void {
     const localized = localizePhotoSpot(spot);
     const card = document.createElement("div");
     card.className = "postcard-reveal";
+    card.classList.toggle("is-gold", stampKind === "gold");
 
     const art = buildPostcardArt(spot, this.spotCountry(spot));
     art.classList.add("postcard-reveal__art");
@@ -1692,9 +1825,18 @@ export class GameUI {
     const stamp = document.createElement("span");
     stamp.className = "postcard-reveal__stamp";
     stamp.setAttribute("aria-hidden", "true");
-    stamp.textContent = "✦";
+    stamp.textContent = stampKind === "gold" ? "★" : "✦";
 
     card.append(art, caption, stamp);
+    if (stampKind === "gold") {
+      const badge = document.createElement("span");
+      badge.className = "postcard-reveal__badge";
+      badge.textContent =
+        this.arrivalStreak > 1
+          ? t("quiz.arrivalStreak", { count: this.arrivalStreak })
+          : t("quiz.arrivalGold");
+      card.append(badge);
+    }
     this.elements.postcardReveals.append(card);
     card.addEventListener("animationend", () => card.remove());
   }

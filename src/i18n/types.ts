@@ -77,6 +77,10 @@ export interface UiMessages {
   "quiz.world": string;
   "quiz.challenge": string;
   "quiz.start": string;
+  "quiz.arrivalSkip": string;
+  "quiz.arrivalContinue": string;
+  "quiz.arrivalGold": string;
+  "quiz.arrivalStreak": string;
   "quiz.close": string;
   "quiz.leave": string;
   "quiz.next": string;

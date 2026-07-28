@@ -230,6 +230,14 @@ export const zhCN = {
     "quiz.world": "世界知识",
     "quiz.challenge": "挑战",
     "quiz.start": "开始知识挑战",
+
+    "quiz.arrivalSkip": "跳过这题",
+
+    "quiz.arrivalContinue": "继续上路",
+
+    "quiz.arrivalGold": "★ 金章",
+
+    "quiz.arrivalStreak": "★ 连对 {count} 次",
     "quiz.close": "关闭挑战",
     "quiz.leave": "先不答",
     "quiz.next": "下一题",

@@ -2956,3 +2956,29 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
     );
   }
 }
+
+/* Gold stamp: the arrival question answered correctly. */
+.postcard-reveal.is-gold {
+  box-shadow: 0 14px 34px rgba(180, 132, 22, 0.42);
+}
+
+.postcard-reveal.is-gold .postcard-reveal__stamp {
+  background: linear-gradient(150deg, #ffd76b, #e0a72e);
+  border-color: rgba(255, 255, 255, 0.92);
+  color: #6b4a08;
+}
+
+.postcard-reveal__badge {
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: linear-gradient(150deg, #ffd76b, #e0a72e);
+  color: #6b4a08;
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 0 5px 14px rgba(180, 132, 22, 0.4);
+}

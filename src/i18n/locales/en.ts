@@ -251,6 +251,14 @@ export const en = {
     "quiz.world": "World knowledge",
     "quiz.challenge": "Challenge",
     "quiz.start": "Start knowledge challenge",
+
+    "quiz.arrivalSkip": "Skip this one",
+
+    "quiz.arrivalContinue": "Back on the road",
+
+    "quiz.arrivalGold": "★ Gold stamp",
+
+    "quiz.arrivalStreak": "★ {count} in a row",
     "quiz.close": "Close the challenge",
     "quiz.leave": "Leave",
     "quiz.next": "Next question",

@@ -140,6 +140,7 @@ export class PocketEarthGame {
       completedTrips: snapshot.completedTrips,
       unlockedPaints: snapshot.unlockedPaints,
       equippedPaint: snapshot.equippedPaint,
+      goldStamps: snapshot.goldStamps,
     });
     this.restoredFromSave = true;
   }

@@ -76,6 +76,14 @@ const messages = {
   "quiz.world": "Weltwissen",
   "quiz.challenge": "Herausforderung",
   "quiz.start": "Wissensquiz starten",
+
+  "quiz.arrivalSkip": "Überspringen",
+
+  "quiz.arrivalContinue": "Weiterfahren",
+
+  "quiz.arrivalGold": "★ Goldstempel",
+
+  "quiz.arrivalStreak": "★ {count} in Folge",
   "quiz.close": "Herausforderung schließen",
   "quiz.leave": "Verlassen",
   "quiz.next": "Nächste Frage",

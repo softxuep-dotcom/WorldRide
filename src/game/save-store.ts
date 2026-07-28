@@ -23,6 +23,7 @@ export interface SaveSnapshot {
   completedTrips: number;
   unlockedPaints: string[];
   equippedPaint: string;
+  goldStamps: string[];
 }
 
 function probeStorage(): Storage | undefined {
@@ -100,6 +101,7 @@ function parseSnapshot(raw: string): SaveSnapshot | undefined {
     unlockedPaints: toStringArray(candidate.unlockedPaints),
     equippedPaint:
       typeof candidate.equippedPaint === "string" ? candidate.equippedPaint : "",
+    goldStamps: toStringArray(candidate.goldStamps),
   };
 }
 
