@@ -120,6 +120,7 @@ interface UIElements {
   albumProgress: HTMLElement;
   albumEmpty: HTMLElement;
   albumGrid: HTMLElement;
+  postcardReveals: HTMLElement;
   tripProgress: HTMLElement;
   garageGrid: HTMLElement;
 }
@@ -290,6 +291,7 @@ export class GameUI {
       albumProgress: requireElement("album-progress"),
       albumEmpty: requireElement("album-empty"),
       albumGrid: requireElement("album-grid"),
+      postcardReveals: requireElement("postcard-reveals"),
       tripProgress: requireElement("trip-progress"),
       garageGrid: requireElement("garage-grid"),
     };
@@ -1402,7 +1404,11 @@ export class GameUI {
         this.showToast(t("toast.worldWrapped"));
         break;
       case "postcard-collected":
-        this.capturePostcard(event.spot, event.firstCollection);
+        this.capturePostcard(
+          event.spot,
+          event.firstCollection,
+          event.automatic ?? false,
+        );
         break;
       case "specialty-discovered":
         this.announceSpecialty(event.specialty, event.firstDiscovery);
@@ -1560,14 +1566,59 @@ export class GameUI {
     this.toggleLandmarkDetail(true);
   }
 
-  private capturePostcard(spot: PhotoSpotDefinition, firstCollection: boolean): void {
+  private capturePostcard(
+    spot: PhotoSpotDefinition,
+    firstCollection: boolean,
+    automatic: boolean,
+  ): void {
     if (spot.visitMode !== "reflection") {
       this.elements.flash.classList.remove("is-active");
       void this.elements.flash.offsetWidth;
       this.elements.flash.classList.add("is-active");
     }
 
+    // An automatic pickup happens mid-drive, so it must never open the modal:
+    // that blocks movement and would interrupt the player every time they pass
+    // a landmark. The postcard reveal is non-blocking instead, and the full
+    // write-up stays one tap away on the place card.
+    if (automatic) {
+      this.revealPostcard(spot);
+      return;
+    }
+
     this.showLandmarkDetail(spot, firstCollection);
+  }
+
+  /**
+   * The collected artwork, shown briefly over the drive. Playtests showed the
+   * old feedback was a white flash and nothing else: the illustration only
+   * existed on the placard and two taps deep in the album, so collecting felt
+   * like it produced no object at all.
+   */
+  private revealPostcard(spot: PhotoSpotDefinition): void {
+    const localized = localizePhotoSpot(spot);
+    const card = document.createElement("div");
+    card.className = "postcard-reveal";
+
+    const art = buildPostcardArt(spot, this.spotCountry(spot));
+    art.classList.add("postcard-reveal__art");
+
+    const caption = document.createElement("span");
+    caption.className = "postcard-reveal__caption";
+    const name = document.createElement("strong");
+    name.textContent = localized.name;
+    const count = document.createElement("small");
+    count.textContent = `${this.latestState?.collectedPostcards.size ?? 0} / ${PHOTO_SPOTS.length}`;
+    caption.append(name, count);
+
+    const stamp = document.createElement("span");
+    stamp.className = "postcard-reveal__stamp";
+    stamp.setAttribute("aria-hidden", "true");
+    stamp.textContent = "✦";
+
+    card.append(art, caption, stamp);
+    this.elements.postcardReveals.append(card);
+    card.addEventListener("animationend", () => card.remove());
   }
 
   private showLandmarkDetail(
@@ -1943,7 +1994,7 @@ export class GameUI {
   }
 }
 
-const INTERACT_RADIUS = 2.6;
+const INTERACT_RADIUS = 3.5;
 const LANDMARK_STEPS = [10, 20, 30] as const;
 const COUNTRY_STEPS = [25, 50, 100] as const;
 

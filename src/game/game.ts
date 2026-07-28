@@ -95,6 +95,10 @@ export class PocketEarthGame {
     this.compassAvailable = this.restoredFromSave;
     this.ui.setCompassAvailable(this.compassAvailable);
     this.simulation.update(0, { x: 0, z: 0 });
+    // Prime the UI before draining events: arriving at the spawn landmark
+    // already emits a collection, and its postcard reveal reads the running
+    // total, which would otherwise still be unset and render "0".
+    this.ui.update(this.simulation.state);
     // Establish Paris as the starting context without pretending that the
     // player has just crossed a border into France.
     this.processEvents(true);

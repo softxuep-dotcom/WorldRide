@@ -32,7 +32,13 @@ export type GameEvent =
   | { type: "cruise-flow" }
   | { type: "map-edge" }
   | { type: "world-wrapped"; deltaX: number }
-  | { type: "postcard-collected"; spot: PhotoSpotDefinition; firstCollection: boolean }
+  | {
+      type: "postcard-collected";
+      spot: PhotoSpotDefinition;
+      firstCollection: boolean;
+      /** True when arriving collected it, rather than a deliberate press. */
+      automatic?: boolean;
+    }
   | {
       type: "specialty-discovered";
       specialty: RegionalSpecialtyDefinition;
@@ -61,11 +67,19 @@ const startWorld = geoToWorld(START_POINT);
 const minimumWorld = geoToWorld([MAP_BOUNDS.minLongitude, MAP_BOUNDS.maxLatitude]);
 const maximumWorld = geoToWorld([MAP_BOUNDS.maxLongitude, MAP_BOUNDS.minLatitude]);
 
+/**
+ * Face north-west out of Paris. Heading 0 pointed due north, which is one of
+ * the three directions where the next landmark is over fifty seconds away;
+ * north-west reaches Big Ben in about a second, so the first instinctive drag
+ * forward now runs into content instead of open sea.
+ */
+const START_HEADING = Math.PI / 4;
+
 export class GameSimulation {
   readonly state: GameState = {
     position: { ...startWorld },
     velocity: { x: 0, z: 0 },
-    heading: 0,
+    heading: START_HEADING,
     vehicleMode: "car",
     cruiseFlow: 0,
     modeTransition: 0,
@@ -335,13 +349,35 @@ export class GameSimulation {
         spotWorld.z - this.state.position.z,
       );
 
-      if (distance < 2.6 && distance < nearestDistance) {
+      if (distance < LANDMARK_INTERACT_RADIUS && distance < nearestDistance) {
         nearest = spot;
         nearestDistance = distance;
       }
     }
 
     this.state.nearestPhotoSpot = nearest;
+
+    // Playtests showed players driving straight past landmarks: the on-screen
+    // prompt existed, but nothing ever required them to stop, so most sessions
+    // ended without the core loop happening even once. Arriving now collects
+    // the postcard by itself, the same way roadside specialties already work.
+    //
+    // Memorial sites are deliberately excluded. They use a quiet, deliberate
+    // visit flow, and auto-collecting one while driving past would turn a
+    // place of remembrance into incidental loot.
+    if (
+      nearest &&
+      nearest.visitMode !== "reflection" &&
+      !this.state.collectedPostcards.has(nearest.id)
+    ) {
+      this.state.collectedPostcards.add(nearest.id);
+      this.events.push({
+        type: "postcard-collected",
+        spot: nearest,
+        firstCollection: true,
+        automatic: true,
+      });
+    }
   }
 
   /**
@@ -380,6 +416,14 @@ export class GameSimulation {
     }
   }
 }
+
+/**
+ * Widened from 2.6 after playtests: at 5.6 units/s a 2.6 radius kept a landmark
+ * in range for well under a second, so players drove straight through. 3.5
+ * roughly doubles that window while staying below the 4.7-unit tenth-percentile
+ * spacing between landmarks, so neighbouring sites rarely contest a pickup.
+ */
+const LANDMARK_INTERACT_RADIUS = 3.5;
 
 const SPECIALTY_DISCOVERY_RADIUS = 1.9;
 const CRUISE_ALIGNMENT = 0.94;
