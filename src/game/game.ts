@@ -406,9 +406,11 @@ export class PocketEarthGame {
     this.sunTarget.position.copy(lightingCenter);
     this.sun.castShadow = easedOverviewBlend < 0.35;
 
+    // The pull-back is what sells the wind-up: at 0.55 units it was below the
+    // threshold of noticing, so cruising looked identical to crawling.
     const targetViewSize =
       this.getTargetViewSize() +
-      (cruiseFlow * 0.55 + modeTransition * 1.25) * localFactor;
+      (cruiseFlow * 2.2 + modeTransition * 1.25) * localFactor;
     this.projectionViewSize +=
       (targetViewSize - this.projectionViewSize) * transitionSmoothing;
     this.applyCameraProjection(this.projectionViewSize);

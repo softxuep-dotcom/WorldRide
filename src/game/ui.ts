@@ -121,6 +121,7 @@ interface UIElements {
   albumEmpty: HTMLElement;
   albumGrid: HTMLElement;
   postcardReveals: HTMLElement;
+  cruiseVeil: HTMLElement;
   tripProgress: HTMLElement;
   garageGrid: HTMLElement;
 }
@@ -165,6 +166,7 @@ export class GameUI {
   private currentCountry?: CountryProfile;
   private currentNearestPhotoSpot?: PhotoSpotDefinition;
   private currentNearestSpecialty?: RegionalSpecialtyDefinition;
+  private renderedCruiseLevel?: number;
   private renderedTotalsKey?: string;
   private renderedRegionKey?: string;
   private selectedPhotoSpotFirstCollection = false;
@@ -292,6 +294,7 @@ export class GameUI {
       albumEmpty: requireElement("album-empty"),
       albumGrid: requireElement("album-grid"),
       postcardReveals: requireElement("postcard-reveals"),
+      cruiseVeil: requireElement("cruise-veil"),
       tripProgress: requireElement("trip-progress"),
       garageGrid: requireElement("garage-grid"),
     };
@@ -458,6 +461,7 @@ export class GameUI {
     }
     this.previousNearestPhotoSpot = nearestId;
     this.refreshQuizAvailability(profile, state.nearestPhotoSpot);
+    this.updateCruiseVeil(state.cruiseFlow);
     this.checkMilestones(state);
     this.updateProgression(state);
     this.updateCompass(state);
@@ -1595,6 +1599,23 @@ export class GameUI {
    * existed on the placard and two taps deep in the album, so collecting felt
    * like it produced no object at all.
    */
+  /**
+   * Quantised to twentieths: this runs every frame, and writing an unrounded
+   * custom property each time would invalidate style on the whole layer for
+   * changes no one can see.
+   */
+  private updateCruiseVeil(cruiseFlow: number): void {
+    const level = Math.round(cruiseFlow * 20) / 20;
+    if (level === this.renderedCruiseLevel) {
+      return;
+    }
+    this.renderedCruiseLevel = level;
+    // Set opacity directly rather than driving it through a custom property in
+    // calc(): the indirection computed to zero in-browser and is not worth
+    // debugging for a value this simple.
+    this.elements.cruiseVeil.style.opacity = (level * 0.9).toFixed(2);
+  }
+
   private revealPostcard(spot: PhotoSpotDefinition): void {
     const localized = localizePhotoSpot(spot);
     const card = document.createElement("div");

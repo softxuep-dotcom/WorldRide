@@ -426,11 +426,22 @@ export class GameSimulation {
 const LANDMARK_INTERACT_RADIUS = 3.5;
 
 const SPECIALTY_DISCOVERY_RADIUS = 1.9;
+/**
+ * Cruise flow is the one driving skill the game has: hold a steady line and
+ * the vehicle winds up, turn and it collapses. It shipped almost invisible —
+ * an 18% top-end bonus that no player could feel — so the whole point of the
+ * mechanic was lost. The numbers below make holding a line actually pay.
+ *
+ * Building stays deliberately slower than breaking: winding up should feel
+ * earned, losing it should be immediate, and that asymmetry is what turns a
+ * turn into a real cost. Veering off to grab a landmark now trades speed for
+ * the postcard, which is the first genuine decision the drive contains.
+ */
 const CRUISE_ALIGNMENT = 0.94;
-const CRUISE_BUILD_RATE = 1.35;
-const CRUISE_BREAK_RATE = 4.8;
-const CRUISE_SPEED_START = 0.48;
-const CRUISE_SPEED_BONUS = 0.18;
+const CRUISE_BUILD_RATE = 1.7;
+const CRUISE_BREAK_RATE = 5.2;
+const CRUISE_SPEED_START = 0.3;
+const CRUISE_SPEED_BONUS = 0.45;
 const CRUISE_CUE_THRESHOLD = 0.82;
 const CRUISE_REARM_THRESHOLD = 0.42;
 const CRUISE_CUE_COOLDOWN_SECONDS = 7;
