@@ -29,6 +29,7 @@ const localeMetadata = {
   },
   it: { code: "it", htmlLang: "it", label: "Italiano" },
   es: { code: "es", htmlLang: "es", label: "Español" },
+  de: { code: "de", htmlLang: "de", label: "Deutsch" },
 };
 
 export type LocaleCode = keyof typeof localeMetadata;
@@ -46,6 +47,7 @@ const localeLoaders: Record<LocaleCode, () => Promise<LocaleDefinition>> = {
     import("./locales/pt-BR").then((module) => module.ptBR),
   it: () => import("./locales/it").then((module) => module.it),
   es: () => import("./locales/es").then((module) => module.es),
+  de: () => import("./locales/de").then((module) => module.de),
 };
 
 let activeLocale: LocaleCode = DEFAULT_LOCALE;

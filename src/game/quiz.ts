@@ -2,6 +2,10 @@ import {
   PHOTO_SPOTS,
   type PhotoSpotId,
 } from "./data";
+import { COUNTRY_EXTRA_QUESTIONS } from "./country-extra-questions";
+import { COUNTRY_CONTEXT_QUESTION_COPY } from "./country-question-copy";
+import { COUNTRY_SUBJECT_QUESTIONS } from "./country-subject-questions";
+import { LANDMARK_CORE_QUESTION_PROMPTS } from "./landmark-core-question-copy";
 import { LANDMARK_THIRD_QUESTIONS } from "./landmark-third-questions";
 import { localizeAuthoredText } from "../i18n/content";
 import { TIER_A_COUNTRY_NAMES } from "./world-map";
@@ -33,8 +37,8 @@ export interface QuizSet {
 }
 
 const FALLBACK_LOCALE = "en";
-const QUIZ_BANK_VERSION = 3;
-const SPOT_QUIZ_BANK_VERSION = 4;
+const QUIZ_BANK_VERSION = 5;
+const SPOT_QUIZ_BANK_VERSION = 5;
 
 export function localizeText(text: LocalizedText, locale: string): string {
   const fallback = text[FALLBACK_LOCALE] ?? Object.values(text)[0] ?? "";
@@ -547,6 +551,12 @@ function buildCountryQuizBank(): Readonly<Record<TierACountryName, QuizSet>> {
   const bank = {} as Record<TierACountryName, QuizSet>;
   TIER_A_COUNTRY_NAMES.forEach((name, index) => {
     const seed = COUNTRY_QUIZ_SEEDS[name];
+    const contextCopy = COUNTRY_CONTEXT_QUESTION_COPY[name];
+    const subject = COUNTRY_SUBJECT_QUESTIONS[name];
+    const extra = COUNTRY_EXTRA_QUESTIONS[name];
+    if (!contextCopy || !subject || !extra) {
+      throw new Error(`Country quiz "${name}" is missing authored question copy.`);
+    }
     const slug = name.toLowerCase().replaceAll(/[^a-z]+/g, "-");
     const answerIndex = index % 3;
     const landscapeDistractors = [
@@ -568,34 +578,36 @@ function buildCountryQuizBank(): Readonly<Record<TierACountryName, QuizSet>> {
     const questions = [
       seed.feature,
       quizQuestion(
-        `${slug}-landscape`,
-        [
-          `Which landscape is most strongly associated with ${seed.label[0]}?`,
-          `以下哪种景观最能代表${seed.label[1]}？`,
-        ],
+        `${slug}-context-v2`,
+        contextCopy[0].prompt,
         insertCorrectOption(seed.landscape, landscapeDistractors, answerIndex),
         answerIndex,
-        [
-          `${seed.landscape[0]} is a characteristic scene of ${seed.label[0]}.`,
-          `${seed.landscape[1]}是${seed.label[1]}具有代表性的景观。`,
-        ],
+        contextCopy[0].explain,
       ),
       quizQuestion(
-        `${slug}-signature`,
-        [
-          `Which cultural or natural signature is closely associated with ${seed.label[0]}?`,
-          `以下哪项文化或自然标志与${seed.label[1]}关系最密切？`,
-        ],
+        `${slug}-subject-v2`,
+        subject.prompt,
+        subject.options,
+        subject.answerIndex,
+        subject.explain,
+      ),
+      quizQuestion(
+        `${slug}-culture-v2`,
+        contextCopy[1].prompt,
         insertCorrectOption(
           seed.signature,
           signatureDistractors,
           (answerIndex + 1) % 3,
         ),
         (answerIndex + 1) % 3,
-        [
-          `${seed.signature[0]} is closely associated with ${seed.label[0]}.`,
-          `${seed.signature[1]}是${seed.label[1]}具有辨识度的文化或自然标志。`,
-        ],
+        contextCopy[1].explain,
+      ),
+      quizQuestion(
+        `${slug}-extra-v2`,
+        extra.prompt,
+        extra.options,
+        extra.answerIndex,
+        extra.explain,
       ),
     ];
     bank[name] = {
@@ -652,9 +664,14 @@ function spotQuiz(
     third.answerIndex,
     third.explain,
   );
+  const corePrompts = LANDMARK_CORE_QUESTION_PROMPTS[id];
+  const revisedCoreQuestions = questions.map((question, index) => ({
+    ...question,
+    prompt: bilingual(corePrompts[index]),
+  }));
   return {
     id: `spot:v${SPOT_QUIZ_BANK_VERSION}:${id}`,
-    questions: [...questions, thirdQuestion],
+    questions: [...revisedCoreQuestions, thirdQuestion],
   };
 }
 
@@ -703,7 +720,7 @@ function expansionSpotQuiz(
   return spotQuiz(id, [
     spotQuestion(
       `${id}-country`,
-      ["In which country is this place located?", "这个地点位于哪个国家？"],
+      LANDMARK_CORE_QUESTION_PROMPTS[id][0],
       countryOptions,
       0,
       [
@@ -1820,7 +1837,7 @@ const WORLD_QUIZ_POOL: readonly QuizSet[] = [
   ...Object.values(SPOT_QUIZZES),
 ];
 
-const WORLD_CHALLENGE_VERSION = 4;
+const WORLD_CHALLENGE_VERSION = 6;
 interface WorldChallengeSource {
   countryName: string;
   quiz: QuizSet;

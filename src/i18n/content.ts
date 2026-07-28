@@ -1,4 +1,4 @@
-export const CONTENT_LOCALES = ["fr", "pt-BR", "it", "es"] as const;
+export const CONTENT_LOCALES = ["fr", "pt-BR", "it", "es", "de"] as const;
 
 export type ContentLocale = (typeof CONTENT_LOCALES)[number];
 
@@ -11,6 +11,7 @@ const contentLoaders: Record<
   () => Promise<Readonly<Record<string, string>>>
 > = {
   es: () => import("./content/es.json").then((module) => module.default),
+  de: () => import("./content/de.json").then((module) => module.default),
   fr: () => import("./content/fr.json").then((module) => module.default),
   it: () => import("./content/it.json").then((module) => module.default),
   "pt-BR": () =>

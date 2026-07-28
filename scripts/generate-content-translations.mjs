@@ -10,6 +10,7 @@ const OUTPUT_DIR = path.join(ROOT_DIR, "src", "i18n", "content");
 const require = createRequire(import.meta.url);
 const isoCountries = require("i18n-iso-countries");
 const TARGETS = {
+  de: "de",
   fr: "fr",
   "pt-BR": "pt",
   it: "it",
