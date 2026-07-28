@@ -58,9 +58,7 @@ async function bootstrap(): Promise<void> {
   loading.update(0.58, t("loading.engine"));
   game = new PocketEarthGame(
     canvas,
-    () => {
-      void platform.quizCommercialBreak();
-    },
+    () => platform.quizCommercialBreak(),
     platform.id === "web" ? undefined : () => platform.rewardedBreak(),
   );
 

@@ -41,7 +41,7 @@ export class PocketEarthGame {
 
   constructor(
     canvas: HTMLCanvasElement,
-    onCommercialBreak: () => void = () => {},
+    onCommercialBreak: () => Promise<boolean> = async () => false,
     onRewardedBreak?: () => Promise<boolean>,
   ) {
     this.renderer = new THREE.WebGLRenderer({

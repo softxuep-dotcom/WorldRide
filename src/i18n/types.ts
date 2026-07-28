@@ -76,6 +76,7 @@ export interface UiMessages {
   "toast.contextRestored": string;
   "quiz.world": string;
   "quiz.challenge": string;
+  "quiz.start": string;
   "quiz.close": string;
   "quiz.leave": string;
   "quiz.next": string;
@@ -88,6 +89,8 @@ export interface UiMessages {
   "quiz.perfect": string;
   "quiz.retry": string;
   "quiz.completedToast": string;
+  "quiz.firstReward": string;
+  "quiz.firstRewardProgress": string;
   "specialty.discovered": string;
   "specialty.seenAgain": string;
   "specialty.kind": string;
@@ -142,6 +145,7 @@ export interface UiMessages {
   "garage.rewarded.unlocked": string;
   "paint.name.coral": string;
   "paint.name.sunset": string;
+  "paint.name.royal": string;
   "paint.name.sky": string;
   "paint.name.forest": string;
   "paint.name.sand": string;

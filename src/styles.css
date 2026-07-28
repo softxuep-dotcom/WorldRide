@@ -2360,11 +2360,39 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
 }
 
 .action-dock .quiz-button {
+  position: relative;
+  inset: auto;
   gap: 8px;
   padding: 4px 12px;
+  overflow: hidden;
   background: var(--coral);
   color: white;
   animation: none;
+}
+
+.action-dock .quiz-button.is-onboarding:not(:disabled) {
+  animation: quiz-onboarding-pulse 1.9s ease-in-out infinite;
+}
+
+.action-dock .quiz-button.is-onboarding:not(:disabled)::after {
+  position: absolute;
+  inset: -45% auto -45% -35%;
+  width: 28%;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.58),
+    transparent
+  );
+  transform: translateX(-180%) skewX(-18deg);
+  animation: quiz-onboarding-shine 3.2s ease-in-out infinite;
+}
+
+.action-dock .quiz-button > * {
+  position: relative;
+  z-index: 1;
 }
 
 .action-dock .quiz-button small,
@@ -2385,6 +2413,40 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
 
 .action-dock .quiz-button.is-completed {
   background: #318d62;
+}
+
+@keyframes quiz-onboarding-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 112, 88, 0.2);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 112, 88, 0.2);
+    filter: brightness(1.08);
+  }
+}
+
+@keyframes quiz-onboarding-shine {
+  0%,
+  42% {
+    transform: translateX(-180%) skewX(-18deg);
+  }
+  68%,
+  100% {
+    transform: translateX(620%) skewX(-18deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-dock .quiz-button.is-onboarding:not(:disabled) {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(255, 112, 88, 0.22);
+  }
+
+  .action-dock .quiz-button.is-onboarding:not(:disabled)::after {
+    display: none;
+  }
 }
 
 .settings-popover {

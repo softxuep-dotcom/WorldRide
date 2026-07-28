@@ -176,6 +176,7 @@ export class GameUI {
   private quizAnswered = false;
   private quizQuestionsAnswered = 0;
   private quizFlowCompleted = false;
+  private pendingFirstQuizReward = false;
   private quizFinishTimer?: number;
   private readonly completedQuizzes = new Set<string>();
   private latestState?: GameState;
@@ -196,7 +197,7 @@ export class GameUI {
   private readonly onCelebrate: () => void;
   private readonly onPaintChange: (color: number) => void;
   private readonly onProgressionChanged: () => void;
-  private readonly onCommercialBreak: () => void;
+  private readonly onCommercialBreak: () => Promise<boolean>;
   private readonly onRewardedBreak?: () => Promise<boolean>;
   private rewardPending = false;
   private trip: PhotoSpotId[] = [];
@@ -217,7 +218,7 @@ export class GameUI {
     onCelebrate: () => void = () => {},
     onPaintChange: (color: number) => void = () => {},
     onProgressionChanged: () => void = () => {},
-    onCommercialBreak: () => void = () => {},
+    onCommercialBreak: () => Promise<boolean> = async () => false,
     onRewardedBreak?: () => Promise<boolean>,
   ) {
     this.onCelebrate = onCelebrate;
@@ -296,6 +297,7 @@ export class GameUI {
       garageGrid: requireElement("garage-grid"),
     };
 
+    this.syncQuizOnboardingState();
     this.buildLanguageSelector();
     const { halo, dot } = this.buildMiniMap();
     this.playerHalo = halo;
@@ -1139,12 +1141,14 @@ export class GameUI {
     for (const id of ids) {
       this.completedQuizzes.add(id);
     }
+    this.syncQuizOnboardingState();
   }
 
   private refreshQuizAvailability(
     profile: CountryProfile | undefined,
     spot: PhotoSpotDefinition | undefined,
   ): void {
+    this.syncQuizOnboardingState();
     const quizModule = this.quizModule;
     if (!quizModule) {
       this.availableQuiz = undefined;
@@ -1172,12 +1176,17 @@ export class GameUI {
     this.availableQuiz = subject;
 
     const completed = this.completedQuizzes.has(subject.quiz.id);
+    const firstChallengePending = this.completedQuizzes.size === 0;
     this.elements.quizButton.hidden = false;
     this.elements.quizButton.disabled = false;
     this.elements.quizButton.classList.toggle("is-completed", completed);
     this.elements.quizButtonSubject.textContent = subject.label;
     this.elements.quizButtonAction.textContent = t(
-      completed ? "quiz.retry" : "quiz.challenge",
+      firstChallengePending
+        ? "quiz.start"
+        : completed
+          ? "quiz.retry"
+          : "quiz.challenge",
     );
     this.elements.quizButton.setAttribute(
       "aria-label",
@@ -1216,9 +1225,18 @@ export class GameUI {
     if (!active) {
       return;
     }
+    const worldFlowCompleted =
+      this.isWorldQuiz(active) && this.quizQuestionsAnswered > 0;
     const completedFlow =
       this.quizFlowCompleted ||
-      (this.isWorldQuiz(active) && this.quizQuestionsAnswered > 0);
+      worldFlowCompleted;
+    if (worldFlowCompleted && !this.completedQuizzes.has(active.quiz.id)) {
+      const firstChallenge = this.completedQuizzes.size === 0;
+      this.completedQuizzes.add(active.quiz.id);
+      this.pendingFirstQuizReward ||= firstChallenge;
+      this.syncQuizOnboardingState();
+      this.onProgressionChanged();
+    }
     if (this.quizFinishTimer !== undefined) {
       window.clearTimeout(this.quizFinishTimer);
       this.quizFinishTimer = undefined;
@@ -1234,9 +1252,37 @@ export class GameUI {
       this.currentCountry,
       this.currentNearestPhotoSpot,
     );
+    const showFirstReward = this.pendingFirstQuizReward;
+    this.pendingFirstQuizReward = false;
     if (completedFlow) {
-      this.onCommercialBreak();
+      void this.finishCompletedQuizFlow(showFirstReward);
+    } else if (showFirstReward) {
+      this.showFirstQuizReward();
     }
+  }
+
+  private async finishCompletedQuizFlow(
+    showFirstReward: boolean,
+  ): Promise<void> {
+    try {
+      await this.onCommercialBreak();
+    } catch {
+      // A platform ad failure must never swallow the player's earned reward.
+    }
+    if (showFirstReward) {
+      this.showFirstQuizReward();
+    }
+  }
+
+  private showFirstQuizReward(): void {
+    this.enqueueCelebration(
+      t("quiz.firstReward"),
+      t("quiz.firstRewardProgress", {
+        countries: this.latestState?.visitedCountries.size ?? 0,
+        total: getPassportCountryProfiles().length,
+        challenges: this.completedQuizzes.size,
+      }),
+    );
   }
 
   private renderQuizQuestion(): void {
@@ -1340,8 +1386,12 @@ export class GameUI {
   private finishQuiz(active: QuizSubject): void {
     const total = active.quiz.questions.length;
     const perfect = this.quizCorrect === total;
+    const firstChallenge = this.completedQuizzes.size === 0;
     this.completedQuizzes.add(active.quiz.id);
+    this.pendingFirstQuizReward ||= firstChallenge;
     this.quizFlowCompleted = true;
+    this.syncQuizOnboardingState();
+    this.onProgressionChanged();
 
     this.elements.quizOptions.replaceChildren();
     this.elements.quizPrompt.textContent = perfect
@@ -1358,6 +1408,13 @@ export class GameUI {
       this.quizFinishTimer = undefined;
       this.closeQuiz();
     }, 1800);
+  }
+
+  private syncQuizOnboardingState(): void {
+    this.elements.quizButton.classList.toggle(
+      "is-onboarding",
+      this.completedQuizzes.size === 0,
+    );
   }
 
   private getQuizQuestion(active: QuizSubject) {
