@@ -299,10 +299,10 @@ export function updateLandmarkStandeeOverview(
   // detailed artwork is still streamed only when the player approaches.
   const localScale =
     distanceToPlayer < 3.2
-      ? 0.43
+      ? 0.56
       : distanceToPlayer < 10
-        ? 0.31
-        : 0.19;
+        ? 0.4
+        : 0.24;
   standee.root.visible = true;
   standee.root.scale.setScalar(
     THREE.MathUtils.lerp(localScale, 0.105, overviewBlend),
@@ -423,11 +423,6 @@ function createFlagCardTexture(
       firstLineY + index * lineHeight,
     );
   });
-
-  context.font =
-    '600 24px "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif';
-  context.fillStyle = accentColor;
-  context.fillText("插画待补", canvas.width / 2, 414);
 
   context.fillStyle = "#5a4637";
   context.fillRect(116, 456, 280, 8);

@@ -18,6 +18,7 @@ import {
   REGIONAL_SPECIALTIES,
   type RegionalSpecialtyDefinition,
 } from "./regional-specialties";
+import { MANUAL_COMMISSION_TARGET_IDS } from "./commission";
 import {
   ARCADE_COURSE_OBJECTS,
   type ArcadeCourseObject,
@@ -1136,10 +1137,10 @@ export class GameSimulation {
 
     this.state.nearestPhotoSpot = nearest;
 
-    // Playtests showed players driving straight past landmarks: the on-screen
-    // prompt existed, but nothing ever required them to stop, so most sessions
-    // ended without the core loop happening even once. Arriving now collects
-    // the postcard by itself, the same way roadside specialties already work.
+    // Most landmarks auto-collect so a fast-moving player cannot miss the core
+    // travel loop. Commission photo targets are different: reaching the place
+    // only frames the shot, and the player must press the visible shutter to
+    // verify it.
     //
     // Memorial sites are deliberately excluded. They use a quiet, deliberate
     // visit flow, and auto-collecting one while driving past would turn a
@@ -1147,6 +1148,7 @@ export class GameSimulation {
     if (
       nearest &&
       nearest.visitMode !== "reflection" &&
+      !MANUAL_COMMISSION_TARGET_IDS.has(nearest.id) &&
       !this.state.collectedPostcards.has(nearest.id)
     ) {
       this.state.collectedPostcards.add(nearest.id);
@@ -1173,8 +1175,7 @@ export class GameSimulation {
 
   /**
    * Specialties are incidental roadside sightings: driving close enough is
-   * itself the discovery, so no button press is required. Landmarks still need
-   * a deliberate interaction, which keeps the two tiers feeling different.
+   * itself the discovery, so no button press is required.
    */
   private updateNearestSpecialty(): void {
     let nearest: RegionalSpecialtyDefinition | undefined;

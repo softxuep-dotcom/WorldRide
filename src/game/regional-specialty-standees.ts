@@ -117,6 +117,15 @@ export function updateRegionalSpecialtyStandeeOverview(
 
   const opacity = 1 - THREE.MathUtils.smoothstep(overviewBlend, 0.12, 0.48);
   standee.root.visible = opacity > 0.01;
+  const localScale =
+    distanceToPlayer < 3.2
+      ? 0.52
+      : distanceToPlayer < 10
+        ? 0.4
+        : 0.28;
+  standee.root.scale.setScalar(
+    THREE.MathUtils.lerp(localScale, 0.045, overviewBlend),
+  );
 
   for (const material of standee.fadeMaterials) {
     if (

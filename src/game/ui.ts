@@ -33,10 +33,9 @@ import {
 import { getSpecialtyCopy } from "./regional-specialty-copy";
 import {
   COMMISSION_HINT_INTERVAL_SECONDS,
-  EGYPT_COMMISSION_EVIDENCE_IDS,
-  EGYPT_COMMISSION_HINT_KEYS,
-  EGYPT_COMMISSION_ID,
-  EGYPT_COMMISSION_TARGET_ID,
+  TRAVEL_COMMISSIONS,
+  getTravelCommission,
+  type TravelCommissionDefinition,
 } from "./commission";
 import {
   hasLandmarkIllustration,
@@ -142,11 +141,14 @@ interface UIElements {
   commissionEyebrow: HTMLElement;
   commissionTitle: HTMLElement;
   commissionBody: HTMLElement;
+  commissionClueStrip: HTMLElement;
   commissionEvidenceTitle: HTMLElement;
   commissionEvidence: HTMLElement;
   commissionHint: HTMLElement;
   commissionHintLabel: HTMLElement;
   commissionHintCopy: HTMLElement;
+  commissionCapture: HTMLButtonElement;
+  commissionCaptureLabel: HTMLElement;
 }
 
 /** Everything the trip/paint loop needs to survive a reload. */
@@ -250,12 +252,14 @@ export class GameUI {
   private passportBuilt = false;
   private activeCommission = "";
   private readonly completedCommissions = new Set<string>();
-  private commissionOfferShown = false;
+  private offeredCommissionId = "";
+  private lastCompletedCommissionId = "";
   private commissionHintClock = 0;
   private commissionHintIndex = 0;
   private commissionLastElapsed?: number;
   private commissionEvidenceSignature?: string;
   private commissionHintTimer?: number;
+  private commissionCompletionHoldSeconds = 0;
 
   constructor(
     onInteract: () => void,
@@ -353,11 +357,14 @@ export class GameUI {
       commissionEyebrow: requireElement("commission-eyebrow"),
       commissionTitle: requireElement("commission-title"),
       commissionBody: requireElement("commission-body"),
+      commissionClueStrip: requireElement("commission-clue-strip"),
       commissionEvidenceTitle: requireElement("commission-evidence-title"),
       commissionEvidence: requireElement("commission-evidence"),
       commissionHint: requireElement("commission-hint"),
       commissionHintLabel: requireElement("commission-hint-label"),
       commissionHintCopy: requireElement("commission-hint-copy"),
+      commissionCapture: requireButton("commission-capture"),
+      commissionCaptureLabel: requireElement("commission-capture-label"),
     };
 
     this.syncChallengeAttentionState();
@@ -413,15 +420,19 @@ export class GameUI {
     this.elements.commissionAccept.addEventListener("click", () =>
       this.acceptCommission(),
     );
+    this.elements.commissionCapture.addEventListener("click", () => {
+      this.elements.commissionCapture.disabled = true;
+      onInteract();
+    });
     this.elements.compass.addEventListener("click", () => {
-      if (this.commissionOfferShown && !this.commissionIsComplete()) {
+      if (this.offeredCommissionId && this.pendingCommission()) {
         this.toggleCommissionPanel(true);
       }
     });
     this.elements.compass.addEventListener("keydown", (event) => {
       if (
-        this.commissionOfferShown &&
-        !this.commissionIsComplete() &&
+        this.offeredCommissionId &&
+        this.pendingCommission() &&
         (event.key === "Enter" || event.key === " ")
       ) {
         event.preventDefault();
@@ -499,6 +510,7 @@ export class GameUI {
     this.currentCountry = profile;
     this.currentNearestPhotoSpot = state.nearestPhotoSpot;
     this.currentNearestSpecialty = state.nearestSpecialty;
+    this.updateCommissionCapture(state);
     const seaId = state.vehicleMode === "boat"
       ? getSeaId(geoPosition)
       : undefined;
@@ -591,8 +603,18 @@ export class GameUI {
    */
   private updateCompass(state: GameState): void {
     const dock = this.elements.compassDock;
+    const completionCommission =
+      this.commissionCompletionHoldSeconds > 0
+        ? getTravelCommission(this.lastCompletedCommissionId)
+        : undefined;
+    const commission = this.pendingCommission();
+    const completionChipAvailable = Boolean(completionCommission);
     const commissionChipAvailable =
-      this.commissionOfferShown && !this.commissionIsComplete();
+      completionChipAvailable ||
+      Boolean(
+        commission &&
+        this.offeredCommissionId === commission.id,
+      );
     const blocked =
       (!this.compassAvailable && !commissionChipAvailable) ||
       this.worldOverviewActive ||
@@ -600,29 +622,57 @@ export class GameUI {
       state.channelChallenge.active;
 
     if (commissionChipAvailable && !blocked) {
-      const accepted = this.activeCommission === EGYPT_COMMISSION_ID;
-      const found = this.commissionEvidenceCount(state);
+      const displayedCommission = completionCommission ?? commission;
+      if (!displayedCommission) {
+        return;
+      }
+      const accepted = this.activeCommission === displayedCommission.id;
+      const found = this.commissionEvidenceCount(
+        state,
+        displayedCommission,
+      );
       this.activeCompassTargetId = undefined;
       dock.hidden = false;
       this.setWishlistOpen(false);
-      this.elements.compass.classList.toggle("is-commission", accepted);
-      this.elements.compass.classList.toggle("is-new-commission", !accepted);
-      this.elements.compass.setAttribute("role", "button");
+      this.elements.compass.classList.toggle(
+        "is-commission",
+        accepted && !completionChipAvailable,
+      );
+      this.elements.compass.classList.toggle(
+        "is-new-commission",
+        !accepted && !completionChipAvailable,
+      );
+      this.elements.compass.classList.toggle(
+        "is-commission-complete",
+        completionChipAvailable,
+      );
+      this.elements.compass.setAttribute(
+        "role",
+        completionChipAvailable ? "status" : "button",
+      );
       this.elements.compass.setAttribute("aria-live", "off");
       this.elements.compass.setAttribute(
         "aria-label",
-        accepted ? t("commission.objective") : t("commission.new"),
+        completionChipAvailable
+          ? t("commission.verified")
+          : accepted
+            ? t(displayedCommission.objectiveKey)
+            : t("commission.new"),
       );
-      this.elements.compass.tabIndex = 0;
-      this.elements.compassTarget.textContent = accepted
-        ? t("commission.objective")
-        : t("commission.new");
-      this.elements.compassDistance.textContent = accepted
-        ? t("commission.progress", {
-            found,
-            total: EGYPT_COMMISSION_EVIDENCE_IDS.length,
-          })
-        : t("commission.reopen");
+      this.elements.compass.tabIndex = completionChipAvailable ? -1 : 0;
+      this.elements.compassTarget.textContent = completionChipAvailable
+        ? t("commission.verified")
+        : accepted
+          ? t(displayedCommission.objectiveKey)
+          : t("commission.new");
+      this.elements.compassDistance.textContent = completionChipAvailable
+        ? t(displayedCommission.verifiedDetailKey)
+        : accepted
+          ? t("commission.progress", {
+              found,
+              total: displayedCommission.evidenceIds.length,
+            })
+          : t("commission.reopen");
       this.compassSignature = undefined;
       return;
     }
@@ -630,6 +680,7 @@ export class GameUI {
     this.elements.compass.classList.remove(
       "is-commission",
       "is-new-commission",
+      "is-commission-complete",
     );
     this.elements.compass.setAttribute("role", "status");
     this.elements.compass.setAttribute("aria-live", "polite");
@@ -697,32 +748,35 @@ export class GameUI {
     );
     this.commissionLastElapsed = state.elapsed;
 
-    if (this.commissionIsComplete()) {
+    if (this.commissionCompletionHoldSeconds > 0) {
+      if (!this.worldOverviewActive && !this.hasPrimarySurface()) {
+        this.commissionCompletionHoldSeconds = Math.max(
+          0,
+          this.commissionCompletionHoldSeconds - elapsedDelta,
+        );
+      }
+      return;
+    }
+
+    const commission = this.pendingCommission();
+    if (!commission) {
       return;
     }
 
     if (
-      this.activeCommission === EGYPT_COMMISSION_ID &&
-      state.collectedPostcards.has(EGYPT_COMMISSION_TARGET_ID)
-    ) {
-      this.completeCommission();
-      return;
-    }
-
-    if (
-      !this.commissionOfferShown &&
-      !state.collectedPostcards.has(EGYPT_COMMISSION_TARGET_ID) &&
+      this.offeredCommissionId !== commission.id &&
       state.elapsed >= 1 &&
       !this.worldOverviewActive &&
       !this.hasPrimarySurface() &&
       !state.channelChallenge.active
     ) {
-      this.commissionOfferShown = true;
+      this.offeredCommissionId = commission.id;
+      this.commissionEvidenceSignature = undefined;
       this.toggleCommissionPanel(true);
       return;
     }
 
-    if (this.activeCommission !== EGYPT_COMMISSION_ID) {
+    if (this.activeCommission !== commission.id) {
       return;
     }
 
@@ -746,59 +800,94 @@ export class GameUI {
     }
 
     this.commissionHintClock %= COMMISSION_HINT_INTERVAL_SECONDS;
-    const key =
-      EGYPT_COMMISSION_HINT_KEYS[
-        this.commissionHintIndex % EGYPT_COMMISSION_HINT_KEYS.length
-      ];
+    const key = commission.hintKeys[
+      this.commissionHintIndex % commission.hintKeys.length
+    ];
     this.commissionHintIndex += 1;
     this.showCommissionHint(t(key));
   }
 
-  private commissionIsComplete(): boolean {
-    return this.completedCommissions.has(EGYPT_COMMISSION_ID);
+  private pendingCommission(): TravelCommissionDefinition | undefined {
+    const active = getTravelCommission(this.activeCommission);
+    if (active && !this.completedCommissions.has(active.id)) {
+      return active;
+    }
+    return TRAVEL_COMMISSIONS.find(
+      (commission) => !this.completedCommissions.has(commission.id),
+    );
   }
 
-  private commissionEvidenceCount(state: GameState): number {
-    return EGYPT_COMMISSION_EVIDENCE_IDS.filter((id) =>
+  private commissionEvidenceCount(
+    state: GameState,
+    commission: TravelCommissionDefinition,
+  ): number {
+    return commission.evidenceIds.filter((id) =>
       state.discoveredSpecialties.has(id),
     ).length;
   }
 
   private acceptCommission(): void {
-    if (this.activeCommission === EGYPT_COMMISSION_ID) {
+    const commission = this.pendingCommission();
+    if (!commission) {
       this.toggleCommissionPanel(false);
       return;
     }
-    if (this.commissionIsComplete()) {
+    if (this.activeCommission === commission.id) {
       this.toggleCommissionPanel(false);
       return;
     }
 
-    this.activeCommission = EGYPT_COMMISSION_ID;
-    this.commissionOfferShown = true;
+    this.activeCommission = commission.id;
+    this.offeredCommissionId = commission.id;
     this.commissionHintClock = 0;
     this.commissionHintIndex = 0;
+    this.commissionEvidenceSignature = undefined;
     this.renderCommissionPanel(this.latestState);
-    this.showToast(t("commission.acceptedToast"));
+    this.showToast(t(commission.acceptedToastKey));
     this.onProgressionChanged();
     window.setTimeout(() => this.toggleCommissionPanel(false), 900);
   }
 
-  private completeCommission(): void {
+  private completeCommission(
+    commission: TravelCommissionDefinition,
+  ): void {
     this.activeCommission = "";
-    this.completedCommissions.add(EGYPT_COMMISSION_ID);
+    this.completedCommissions.add(commission.id);
+    this.lastCompletedCommissionId = commission.id;
+    this.offeredCommissionId = "";
+    this.commissionCompletionHoldSeconds = 8;
+    this.commissionHintClock = 0;
+    this.commissionHintIndex = 0;
+    this.commissionEvidenceSignature = undefined;
     window.clearTimeout(this.commissionHintTimer);
     this.elements.commissionHint.classList.remove("is-visible");
     this.elements.commissionHint.setAttribute("aria-hidden", "true");
-    this.showToast(t("commission.complete"));
+    this.showToast(t(commission.completeKey));
     this.onProgressionChanged();
+  }
+
+  private updateCommissionCapture(state: GameState): void {
+    const commission = getTravelCommission(this.activeCommission);
+    const visible =
+      Boolean(commission) &&
+      state.nearestPhotoSpot?.id === commission?.targetId &&
+      !this.worldOverviewActive &&
+      !this.hasPrimarySurface() &&
+      !state.channelChallenge.active;
+    this.elements.commissionCapture.hidden = !visible;
+    this.elements.commissionCapture.disabled = !visible;
+    this.elements.commissionCaptureLabel.textContent = t("commission.capture");
+    this.elements.commissionCapture.setAttribute(
+      "aria-label",
+      t("commission.captureAria"),
+    );
   }
 
   private toggleCommissionPanel(force?: boolean): void {
     const panel = this.elements.commissionPanel;
     const shouldOpen =
       force ?? !panel.classList.contains("is-visible");
-    if (shouldOpen && this.commissionIsComplete()) {
+    if (shouldOpen && !this.pendingCommission()) {
       return;
     }
     if (shouldOpen) {
@@ -816,11 +905,16 @@ export class GameUI {
   }
 
   private renderCommissionPanel(state?: GameState): void {
-    const accepted = this.activeCommission === EGYPT_COMMISSION_ID;
+    const commission = this.pendingCommission();
+    if (!commission) {
+      return;
+    }
+    const accepted = this.activeCommission === commission.id;
     this.elements.commissionPanel.classList.toggle("is-accepted", accepted);
     this.elements.commissionEyebrow.textContent = t("commission.eyebrow");
-    this.elements.commissionTitle.textContent = t("commission.offerTitle");
-    this.elements.commissionBody.textContent = t("commission.offerBody");
+    this.elements.commissionTitle.textContent = t(commission.titleKey);
+    this.elements.commissionBody.textContent = t(commission.bodyKey);
+    this.elements.commissionClueStrip.textContent = commission.clueStrip;
     this.elements.commissionEvidenceTitle.textContent = t(
       "commission.evidenceTitle",
     );
@@ -829,7 +923,7 @@ export class GameUI {
       : t("commission.accept");
 
     const discovered = state?.discoveredSpecialties ?? new Set<string>();
-    const signature = `${getLocale()}|${[...EGYPT_COMMISSION_EVIDENCE_IDS]
+    const signature = `${commission.id}|${getLocale()}|${commission.evidenceIds
       .map((id) => `${id}:${discovered.has(id) ? 1 : 0}`)
       .join("|")}`;
     if (signature === this.commissionEvidenceSignature) {
@@ -838,7 +932,7 @@ export class GameUI {
     this.commissionEvidenceSignature = signature;
     this.elements.commissionEvidence.replaceChildren();
 
-    for (const id of EGYPT_COMMISSION_EVIDENCE_IDS) {
+    for (const id of commission.evidenceIds) {
       const specialty = REGIONAL_SPECIALTIES.find(
         (candidate) => candidate.id === id,
       );
@@ -1211,16 +1305,18 @@ export class GameUI {
         this.goldStamps.add(id);
       }
     }
-    this.activeCommission =
-      snapshot.activeCommission === EGYPT_COMMISSION_ID
-        ? EGYPT_COMMISSION_ID
-        : "";
+    this.activeCommission = getTravelCommission(snapshot.activeCommission)
+      ? snapshot.activeCommission
+      : "";
     for (const id of snapshot.completedCommissions ?? []) {
-      this.completedCommissions.add(id);
+      if (getTravelCommission(id)) {
+        this.completedCommissions.add(id);
+      }
     }
-    this.commissionOfferShown =
-      this.activeCommission === EGYPT_COMMISSION_ID ||
-      this.completedCommissions.has(EGYPT_COMMISSION_ID);
+    if (this.completedCommissions.has(this.activeCommission)) {
+      this.activeCommission = "";
+    }
+    this.offeredCommissionId = this.activeCommission;
     this.tripStructureSig = undefined;
     this.onPaintChange(getPaint(this.equippedPaint).color);
     this.buildGarageGrid();
@@ -1827,6 +1923,16 @@ export class GameUI {
           event.firstCollection,
           event.automatic ?? false,
         );
+        {
+          const commission = getTravelCommission(this.activeCommission);
+          if (
+            commission &&
+            commission.targetId === event.spot.id &&
+            !event.automatic
+          ) {
+            this.completeCommission(commission);
+          }
+        }
         break;
       case "specialty-discovered":
         this.announceSpecialty(event.specialty, event.firstDiscovery);
@@ -1972,7 +2078,12 @@ export class GameUI {
       Boolean(seaId && !displayCountry),
     );
     if (displayCountry) {
-      this.elements.countryKicker.textContent = displayCountry.flag;
+      const badge = countryBadge(displayCountry.flag);
+      this.elements.countryKicker.textContent = badge.text;
+      this.elements.countryKicker.classList.toggle(
+        "is-country-code",
+        badge.isCode,
+      );
       this.elements.countryName.textContent = displayCountry.name;
       this.elements.interactButton.setAttribute(
         "aria-label",
@@ -1986,6 +2097,7 @@ export class GameUI {
     if (seaId) {
       const seaName = t(`sea.${seaId}` as never);
       this.elements.countryReveal.classList.remove("has-landmark");
+      this.elements.countryKicker.classList.remove("is-country-code");
       this.elements.countryKicker.textContent = "🌊";
       this.elements.countryName.textContent = seaName;
       this.elements.interactButton.setAttribute("aria-label", seaName);
@@ -2450,7 +2562,7 @@ export class GameUI {
     this.tripStructureSig = undefined;
     this.compassSignature = undefined;
     this.commissionEvidenceSignature = undefined;
-    if (this.commissionOfferShown && !this.commissionIsComplete()) {
+    if (this.offeredCommissionId && this.pendingCommission()) {
       this.renderCommissionPanel(this.latestState);
     }
     if (this.elements.postcardAlbum.classList.contains("is-visible")) {
@@ -2639,6 +2751,31 @@ function geoToMiniMap(point: readonly [number, number]): { x: number; y: number 
     x: ((world.x - northWest.x) / (southEast.x - northWest.x)) * 360,
     y: ((world.z - northWest.z) / (southEast.z - northWest.z)) * 180,
   };
+}
+
+function countryBadge(flag: string): { text: string; isCode: boolean } {
+  const regionalIndicators = [...flag].map((character) =>
+    character.codePointAt(0),
+  );
+  if (
+    regionalIndicators.length === 2 &&
+    regionalIndicators.every(
+      (codePoint) =>
+        codePoint !== undefined &&
+        codePoint >= 0x1f1e6 &&
+        codePoint <= 0x1f1ff,
+    )
+  ) {
+    return {
+      text: regionalIndicators
+        .map((codePoint) =>
+          String.fromCharCode((codePoint ?? 0x1f1e6) - 0x1f1e6 + 65),
+        )
+        .join(""),
+      isCode: true,
+    };
+  }
+  return { text: flag, isCode: false };
 }
 
 function requireElement(id: string): HTMLElement {

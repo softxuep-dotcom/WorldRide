@@ -123,6 +123,16 @@
         <strong id="commission-hint-copy"></strong>
       </div>
 
+      <button
+        id="commission-capture"
+        class="commission-capture"
+        type="button"
+        hidden
+      >
+        <span aria-hidden="true">📷</span>
+        <span id="commission-capture-label"></span>
+      </button>
+
       <section
         id="commission-panel"
         class="commission-panel"
@@ -149,9 +159,11 @@
           <div class="commission-card__accepted-mark" aria-hidden="true">✓</div>
           <h2 id="commission-title"></h2>
           <p id="commission-body" class="commission-card__body"></p>
-          <div class="commission-card__clue-strip" aria-hidden="true">
-            <span>🏜️</span><i>＋</i><span>〰️</span><i>＋</i><span>🐪</span><i>→</i><span>▲▲▲</span>
-          </div>
+          <div
+            id="commission-clue-strip"
+            class="commission-card__clue-strip"
+            aria-hidden="true"
+          ></div>
           <section class="commission-card__evidence">
             <h3 id="commission-evidence-title"></h3>
             <ul id="commission-evidence"></ul>
