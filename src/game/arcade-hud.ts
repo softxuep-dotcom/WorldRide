@@ -22,6 +22,9 @@ export class ArcadeHUD {
     this.root.dataset.airHeight = state.airHeight.toFixed(2);
     this.root.dataset.boosting = String(state.boosting);
     this.root.dataset.destroyed = String(state.destroyedArcadeObjects.size);
+    this.root.dataset.heading = state.heading.toFixed(3);
+    this.root.dataset.velocityX = state.velocity.x.toFixed(2);
+    this.root.dataset.velocityZ = state.velocity.z.toFixed(2);
     this.score.textContent = Math.round(state.arcadeScore).toLocaleString();
     this.combo.textContent = `×${Math.max(1, state.combo)}`;
     this.combo.classList.toggle("is-active", state.combo > 1);

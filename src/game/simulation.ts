@@ -27,6 +27,8 @@ export interface MovementInput {
   x: number;
   z: number;
   boost?: boolean;
+  /** Screen-relative target direction used by touch steering. */
+  directional?: boolean;
 }
 
 export type VehicleMode = "car" | "boat";
@@ -184,8 +186,33 @@ export class GameSimulation {
       this.state.modeTransition - dt / MODE_TRANSITION_SECONDS,
     );
 
-    const throttle = clamp(-input.z, -1, 1);
-    const steering = clamp(input.x, -1, 1);
+    const directionalStrength = input.directional
+      ? clamp(Math.hypot(input.x, input.z), 0, 1)
+      : 0;
+    const desiredHeading =
+      input.directional && directionalStrength > 0.03
+        ? Math.atan2(-input.x, -input.z)
+        : this.state.heading;
+    const directionalHeadingError = shortestAngleDelta(
+      this.state.heading,
+      desiredHeading,
+    );
+    const directionalAlignment = Math.cos(directionalHeadingError);
+    const throttle = input.directional
+      ? directionalStrength *
+        lerp(
+          0.18,
+          1,
+          smoothstep(directionalAlignment, -0.08, 0.92),
+        )
+      : clamp(-input.z, -1, 1);
+    const steering = input.directional
+      ? clamp(
+          -directionalHeadingError / DIRECTIONAL_FULL_STEER_ANGLE,
+          -1,
+          1,
+        )
+      : clamp(input.x, -1, 1);
     const velocityBefore = Math.hypot(
       this.state.velocity.x,
       this.state.velocity.z,
@@ -227,7 +254,9 @@ export class GameSimulation {
     const speedFactor = smoothstep(velocityBefore, 0.8, 7.2);
     const turnRate =
       (this.state.vehicleMode === "car" ? CAR_TURN_RATE : BOAT_TURN_RATE) *
-      (0.28 + speedFactor * 0.72);
+      (input.directional
+        ? 0.62 + speedFactor * 0.65
+        : 0.28 + speedFactor * 0.72);
     this.state.heading -= steering * turnRate * directionSign * dt;
 
     const forwardX = -Math.sin(this.state.heading);
@@ -240,6 +269,14 @@ export class GameSimulation {
     let lateralSpeed =
       this.state.velocity.x * rightX +
       this.state.velocity.z * rightZ;
+    if (input.directional) {
+      const sharpTurn = smoothstep(
+        1 - directionalAlignment,
+        0.42,
+        1.55,
+      );
+      forwardSpeed *= Math.exp(-sharpTurn * DIRECTIONAL_TURN_BRAKE * dt);
+    }
 
     const acceleration =
       this.state.vehicleMode === "car" ? CAR_ACCELERATION : BOAT_ACCELERATION;
@@ -259,9 +296,10 @@ export class GameSimulation {
         (forwardSpeed < -0.2 ? -1 : 1) * BOOST_ACCELERATION * dt;
     }
 
+    const driftSteering = smoothstep(Math.abs(steering), 0.42, 0.92);
     const driftIntent =
       this.state.vehicleMode === "car"
-        ? Math.abs(steering) * smoothstep(Math.abs(forwardSpeed), 2.8, 7.4)
+        ? driftSteering * smoothstep(Math.abs(forwardSpeed), 2.8, 7.4)
         : 0;
     const lateralBeforeGrip = lateralSpeed;
     const grounded = this.state.airHeight < 0.04;
@@ -277,7 +315,7 @@ export class GameSimulation {
       this.state.vehicleMode === "car"
         ? smoothstep(Math.abs(lateralBeforeGrip), 0.35, 2.6) *
           smoothstep(Math.abs(forwardSpeed), 2.4, 7.2) *
-          Math.max(0.35, Math.abs(steering))
+          (0.18 + driftSteering * 0.82)
         : 0;
     const driftResponse =
       1 - Math.exp(-(driftTarget > this.state.drift ? 8 : 10) * dt);
@@ -814,6 +852,8 @@ const CAR_LATERAL_GRIP = 7.8;
 const CAR_DRIFT_GRIP = 0.85;
 const BOAT_LATERAL_GRIP = 4;
 const AIR_LATERAL_GRIP = 0.24;
+const DIRECTIONAL_FULL_STEER_ANGLE = Math.PI * 0.38;
+const DIRECTIONAL_TURN_BRAKE = 3.8;
 const DRIFT_START_THRESHOLD = 0.14;
 const DRIFT_END_THRESHOLD = 0.07;
 const DRIFT_SCORE_MIN_SECONDS = 0.16;
@@ -857,6 +897,10 @@ function clamp(value: number, minimum: number, maximum: number): number {
 function smoothstep(value: number, minimum: number, maximum: number): number {
   const normalized = clamp((value - minimum) / (maximum - minimum), 0, 1);
   return normalized * normalized * (3 - 2 * normalized);
+}
+
+function shortestAngleDelta(from: number, to: number): number {
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }
 
 function lerp(start: number, end: number, amount: number): number {
