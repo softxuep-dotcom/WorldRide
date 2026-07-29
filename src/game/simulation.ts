@@ -18,10 +18,15 @@ import {
   REGIONAL_SPECIALTIES,
   type RegionalSpecialtyDefinition,
 } from "./regional-specialties";
+import {
+  ARCADE_COURSE_OBJECTS,
+  type ArcadeCourseObject,
+} from "./arcade-course";
 
 export interface MovementInput {
   x: number;
   z: number;
+  boost?: boolean;
 }
 
 export type VehicleMode = "car" | "boat";
@@ -38,14 +43,43 @@ export type GameEvent =
       firstCollection: boolean;
       /** True when arriving collected it, rather than a deliberate press. */
       automatic?: boolean;
-      /** True once this session has accumulated enough active driving time. */
-      arrivalQuizEligible?: boolean;
     }
   | {
       type: "specialty-discovered";
       specialty: RegionalSpecialtyDefinition;
       firstDiscovery: boolean;
-    };
+    }
+  | { type: "boost-started" }
+  | { type: "ramp-launched"; ramp: ArcadeCourseObject }
+  | {
+      type: "arcade-hit";
+      object: ArcadeCourseObject;
+      points: number;
+      combo: number;
+      impulse: { x: number; z: number };
+    }
+  | {
+      type: "arcade-near-miss";
+      object: ArcadeCourseObject;
+      points: number;
+      combo: number;
+    }
+  | {
+      type: "drift-completed";
+      seconds: number;
+      points: number;
+      combo: number;
+    }
+  | {
+      type: "jump-landed";
+      seconds: number;
+      points: number;
+      combo: number;
+    }
+  | { type: "water-rebound"; points: number; combo: number }
+  | { type: "combo-ended"; combo: number }
+  | { type: "special-event-started"; event: "ufo" }
+  | { type: "special-event-ended"; event: "ufo" };
 
 export interface GameState {
   position: { x: number; z: number };
@@ -62,7 +96,20 @@ export interface GameState {
   visitedCountries: Set<string>;
   collectedPostcards: Set<PhotoSpotId>;
   discoveredSpecialties: Set<string>;
+  destroyedArcadeObjects: Set<string>;
   elapsed: number;
+  drift: number;
+  boostCharge: number;
+  boosting: boolean;
+  airHeight: number;
+  verticalVelocity: number;
+  airTime: number;
+  combo: number;
+  comboTimer: number;
+  lastComboAward: number;
+  arcadeScore: number;
+  specialEvent?: "ufo";
+  specialEventRemaining: number;
 }
 
 const startWorld = geoToWorld(START_POINT);
@@ -93,51 +140,164 @@ export class GameSimulation {
     visitedCountries: new Set<string>(),
     collectedPostcards: new Set<PhotoSpotId>(),
     discoveredSpecialties: new Set<string>(),
+    destroyedArcadeObjects: new Set<string>(),
     elapsed: 0,
+    drift: 0,
+    boostCharge: 0.42,
+    boosting: false,
+    airHeight: 0,
+    verticalVelocity: 0,
+    airTime: 0,
+    combo: 0,
+    comboTimer: 0,
+    lastComboAward: 0,
+    arcadeScore: 0,
+    specialEvent: undefined,
+    specialEventRemaining: 0,
   };
 
   private events: GameEvent[] = [];
   private edgeCooldown = 0;
   private cruiseFlowActive = false;
   private cruiseFlowCueCooldown = 0;
-  private activeDrivingSeconds = 0;
+  private driftActive = false;
+  private driftSeconds = 0;
+  private boostActive = false;
+  private activeRampId?: string;
+  private readonly nearMissedArcadeObjects = new Set<string>();
+  private waterReboundCooldown = 0;
+  private nextSpecialEventAt = SPECIAL_EVENT_FIRST_SECONDS;
 
   update(deltaSeconds: number, input: MovementInput): void {
     const dt = Math.min(deltaSeconds, 0.05);
     this.state.elapsed += dt;
     this.edgeCooldown = Math.max(0, this.edgeCooldown - dt);
+    this.waterReboundCooldown = Math.max(0, this.waterReboundCooldown - dt);
     this.cruiseFlowCueCooldown = Math.max(
       0,
       this.cruiseFlowCueCooldown - dt,
     );
+    this.updateCombo(dt);
+    this.updateSpecialEvent(dt);
     this.state.modeTransition = Math.max(
       0,
       this.state.modeTransition - dt / MODE_TRANSITION_SECONDS,
     );
 
-    const inputLength = Math.hypot(input.x, input.z);
-    const normalizedX = inputLength > 1 ? input.x / inputLength : input.x;
-    const normalizedZ = inputLength > 1 ? input.z / inputLength : input.z;
+    const throttle = clamp(-input.z, -1, 1);
+    const steering = clamp(input.x, -1, 1);
     const velocityBefore = Math.hypot(
       this.state.velocity.x,
       this.state.velocity.z,
     );
-    const directionAlignment =
-      velocityBefore < 0.35 || inputLength < 0.01
-        ? 1
-        : (
-            normalizedX * (this.state.velocity.x / velocityBefore) +
-            normalizedZ * (this.state.velocity.z / velocityBefore)
-          ) / Math.max(0.01, Math.min(1, inputLength));
+    const wantsBoost =
+      input.boost === true &&
+      (Math.abs(throttle) > 0.08 || velocityBefore > 0.5);
+    this.state.boosting = wantsBoost && this.state.boostCharge > 0.015;
+    if (this.state.boosting) {
+      this.state.boostCharge = Math.max(
+        0,
+        this.state.boostCharge - BOOST_DRAIN_RATE * dt,
+      );
+      if (!this.boostActive) {
+        this.events.push({ type: "boost-started" });
+      }
+    } else {
+      const eventBonus = this.state.specialEvent === "ufo" ? 0.055 : 0;
+      this.state.boostCharge = Math.min(
+        1,
+        this.state.boostCharge +
+          (BOOST_IDLE_RECHARGE + eventBonus + this.state.drift * BOOST_DRIFT_RECHARGE) *
+            dt,
+      );
+    }
+    this.boostActive = this.state.boosting;
+
+    const oldForwardX = -Math.sin(this.state.heading);
+    const oldForwardZ = -Math.cos(this.state.heading);
+    const oldForwardSpeed =
+      this.state.velocity.x * oldForwardX +
+      this.state.velocity.z * oldForwardZ;
+    const directionSign =
+      Math.abs(oldForwardSpeed) > 0.2
+        ? Math.sign(oldForwardSpeed)
+        : throttle < -0.05
+          ? -1
+          : 1;
+    const speedFactor = smoothstep(velocityBefore, 0.8, 7.2);
+    const turnRate =
+      (this.state.vehicleMode === "car" ? CAR_TURN_RATE : BOAT_TURN_RATE) *
+      (0.28 + speedFactor * 0.72);
+    this.state.heading -= steering * turnRate * directionSign * dt;
+
+    const forwardX = -Math.sin(this.state.heading);
+    const forwardZ = -Math.cos(this.state.heading);
+    const rightX = Math.cos(this.state.heading);
+    const rightZ = -Math.sin(this.state.heading);
+    let forwardSpeed =
+      this.state.velocity.x * forwardX +
+      this.state.velocity.z * forwardZ;
+    let lateralSpeed =
+      this.state.velocity.x * rightX +
+      this.state.velocity.z * rightZ;
+
+    const acceleration =
+      this.state.vehicleMode === "car" ? CAR_ACCELERATION : BOAT_ACCELERATION;
+    const braking =
+      throttle !== 0 && Math.sign(throttle) !== Math.sign(forwardSpeed)
+        ? BRAKE_ACCELERATION
+        : acceleration;
+    forwardSpeed += throttle * braking * dt;
+    if (Math.abs(throttle) < 0.04) {
+      forwardSpeed *= Math.exp(
+        -(this.state.vehicleMode === "car" ? CAR_ROLLING_DRAG : BOAT_DRAG) * dt,
+      );
+    }
+
+    if (this.state.boosting) {
+      forwardSpeed +=
+        (forwardSpeed < -0.2 ? -1 : 1) * BOOST_ACCELERATION * dt;
+    }
+
+    const driftIntent =
+      this.state.vehicleMode === "car"
+        ? Math.abs(steering) * smoothstep(Math.abs(forwardSpeed), 2.8, 7.4)
+        : 0;
+    const lateralBeforeGrip = lateralSpeed;
+    const grounded = this.state.airHeight < 0.04;
+    const grip =
+      this.state.vehicleMode === "boat"
+        ? BOAT_LATERAL_GRIP
+        : grounded
+          ? lerp(CAR_LATERAL_GRIP, CAR_DRIFT_GRIP, driftIntent)
+          : AIR_LATERAL_GRIP;
+    lateralSpeed *= Math.exp(-grip * dt);
+
+    const driftTarget =
+      this.state.vehicleMode === "car"
+        ? smoothstep(Math.abs(lateralBeforeGrip), 0.35, 2.6) *
+          smoothstep(Math.abs(forwardSpeed), 2.4, 7.2) *
+          Math.max(0.35, Math.abs(steering))
+        : 0;
+    const driftResponse =
+      1 - Math.exp(-(driftTarget > this.state.drift ? 8 : 10) * dt);
+    this.state.drift +=
+      (driftTarget - this.state.drift) * driftResponse;
+    this.updateDrift(dt, this.state.drift);
+
     const holdingCourse =
-      inputLength > 0.72 && directionAlignment > CRUISE_ALIGNMENT;
+      throttle > 0.72 &&
+      Math.abs(steering) < 0.14 &&
+      this.state.drift < 0.12 &&
+      grounded;
     const flowTarget = holdingCourse ? 1 : 0;
-    const flowResponse = 1 - Math.exp(
-      -(holdingCourse ? CRUISE_BUILD_RATE : CRUISE_BREAK_RATE) * dt,
-    );
+    const flowResponse =
+      1 -
+      Math.exp(
+        -(holdingCourse ? CRUISE_BUILD_RATE : CRUISE_BREAK_RATE) * dt,
+      );
     this.state.cruiseFlow +=
       (flowTarget - this.state.cruiseFlow) * flowResponse;
-
     if (
       this.state.cruiseFlow >= CRUISE_CUE_THRESHOLD &&
       !this.cruiseFlowActive &&
@@ -150,35 +310,23 @@ export class GameSimulation {
       this.cruiseFlowActive = false;
     }
 
-    const baseSpeed = this.state.vehicleMode === "car" ? 5.6 : 4.5;
-    const cruiseBonus =
-      1 +
-      smoothstep(
-        this.state.cruiseFlow,
-        CRUISE_SPEED_START,
-        1,
-      ) *
-        CRUISE_SPEED_BONUS;
-    const transitionBonus =
-      1 +
-      this.state.modeTransition *
-        (this.state.vehicleMode === "boat"
-          ? WATER_ENTRY_SPEED_BONUS
-          : LANDING_SPEED_BONUS);
-    const speed = baseSpeed * cruiseBonus * transitionBonus;
-    const responsiveness = 1 - Math.exp(-8 * dt);
-
-    this.state.velocity.x += (normalizedX * speed - this.state.velocity.x) * responsiveness;
-    this.state.velocity.z += (normalizedZ * speed - this.state.velocity.z) * responsiveness;
-
-    if (inputLength < 0.01) {
-      const coast = Math.exp(-4.2 * dt);
-      this.state.velocity.x *= coast;
-      this.state.velocity.z *= coast;
-    }
+    const normalLimit =
+      this.state.vehicleMode === "car" ? CAR_TOP_SPEED : BOAT_TOP_SPEED;
+    const flowLimit =
+      normalLimit * (1 + this.state.cruiseFlow * CRUISE_SPEED_BONUS);
+    const boostLimit = this.state.boosting
+      ? flowLimit * BOOST_SPEED_MULTIPLIER
+      : flowLimit;
+    const airLimit = this.state.airHeight > 0.02 ? boostLimit * 1.08 : boostLimit;
+    forwardSpeed = clamp(forwardSpeed, -REVERSE_TOP_SPEED, airLimit);
+    this.state.velocity.x =
+      forwardX * forwardSpeed + rightX * lateralSpeed;
+    this.state.velocity.z =
+      forwardZ * forwardSpeed + rightZ * lateralSpeed;
 
     this.state.position.x += this.state.velocity.x * dt;
     this.state.position.z += this.state.velocity.z * dt;
+    this.updateAir(dt);
 
     const unwrappedX = this.state.position.x;
     let wrappedX = unwrappedX;
@@ -210,18 +358,7 @@ export class GameSimulation {
       }
     }
 
-    const velocityLength = Math.hypot(this.state.velocity.x, this.state.velocity.z);
-    if (
-      inputLength > ACTIVE_DRIVING_INPUT_THRESHOLD &&
-      velocityLength > ACTIVE_DRIVING_SPEED_THRESHOLD
-    ) {
-      this.activeDrivingSeconds += dt;
-    }
-    if (velocityLength > 0.12) {
-      const targetHeading = Math.atan2(-this.state.velocity.x, -this.state.velocity.z);
-      this.state.heading = dampAngle(this.state.heading, targetHeading, 1 - Math.exp(-10 * dt));
-    }
-
+    this.updateArcadeCollisions();
     this.updateLocation();
     this.updateNearestPhotoSpot();
     this.updateNearestSpecialty();
@@ -268,11 +405,28 @@ export class GameSimulation {
     this.state.elapsed = snapshot.elapsed;
     this.state.cruiseFlow = 0;
     this.state.modeTransition = 0;
+    this.state.drift = 0;
+    this.state.boostCharge = 0.42;
+    this.state.boosting = false;
+    this.state.airHeight = 0;
+    this.state.verticalVelocity = 0;
+    this.state.airTime = 0;
+    this.state.combo = 0;
+    this.state.comboTimer = 0;
+    this.state.lastComboAward = 0;
+    this.state.arcadeScore = 0;
+    this.state.specialEvent = undefined;
+    this.state.specialEventRemaining = 0;
+    this.state.destroyedArcadeObjects.clear();
     this.cruiseFlowActive = false;
     this.cruiseFlowCueCooldown = 0;
-    // The arrival quiz gate is session onboarding, not saved progression.
-    // Returning players get a short uninterrupted drive again after reloading.
-    this.activeDrivingSeconds = 0;
+    this.driftActive = false;
+    this.driftSeconds = 0;
+    this.boostActive = false;
+    this.activeRampId = undefined;
+    this.nearMissedArcadeObjects.clear();
+    this.waterReboundCooldown = 0;
+    this.nextSpecialEventAt = this.state.elapsed + SPECIAL_EVENT_FIRST_SECONDS;
 
     this.state.visitedCountries = new Set(snapshot.visitedCountries);
     this.state.collectedPostcards = new Set(
@@ -307,13 +461,204 @@ export class GameSimulation {
     this.state.velocity.z = 0;
     this.state.cruiseFlow = 0;
     this.state.modeTransition = 0;
+    this.state.airHeight = 0;
+    this.state.verticalVelocity = 0;
+    this.state.airTime = 0;
+    this.state.drift = 0;
+    this.state.boosting = false;
     this.cruiseFlowActive = false;
+    this.activeRampId = undefined;
     this.updateLocation();
     this.updateNearestPhotoSpot();
   }
 
   consumeEvents(): GameEvent[] {
     return this.events.splice(0);
+  }
+
+  private updateCombo(dt: number): void {
+    if (this.state.comboTimer <= 0) {
+      return;
+    }
+    this.state.comboTimer = Math.max(0, this.state.comboTimer - dt);
+    if (this.state.comboTimer === 0 && this.state.combo > 1) {
+      this.events.push({ type: "combo-ended", combo: this.state.combo });
+      this.state.combo = 0;
+      this.state.lastComboAward = 0;
+    }
+  }
+
+  private updateSpecialEvent(dt: number): void {
+    if (this.state.specialEvent === "ufo") {
+      this.state.specialEventRemaining = Math.max(
+        0,
+        this.state.specialEventRemaining - dt,
+      );
+      if (this.state.specialEventRemaining === 0) {
+        this.state.specialEvent = undefined;
+        this.nextSpecialEventAt =
+          this.state.elapsed + SPECIAL_EVENT_INTERVAL_SECONDS;
+        this.events.push({ type: "special-event-ended", event: "ufo" });
+      }
+      return;
+    }
+
+    if (this.state.elapsed >= this.nextSpecialEventAt) {
+      this.state.specialEvent = "ufo";
+      this.state.specialEventRemaining = SPECIAL_EVENT_DURATION_SECONDS;
+      this.events.push({ type: "special-event-started", event: "ufo" });
+    }
+  }
+
+  private updateDrift(dt: number, drift: number): void {
+    if (drift >= DRIFT_START_THRESHOLD) {
+      this.driftActive = true;
+      this.driftSeconds += dt;
+      return;
+    }
+    if (!this.driftActive || drift > DRIFT_END_THRESHOLD) {
+      return;
+    }
+
+    if (this.driftSeconds >= DRIFT_SCORE_MIN_SECONDS) {
+      const rawPoints = Math.round(80 + this.driftSeconds * 110);
+      const award = this.awardCombo(rawPoints);
+      this.events.push({
+        type: "drift-completed",
+        seconds: this.driftSeconds,
+        ...award,
+      });
+    }
+    this.driftActive = false;
+    this.driftSeconds = 0;
+  }
+
+  private updateAir(dt: number): void {
+    if (this.state.airHeight <= 0 && this.state.verticalVelocity <= 0) {
+      this.state.airHeight = 0;
+      this.state.verticalVelocity = 0;
+      return;
+    }
+
+    this.state.airHeight += this.state.verticalVelocity * dt;
+    this.state.verticalVelocity -= ARCADE_GRAVITY * dt;
+    this.state.airTime += dt;
+    if (this.state.airHeight > 0) {
+      return;
+    }
+
+    const completedAirTime = this.state.airTime;
+    this.state.airHeight = 0;
+    this.state.verticalVelocity = 0;
+    this.state.airTime = 0;
+    if (completedAirTime >= LANDING_SCORE_MIN_SECONDS) {
+      const rawPoints = Math.round(120 + completedAirTime * 170);
+      const award = this.awardCombo(rawPoints);
+      this.events.push({
+        type: "jump-landed",
+        seconds: completedAirTime,
+        ...award,
+      });
+    }
+  }
+
+  private updateArcadeCollisions(): void {
+    const { position, airHeight } = this.state;
+    const speed = Math.hypot(this.state.velocity.x, this.state.velocity.z);
+
+    if (this.activeRampId) {
+      const activeRamp = ARCADE_COURSE_OBJECTS.find(
+        (object) => object.id === this.activeRampId,
+      );
+      if (
+        !activeRamp ||
+        Math.hypot(activeRamp.x - position.x, activeRamp.z - position.z) >
+          activeRamp.radius + 1.3
+      ) {
+        this.activeRampId = undefined;
+      }
+    }
+
+    for (const object of ARCADE_COURSE_OBJECTS) {
+      const distance = Math.hypot(
+        object.x - position.x,
+        object.z - position.z,
+      );
+
+      if (object.kind === "ramp") {
+        if (
+          distance < object.radius &&
+          airHeight < 0.06 &&
+          speed >= RAMP_MIN_SPEED &&
+          this.activeRampId !== object.id
+        ) {
+          this.activeRampId = object.id;
+          this.state.airHeight = 0.04;
+          this.state.verticalVelocity =
+            RAMP_VERTICAL_VELOCITY + Math.min(1.2, speed * 0.08);
+          this.state.airTime = 0;
+          this.state.velocity.x *= 1.12;
+          this.state.velocity.z *= 1.12;
+          this.events.push({ type: "ramp-launched", ramp: object });
+        }
+        continue;
+      }
+
+      if (this.state.destroyedArcadeObjects.has(object.id)) {
+        continue;
+      }
+
+      const vehicleCenterY = airHeight + 0.58;
+      const verticalDistance = Math.abs(vehicleCenterY - object.y);
+      if (
+        distance < object.radius &&
+        verticalDistance < (object.kind === "balloon" ? 0.9 : 0.72)
+      ) {
+        this.state.destroyedArcadeObjects.add(object.id);
+        const award = this.awardCombo(object.points);
+        const inverseSpeed = speed > 0.01 ? 1 / speed : 0;
+        this.events.push({
+          type: "arcade-hit",
+          object,
+          ...award,
+          impulse: {
+            x: this.state.velocity.x * inverseSpeed * (4.2 + speed * 0.2),
+            z: this.state.velocity.z * inverseSpeed * (4.2 + speed * 0.2),
+          },
+        });
+        this.state.boostCharge = Math.min(
+          1,
+          this.state.boostCharge + SMASH_BOOST_REWARD,
+        );
+        continue;
+      }
+
+      if (
+        object.kind !== "balloon" &&
+        speed >= NEAR_MISS_MIN_SPEED &&
+        distance >= object.radius &&
+        distance < object.radius + NEAR_MISS_BAND &&
+        !this.nearMissedArcadeObjects.has(object.id)
+      ) {
+        this.nearMissedArcadeObjects.add(object.id);
+        const award = this.awardCombo(75);
+        this.events.push({
+          type: "arcade-near-miss",
+          object,
+          ...award,
+        });
+      }
+    }
+  }
+
+  private awardCombo(rawPoints: number): { points: number; combo: number } {
+    this.state.combo = Math.min(MAX_COMBO, Math.max(1, this.state.combo + 1));
+    this.state.comboTimer = COMBO_SECONDS;
+    const eventMultiplier = this.state.specialEvent === "ufo" ? 2 : 1;
+    const points = rawPoints * this.state.combo * eventMultiplier;
+    this.state.lastComboAward = points;
+    this.state.arcadeScore += points;
+    return { points, combo: this.state.combo };
   }
 
   private updateLocation(): void {
@@ -335,6 +680,22 @@ export class GameSimulation {
       this.state.vehicleMode = nextMode;
       this.state.modeTransition = 1;
       this.events.push({ type: "mode-changed", mode: nextMode });
+      const speed = Math.hypot(this.state.velocity.x, this.state.velocity.z);
+      if (
+        nextMode === "boat" &&
+        speed >= WATER_REBOUND_MIN_SPEED &&
+        this.waterReboundCooldown === 0
+      ) {
+        this.waterReboundCooldown = WATER_REBOUND_COOLDOWN_SECONDS;
+        this.state.airHeight = Math.max(0.04, this.state.airHeight);
+        this.state.verticalVelocity = Math.max(
+          this.state.verticalVelocity,
+          WATER_REBOUND_VELOCITY,
+        );
+        this.state.airTime = 0;
+        const award = this.awardCombo(140);
+        this.events.push({ type: "water-rebound", ...award });
+      }
     }
 
     if (nextProfile && nextProfile.id !== previousProfile?.id) {
@@ -388,8 +749,6 @@ export class GameSimulation {
         spot: nearest,
         firstCollection: true,
         automatic: true,
-        arrivalQuizEligible:
-          this.activeDrivingSeconds >= ARRIVAL_QUIZ_DRIVING_SECONDS,
       });
     }
   }
@@ -432,40 +791,64 @@ export class GameSimulation {
 }
 
 /**
- * Widened from 2.6 after playtests: at 5.6 units/s a 2.6 radius kept a landmark
- * in range for well under a second, so players drove straight through. 3.5
- * roughly doubles that window while staying below the 4.7-unit tenth-percentile
- * spacing between landmarks, so neighbouring sites rarely contest a pickup.
+ * Arcade driving needs the player to deliberately cut close to a landmark.
+ * Keeping this below the playground ramp distance prevents a large pickup
+ * radius from collecting several nearby European landmarks during one pass.
  */
-const LANDMARK_INTERACT_RADIUS = 3.5;
+const LANDMARK_INTERACT_RADIUS = 2.2;
 
 const SPECIALTY_DISCOVERY_RADIUS = 1.9;
-/** Delay route-triggered questions until the player has learned the drive. */
-const ARRIVAL_QUIZ_DRIVING_SECONDS = 25;
-const ACTIVE_DRIVING_INPUT_THRESHOLD = 0.1;
-const ACTIVE_DRIVING_SPEED_THRESHOLD = 0.65;
+
+const CAR_ACCELERATION = 9.8;
+const BOAT_ACCELERATION = 5.8;
+const BRAKE_ACCELERATION = 14;
+const BOOST_ACCELERATION = 12.5;
+const CAR_TOP_SPEED = 8.4;
+const BOAT_TOP_SPEED = 6.6;
+const REVERSE_TOP_SPEED = 4.2;
+const CAR_TURN_RATE = 2.25;
+const BOAT_TURN_RATE = 1.55;
+const CAR_ROLLING_DRAG = 1.35;
+const BOAT_DRAG = 1.05;
+const CAR_LATERAL_GRIP = 7.8;
+const CAR_DRIFT_GRIP = 0.85;
+const BOAT_LATERAL_GRIP = 4;
+const AIR_LATERAL_GRIP = 0.24;
+const DRIFT_START_THRESHOLD = 0.14;
+const DRIFT_END_THRESHOLD = 0.07;
+const DRIFT_SCORE_MIN_SECONDS = 0.16;
+const BOOST_DRAIN_RATE = 0.26;
+const BOOST_IDLE_RECHARGE = 0.018;
+const BOOST_DRIFT_RECHARGE = 0.24;
+const BOOST_SPEED_MULTIPLIER = 1.62;
+const SMASH_BOOST_REWARD = 0.075;
+const RAMP_MIN_SPEED = 3.2;
+const RAMP_VERTICAL_VELOCITY = 5.2;
+const ARCADE_GRAVITY = 10.8;
+const LANDING_SCORE_MIN_SECONDS = 0.38;
+const NEAR_MISS_MIN_SPEED = 5.8;
+const NEAR_MISS_BAND = 0.62;
+const COMBO_SECONDS = 3.8;
+const MAX_COMBO = 12;
+const WATER_REBOUND_MIN_SPEED = 4.2;
+const WATER_REBOUND_VELOCITY = 4.1;
+const WATER_REBOUND_COOLDOWN_SECONDS = 2.5;
+const SPECIAL_EVENT_FIRST_SECONDS = 24;
+const SPECIAL_EVENT_DURATION_SECONDS = 12;
+const SPECIAL_EVENT_INTERVAL_SECONDS = 34;
+
 /**
- * Cruise flow is the one driving skill the game has: hold a steady line and
- * the vehicle winds up, turn and it collapses. It shipped almost invisible —
- * an 18% top-end bonus that no player could feel — so the whole point of the
- * mechanic was lost. The numbers below make holding a line actually pay.
- *
- * Building stays deliberately slower than breaking: winding up should feel
- * earned, losing it should be immediate, and that asymmetry is what turns a
- * turn into a real cost. Veering off to grab a landmark now trades speed for
- * the postcard, which is the first genuine decision the drive contains.
+ * Cruise flow rewards a clean line while the new drift meter rewards breaking
+ * that line on purpose. The two systems create an immediately readable rhythm:
+ * build speed, throw the car sideways, then spend the earned boost.
  */
-const CRUISE_ALIGNMENT = 0.94;
 const CRUISE_BUILD_RATE = 1.7;
 const CRUISE_BREAK_RATE = 5.2;
-const CRUISE_SPEED_START = 0.3;
-const CRUISE_SPEED_BONUS = 0.45;
+const CRUISE_SPEED_BONUS = 0.22;
 const CRUISE_CUE_THRESHOLD = 0.82;
 const CRUISE_REARM_THRESHOLD = 0.42;
 const CRUISE_CUE_COOLDOWN_SECONDS = 7;
 const MODE_TRANSITION_SECONDS = 0.82;
-const WATER_ENTRY_SPEED_BONUS = 0.34;
-const LANDING_SPEED_BONUS = 0.08;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -476,12 +859,8 @@ function smoothstep(value: number, minimum: number, maximum: number): number {
   return normalized * normalized * (3 - 2 * normalized);
 }
 
-function dampAngle(current: number, target: number, amount: number): number {
-  let difference = ((target - current + Math.PI) % (Math.PI * 2)) - Math.PI;
-  if (difference < -Math.PI) {
-    difference += Math.PI * 2;
-  }
-  return current + difference * amount;
+function lerp(start: number, end: number, amount: number): number {
+  return start + (end - start) * amount;
 }
 
 export function getCurrentGeoPosition(state: GameState): readonly [number, number] {

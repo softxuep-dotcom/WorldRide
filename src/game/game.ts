@@ -7,6 +7,7 @@ import { WorldView } from "./world";
 import { SaveStore } from "./save-store";
 import { GameAudio } from "./audio";
 import { t } from "../i18n";
+import { ArcadeHUD } from "./arcade-hud";
 
 const ROUTINE_SAVE_SECONDS = 5;
 const COMPASS_INTRO_MOVEMENT_SECONDS = 0.4;
@@ -23,9 +24,10 @@ export class PocketEarthGame {
   private readonly clock = new THREE.Clock();
   private readonly input: InputController;
   private readonly ui: GameUI;
+  private readonly arcadeHud = new ArcadeHUD();
   private cameraViewSize =
-    document.documentElement.dataset.coverCapture === "true" ? 5.5 : 17;
-  private projectionViewSize = 17;
+    document.documentElement.dataset.coverCapture === "true" ? 5.5 : 13.2;
+  private projectionViewSize = 13.2;
   private overviewBlend = 0;
   private hasSizedCamera = false;
   private worldOverview = false;
@@ -39,6 +41,8 @@ export class PocketEarthGame {
   private platformSuspended = false;
   private contextLost = false;
   private backgrounded = false;
+  private cameraShake = 0;
+  private impactFreeze = 0;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -78,7 +82,7 @@ export class PocketEarthGame {
 
     this.camera.near = 0.1;
     this.camera.far = 600;
-    this.camera.position.set(0, 20, 16);
+    this.camera.position.set(0, 14.5, 11);
     this.camera.lookAt(0, 0, -2);
     this.scene.add(this.camera);
 
@@ -107,6 +111,7 @@ export class PocketEarthGame {
     // player has just crossed a border into France.
     this.processEvents(true);
     this.ui.update(this.simulation.state);
+    this.arcadeHud.update(this.simulation.state);
   }
 
   private readonly onFirstGesture = (): void => {
@@ -189,6 +194,7 @@ export class PocketEarthGame {
       state.cruiseFlow,
       state.modeTransition,
       this.overviewBlend,
+      state,
     );
     this.updateCamera(1);
     this.renderer.render(this.scene, this.camera);
@@ -263,7 +269,9 @@ export class PocketEarthGame {
   }
 
   private readonly tick = (): void => {
-    const delta = Math.min(this.clock.getDelta(), 0.05);
+    const frameDelta = Math.min(this.clock.getDelta(), 0.05);
+    this.impactFreeze = Math.max(0, this.impactFreeze - frameDelta);
+    const delta = this.impactFreeze > 0 ? frameDelta * 0.08 : frameDelta;
     const movement =
       this.worldOverview || this.ui.isInputBlocked()
         ? { x: 0, z: 0 }
@@ -302,9 +310,11 @@ export class PocketEarthGame {
       state.cruiseFlow,
       state.modeTransition,
       this.overviewBlend,
+      state,
     );
     this.updateCamera(delta);
     this.ui.update(state);
+    this.arcadeHud.update(state);
     this.audio.updateDrive(state);
     this.renderer.render(this.scene, this.camera);
 
@@ -333,13 +343,39 @@ export class PocketEarthGame {
       const suppressFeedback =
         suppressCountryFeedback && event.type === "country-entered";
       if (!suppressFeedback) {
+        this.applyArcadeImpact(event);
         this.emitAudioForEvent(event);
+        this.world.handleGameEvent(event);
+        this.arcadeHud.handleEvent(event);
         this.ui.handleEvent(event);
       }
     }
     if (reachedMilestone) {
       this.persist(true);
       this.sinceRoutineSave = 0;
+    }
+  }
+
+  private applyArcadeImpact(
+    event: ReturnType<GameSimulation["consumeEvents"]>[number],
+  ): void {
+    switch (event.type) {
+      case "arcade-hit":
+        this.cameraShake = Math.max(
+          this.cameraShake,
+          Math.min(0.62, 0.3 + event.combo * 0.035),
+        );
+        this.impactFreeze = Math.max(this.impactFreeze, 0.055);
+        break;
+      case "jump-landed":
+      case "water-rebound":
+        this.cameraShake = Math.max(this.cameraShake, 0.24);
+        break;
+      case "ramp-launched":
+        this.cameraShake = Math.max(this.cameraShake, 0.12);
+        break;
+      default:
+        break;
     }
   }
 
@@ -367,11 +403,46 @@ export class PocketEarthGame {
         break;
       case "world-wrapped":
         break;
+      case "boost-started":
+        this.audio.onBoostStarted();
+        break;
+      case "ramp-launched":
+        this.audio.onRampLaunch();
+        break;
+      case "arcade-hit":
+        this.audio.onArcadeHit(event.combo);
+        break;
+      case "arcade-near-miss":
+        this.audio.onNearMiss();
+        break;
+      case "drift-completed":
+        this.audio.onDriftCompleted(event.combo);
+        break;
+      case "jump-landed":
+        this.audio.onJumpLanded(event.combo);
+        break;
+      case "water-rebound":
+        this.audio.onWaterRebound();
+        break;
+      case "special-event-started":
+        this.audio.onSpecialEvent();
+        break;
+      case "combo-ended":
+      case "special-event-ended":
+        break;
     }
   }
 
   private updateCamera(delta: number): void {
-    const { position, velocity, cruiseFlow, modeTransition } =
+    const {
+      position,
+      velocity,
+      cruiseFlow,
+      modeTransition,
+      drift,
+      boosting,
+      airHeight,
+    } =
       this.simulation.state;
     const transitionSmoothing = 1 - Math.exp(-3.2 * delta);
     this.overviewBlend +=
@@ -385,19 +456,30 @@ export class PocketEarthGame {
     const localFactor = 1 - easedOverviewBlend;
     const leadX = velocity.x * 0.2 * localFactor;
     const leadZ = velocity.z * 0.2 * localFactor;
+    const speed = Math.hypot(velocity.x, velocity.z);
     const targetPosition = new THREE.Vector3(
       position.x + leadX * 0.45,
-      20,
-      position.z + 16 + leadZ * 0.45,
+      14.2 + speed * 0.1 + airHeight * 0.42,
+      position.z + 10.7 + speed * 0.13 + leadZ * 0.45,
     ).lerp(new THREE.Vector3(0, 240, 92), easedOverviewBlend);
     const smoothing = 1 - Math.exp(-4.5 * delta);
     this.camera.position.lerp(targetPosition, smoothing);
     const lookAtTarget = new THREE.Vector3(
       position.x + leadX,
-      0,
-      position.z - 2.4 + leadZ,
+      airHeight * 0.18,
+      position.z - 1.4 + leadZ,
     ).lerp(new THREE.Vector3(0, 0, 0), easedOverviewBlend);
     this.camera.lookAt(lookAtTarget);
+    this.cameraShake = Math.max(0, this.cameraShake - delta * 2.9);
+    if (this.cameraShake > 0.001 && easedOverviewBlend < 0.2) {
+      const shakeTime = this.simulation.state.elapsed;
+      this.camera.position.x +=
+        Math.sin(shakeTime * 91) * this.cameraShake;
+      this.camera.position.y +=
+        Math.sin(shakeTime * 73 + 1.2) * this.cameraShake * 0.34;
+      this.camera.position.z +=
+        Math.cos(shakeTime * 83) * this.cameraShake * 0.52;
+    }
     const lightingCenter = new THREE.Vector3(
       position.x,
       0,
@@ -415,7 +497,14 @@ export class PocketEarthGame {
     // threshold of noticing, so cruising looked identical to crawling.
     const targetViewSize =
       this.getTargetViewSize() +
-      (cruiseFlow * 2.2 + modeTransition * 1.25) * localFactor;
+      (
+        cruiseFlow * 2.2 +
+        modeTransition * 1.25 +
+        drift * 0.75 +
+        (boosting ? 2.4 : 0) +
+        Math.min(1.4, airHeight * 0.42)
+      ) *
+        localFactor;
     this.projectionViewSize +=
       (targetViewSize - this.projectionViewSize) * transitionSmoothing;
     this.applyCameraProjection(this.projectionViewSize);
@@ -480,7 +569,7 @@ export class PocketEarthGame {
     const width = window.innerWidth;
     const height = window.innerHeight;
     const aspect = width / height;
-    const mobileAdjustment = width < 700 ? 1.16 : 1;
+    const mobileAdjustment = width < 700 ? 1.08 : 1;
     const northWest = geoToWorld([
       MAP_BOUNDS.minLongitude,
       MAP_BOUNDS.maxLatitude,

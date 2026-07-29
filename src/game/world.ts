@@ -29,6 +29,12 @@ import type { WorldEcology } from "./world-ecology";
 import type { WorldLife } from "./world-life";
 import type { OceanLife } from "./ocean-life";
 import { wrappedDeltaX } from "./progression";
+import {
+  ARCADE_COURSE_OBJECTS,
+  type ArcadeCourseObject,
+  type ArcadeObjectKind,
+} from "./arcade-course";
+import type { GameEvent } from "./simulation";
 
 const RESERVED_MAP_MARKER_POSITIONS = [
   ...PHOTO_SPOTS.map((spot) => geoToWorld(spot.point)),
@@ -40,6 +46,7 @@ interface VehicleView {
   wheels: THREE.Mesh[];
   pontoons: THREE.Mesh[];
   wake: THREE.Mesh[];
+  boostFlames: THREE.Mesh[];
   /** Shared body material, retained so unlocked paints can recolour it. */
   bodyMaterial: THREE.MeshStandardMaterial;
 }
@@ -70,6 +77,40 @@ interface LandmarkEffect {
   phase: number;
   reveal: number;
   quiet: boolean;
+}
+
+interface ArcadePropView {
+  root: THREE.Group;
+  definition: ArcadeCourseObject;
+  dynamic: boolean;
+  age: number;
+  velocityX: number;
+  velocityY: number;
+  velocityZ: number;
+  spinX: number;
+  spinY: number;
+  spinZ: number;
+}
+
+interface ImpactParticle {
+  mesh: THREE.Mesh;
+  age: number;
+  lifetime: number;
+  velocityX: number;
+  velocityY: number;
+  velocityZ: number;
+  spinX: number;
+  spinY: number;
+}
+
+export interface ArcadeVisualState {
+  airHeight: number;
+  verticalVelocity: number;
+  drift: number;
+  boosting: boolean;
+  boostCharge: number;
+  specialEvent?: "ufo";
+  specialEventRemaining: number;
 }
 
 type CreateLandmarkStandee =
@@ -106,13 +147,27 @@ export class WorldView {
   private previousVehicleBoatMode?: boolean;
   private vehicleTrailClock = 0;
   private vehicleTrailCursor = 0;
+  private readonly arcadeProps = new Map<string, ArcadePropView>();
+  private readonly impactParticles: ImpactParticle[] = [];
+  private impactParticleCursor = 0;
+  private readonly ufo = new THREE.Group();
+  private readonly ufoBeamMaterial = new THREE.MeshBasicMaterial({
+    color: 0x74ffe1,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
 
   constructor() {
     this.root.name = "Pocket Planet world";
     this.addBoard();
+    this.buildArcadePlayground();
+    this.buildImpactParticles();
     this.vehicle = this.createVehicle();
     this.root.add(this.vehicle.root);
     this.buildVehicleTrail();
+    this.buildUfo();
   }
 
   loadDeferredContent(
@@ -203,7 +258,9 @@ export class WorldView {
     cruiseFlow = 0,
     modeTransition = 0,
     overviewBlend = 0,
+    arcade?: ArcadeVisualState,
   ): void {
+    const arcadeState = arcade ?? DEFAULT_ARCADE_VISUAL_STATE;
     this.modeBlend += ((boatMode ? 1 : 0) - this.modeBlend) * (1 - Math.exp(-7 * delta));
     this.life?.update(
       elapsed,
@@ -242,10 +299,12 @@ export class WorldView {
     this.vehicle.root.position.z = position.z;
     this.vehicle.root.position.y =
       THREE.MathUtils.lerp(0.37, 0.09, this.modeBlend) +
-      transitionArc * (boatMode ? 0.13 : 0.06);
+      transitionArc * (boatMode ? 0.13 : 0.06) +
+      arcadeState.airHeight;
     this.vehicle.root.rotation.y = heading;
     this.vehicle.root.rotation.x =
-      -transitionArc * (boatMode ? 0.085 : 0.035);
+      -transitionArc * (boatMode ? 0.085 : 0.035) -
+      THREE.MathUtils.clamp(arcadeState.verticalVelocity * 0.035, -0.16, 0.18);
     this.vehicle.root.rotation.z =
       this.vehicleLean +
       (boatMode ? Math.sin(elapsed * 2.1) * 0.045 : 0);
@@ -259,6 +318,16 @@ export class WorldView {
     for (const pontoon of this.vehicle.pontoons) {
       const scale = THREE.MathUtils.lerp(0.08, 1, this.modeBlend);
       pontoon.scale.set(scale, scale, scale);
+    }
+
+    for (const [index, flame] of this.vehicle.boostFlames.entries()) {
+      flame.visible = arcadeState.boosting && !boatMode;
+      const pulse = 0.88 + Math.sin(elapsed * 28 + index * 1.8) * 0.16;
+      flame.scale.set(
+        1,
+        1,
+        pulse * (0.85 + arcadeState.boostCharge * 0.55),
+      );
     }
 
     for (let index = 0; index < this.vehicle.wake.length; index += 1) {
@@ -281,7 +350,18 @@ export class WorldView {
       velocity,
       heading,
       boatMode,
-      cruiseFlow,
+      Math.max(
+        cruiseFlow,
+        arcadeState.drift,
+        arcadeState.boosting ? 1 : 0,
+      ),
+      overviewBlend,
+    );
+    this.updateArcadePlayground(
+      elapsed,
+      delta,
+      position,
+      arcadeState,
       overviewBlend,
     );
 
@@ -974,9 +1054,342 @@ export class WorldView {
     }
   }
 
+  handleGameEvent(event: GameEvent): void {
+    if (event.type !== "arcade-hit") {
+      return;
+    }
+    const prop = this.arcadeProps.get(event.object.id);
+    if (!prop || prop.dynamic || event.object.kind === "ramp") {
+      return;
+    }
+
+    const hash = hashString(event.object.id);
+    const sideways = ((hash % 17) / 16 - 0.5) * 3.2;
+    prop.dynamic = true;
+    prop.age = 0;
+    prop.velocityX = event.impulse.x + Math.cos(event.object.heading) * sideways;
+    prop.velocityY = event.object.kind === "balloon" ? 5.4 : 3.5 + (hash % 5) * 0.24;
+    prop.velocityZ = event.impulse.z - Math.sin(event.object.heading) * sideways;
+    prop.spinX = 3.4 + (hash % 7) * 0.45;
+    prop.spinY = -4.2 + (hash % 11) * 0.7;
+    prop.spinZ = 2.8 + (hash % 5) * 0.6;
+    this.spawnImpactBurst(event);
+  }
+
+  private buildArcadePlayground(): void {
+    for (const definition of ARCADE_COURSE_OBJECTS) {
+      const root = new THREE.Group();
+      root.name = `Arcade ${definition.kind} ${definition.id}`;
+      root.position.set(definition.x, 0, definition.z);
+      root.rotation.y = definition.heading;
+      const addPart = (
+        geometry: THREE.BufferGeometry,
+        material: THREE.Material,
+        x: number,
+        y: number,
+        z: number,
+      ): THREE.Mesh => {
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(x, y, z);
+        mesh.castShadow = true;
+        root.add(mesh);
+        return mesh;
+      };
+
+      this.buildArcadeObject(definition.kind, addPart);
+      this.arcadeProps.set(definition.id, {
+        root,
+        definition,
+        dynamic: false,
+        age: 0,
+        velocityX: 0,
+        velocityY: 0,
+        velocityZ: 0,
+        spinX: 0,
+        spinY: 0,
+        spinZ: 0,
+      });
+      this.root.add(root);
+    }
+  }
+
+  private buildArcadeObject(
+    kind: ArcadeObjectKind,
+    addPart: (
+      geometry: THREE.BufferGeometry,
+      material: THREE.Material,
+      x: number,
+      y: number,
+      z: number,
+    ) => THREE.Mesh,
+  ): void {
+    const coral = new THREE.MeshStandardMaterial({
+      color: 0xff684d,
+      roughness: 0.68,
+      emissive: 0x6c160b,
+      emissiveIntensity: 0.12,
+    });
+    const yellow = new THREE.MeshStandardMaterial({
+      color: 0xffd643,
+      roughness: 0.7,
+      emissive: 0x83520a,
+      emissiveIntensity: 0.14,
+    });
+    const cream = new THREE.MeshStandardMaterial({
+      color: 0xfff0be,
+      roughness: 0.82,
+    });
+    const dark = new THREE.MeshStandardMaterial({
+      color: 0x284655,
+      roughness: 0.8,
+    });
+    const cyan = new THREE.MeshStandardMaterial({
+      color: 0x5ee8da,
+      roughness: 0.52,
+      emissive: 0x146f71,
+      emissiveIntensity: 0.24,
+    });
+
+    switch (kind) {
+      case "ramp": {
+        const deck = addPart(
+          new THREE.BoxGeometry(2.15, 0.18, 2.7),
+          coral,
+          0,
+          0.38,
+          0,
+        );
+        deck.rotation.x = -0.2;
+        for (const x of [-0.62, 0, 0.62]) {
+          const stripe = addPart(
+            new THREE.BoxGeometry(0.26, 0.04, 1.92),
+            yellow,
+            x,
+            0.58,
+            -0.02,
+          );
+          stripe.rotation.x = -0.2;
+        }
+        addPart(new THREE.BoxGeometry(2.25, 0.22, 0.22), dark, 0, 0.18, 1.25);
+        break;
+      }
+      case "crate": {
+        addPart(new THREE.BoxGeometry(0.86, 0.86, 0.86), yellow, 0, 0.43, 0);
+        addPart(new THREE.BoxGeometry(0.12, 0.92, 0.92), coral, 0, 0.43, 0);
+        addPart(new THREE.BoxGeometry(0.92, 0.92, 0.12), coral, 0, 0.43, 0);
+        break;
+      }
+      case "barrier": {
+        for (const x of [-0.48, 0.48]) {
+          addPart(new THREE.BoxGeometry(0.14, 0.72, 0.14), dark, x, 0.36, 0);
+          addPart(new THREE.BoxGeometry(0.42, 0.11, 0.28), dark, x, 0.08, 0);
+        }
+        addPart(new THREE.BoxGeometry(1.34, 0.36, 0.14), cream, 0, 0.55, 0);
+        for (const x of [-0.44, 0, 0.44]) {
+          const stripe = addPart(
+            new THREE.BoxGeometry(0.26, 0.4, 0.16),
+            coral,
+            x,
+            0.55,
+            0,
+          );
+          stripe.rotation.z = -0.46;
+        }
+        break;
+      }
+      case "balloon": {
+        addPart(new THREE.SphereGeometry(0.52, 12, 9), cyan, 0, 1.65, 0);
+        addPart(new THREE.TorusGeometry(0.34, 0.06, 6, 14), yellow, 0, 1.65, 0)
+          .rotation.x = Math.PI / 2;
+        addPart(new THREE.CylinderGeometry(0.018, 0.018, 1.1, 5), cream, 0, 0.85, 0);
+        addPart(new THREE.BoxGeometry(0.28, 0.22, 0.28), coral, 0, 0.25, 0);
+        break;
+      }
+    }
+  }
+
+  private buildUfo(): void {
+    this.ufo.name = "Arcade UFO event";
+    const hull = new THREE.MeshStandardMaterial({
+      color: 0xc7dbdd,
+      roughness: 0.32,
+      metalness: 0.58,
+      emissive: 0x2ce4cf,
+      emissiveIntensity: 0.16,
+    });
+    const glass = new THREE.MeshStandardMaterial({
+      color: 0x6ef2e2,
+      transparent: true,
+      opacity: 0.76,
+      roughness: 0.18,
+      emissive: 0x20a993,
+      emissiveIntensity: 0.62,
+    });
+    const disc = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.35, 0.82, 0.38, 18),
+      hull,
+    );
+    disc.castShadow = true;
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.58, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+      glass,
+    );
+    dome.position.y = 0.18;
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1.02, 0.09, 8, 22),
+      glass,
+    );
+    ring.rotation.x = Math.PI / 2;
+    const beam = new THREE.Mesh(
+      new THREE.ConeGeometry(1.45, 4.5, 18, 1, true),
+      this.ufoBeamMaterial,
+    );
+    beam.position.y = -2.25;
+    beam.rotation.z = Math.PI;
+    this.ufo.add(disc, dome, ring, beam);
+    this.ufo.visible = false;
+    this.root.add(this.ufo);
+  }
+
+  private buildImpactParticles(): void {
+    const geometry = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+    const palette = [0xffd643, 0xff684d, 0xfff0be, 0x5ee8da];
+    for (let index = 0; index < 40; index += 1) {
+      const mesh = new THREE.Mesh(
+        geometry,
+        new THREE.MeshStandardMaterial({
+          color: palette[index % palette.length],
+          roughness: 0.68,
+          emissive: palette[index % palette.length],
+          emissiveIntensity: 0.08,
+        }),
+      );
+      mesh.visible = false;
+      mesh.castShadow = true;
+      this.impactParticles.push({
+        mesh,
+        age: 0,
+        lifetime: 0.8,
+        velocityX: 0,
+        velocityY: 0,
+        velocityZ: 0,
+        spinX: 0,
+        spinY: 0,
+      });
+      this.root.add(mesh);
+    }
+  }
+
+  private spawnImpactBurst(
+    event: Extract<GameEvent, { type: "arcade-hit" }>,
+  ): void {
+    const count = event.object.kind === "balloon" ? 14 : 10;
+    const seed = hashString(event.object.id);
+    for (let index = 0; index < count; index += 1) {
+      const particle =
+        this.impactParticles[
+          this.impactParticleCursor % this.impactParticles.length
+        ];
+      this.impactParticleCursor += 1;
+      const angle = (index / count) * Math.PI * 2 + (seed % 31) * 0.07;
+      const spread = 1.4 + ((seed + index * 13) % 9) * 0.16;
+      particle.mesh.position.set(
+        event.object.x,
+        Math.max(0.45, event.object.y),
+        event.object.z,
+      );
+      particle.mesh.rotation.set(0, angle, 0);
+      particle.mesh.scale.setScalar(0.75 + (index % 3) * 0.18);
+      particle.mesh.visible = true;
+      particle.age = 0;
+      particle.lifetime = 0.62 + (index % 5) * 0.07;
+      particle.velocityX =
+        event.impulse.x * 0.32 + Math.cos(angle) * spread;
+      particle.velocityY = 2.6 + (index % 4) * 0.48;
+      particle.velocityZ =
+        event.impulse.z * 0.32 + Math.sin(angle) * spread;
+      particle.spinX = 5 + (index % 6) * 0.8;
+      particle.spinY = -5 + (index % 7) * 1.35;
+    }
+  }
+
+  private updateImpactParticles(delta: number, visibility: number): void {
+    for (const particle of this.impactParticles) {
+      if (!particle.mesh.visible) {
+        continue;
+      }
+      particle.age += delta;
+      if (particle.age >= particle.lifetime) {
+        particle.mesh.visible = false;
+        continue;
+      }
+      particle.velocityY -= 10.5 * delta;
+      particle.mesh.position.x += particle.velocityX * delta;
+      particle.mesh.position.y += particle.velocityY * delta;
+      particle.mesh.position.z += particle.velocityZ * delta;
+      particle.mesh.rotation.x += particle.spinX * delta;
+      particle.mesh.rotation.y += particle.spinY * delta;
+      const remaining = 1 - particle.age / particle.lifetime;
+      particle.mesh.scale.setScalar(
+        visibility * (0.42 + remaining * 0.88),
+      );
+    }
+  }
+
+  private updateArcadePlayground(
+    elapsed: number,
+    delta: number,
+    position: { x: number; z: number },
+    arcade: ArcadeVisualState,
+    overviewBlend: number,
+  ): void {
+    const localVisibility =
+      1 - THREE.MathUtils.smoothstep(overviewBlend, 0.28, 0.66);
+    this.updateImpactParticles(delta, localVisibility);
+    for (const prop of this.arcadeProps.values()) {
+      if (!prop.root.visible) {
+        continue;
+      }
+      if (prop.dynamic) {
+        prop.age += delta;
+        prop.velocityY -= 9.5 * delta;
+        prop.root.position.x += prop.velocityX * delta;
+        prop.root.position.y += prop.velocityY * delta;
+        prop.root.position.z += prop.velocityZ * delta;
+        prop.root.rotation.x += prop.spinX * delta;
+        prop.root.rotation.y += prop.spinY * delta;
+        prop.root.rotation.z += prop.spinZ * delta;
+        if (prop.root.position.y < -0.9 || prop.age > 2.8) {
+          prop.root.visible = false;
+        }
+      } else if (prop.definition.kind === "balloon") {
+        prop.root.position.y = Math.sin(elapsed * 2.1 + prop.definition.x) * 0.09;
+        prop.root.rotation.y =
+          prop.definition.heading + Math.sin(elapsed * 1.4) * 0.08;
+      }
+      prop.root.scale.setScalar(localVisibility);
+    }
+
+    const ufoActive = arcade.specialEvent === "ufo" && localVisibility > 0.02;
+    this.ufo.visible = ufoActive;
+    if (ufoActive) {
+      const angle = elapsed * 0.72;
+      this.ufo.position.set(
+        position.x + Math.cos(angle) * 4.8,
+        5.8 + Math.sin(elapsed * 2.2) * 0.28,
+        position.z + Math.sin(angle) * 3.5,
+      );
+      this.ufo.rotation.y = -angle * 1.7;
+      const eventPulse = 0.5 + Math.sin(elapsed * 5.4) * 0.5;
+      this.ufoBeamMaterial.opacity = 0.08 + eventPulse * 0.09;
+      this.ufo.scale.setScalar(localVisibility);
+    }
+  }
+
   private createVehicle(): VehicleView {
     const root = new THREE.Group();
     root.name = "Traveller car boat";
+    root.scale.setScalar(1.12);
 
     const bodyMaterial = new THREE.MeshStandardMaterial({
       color: 0xff6c55,
@@ -1173,7 +1586,25 @@ export class WorldView {
       root.add(ripple);
     }
 
-    return { root, wheels, pontoons, wake, bodyMaterial };
+    const boostFlames: THREE.Mesh[] = [];
+    for (const x of [-0.38, 0.38]) {
+      const flame = new THREE.Mesh(
+        new THREE.ConeGeometry(0.13, 0.82, 7),
+        new THREE.MeshBasicMaterial({
+          color: 0xffdf4f,
+          transparent: true,
+          opacity: 0.9,
+          depthWrite: false,
+        }),
+      );
+      flame.rotation.x = Math.PI / 2;
+      flame.position.set(x, 0.56, 1.13);
+      flame.visible = false;
+      boostFlames.push(flame);
+      root.add(flame);
+    }
+
+    return { root, wheels, pontoons, wake, boostFlames, bodyMaterial };
   }
 
   /** Applies an unlocked paint colour to the travel car and boat hull. */
@@ -1323,6 +1754,25 @@ export class WorldView {
     particle.velocityZ = burst ? Math.sin(burstAngle) * 1.15 : 0;
   }
 
+}
+
+const DEFAULT_ARCADE_VISUAL_STATE: ArcadeVisualState = {
+  airHeight: 0,
+  verticalVelocity: 0,
+  drift: 0,
+  boosting: false,
+  boostCharge: 0,
+  specialEvent: undefined,
+  specialEventRemaining: 0,
+};
+
+function hashString(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
 function createRiverRibbonGeometry(

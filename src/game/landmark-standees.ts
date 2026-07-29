@@ -284,8 +284,24 @@ export function updateLandmarkStandeeOverview(
   standee.root.rotation.z =
     standee.baseLean + Math.sin(elapsed * 0.72 + standee.swayPhase) * 0.008;
 
-  const opacity = 1 - THREE.MathUtils.smoothstep(overviewBlend, 0.3, 0.72);
+  const overviewOpacity =
+    1 - THREE.MathUtils.smoothstep(overviewBlend, 0.3, 0.72);
+  const nearClear = THREE.MathUtils.smoothstep(
+    distanceToPlayer,
+    1.15,
+    2.05,
+  );
+  const farFade =
+    1 - THREE.MathUtils.smoothstep(distanceToPlayer, 4.35, 5.8);
+  const opacity = overviewOpacity * nearClear * farFade;
   standee.root.visible = opacity > 0.01;
+  standee.root.scale.setScalar(
+    THREE.MathUtils.lerp(
+      0.38,
+      0.47,
+      THREE.MathUtils.smoothstep(distanceToPlayer, 1.5, 4.8),
+    ),
+  );
 
   for (const material of standee.fadeMaterials) {
     if (
@@ -298,6 +314,7 @@ export function updateLandmarkStandeeOverview(
           : 1;
       material.opacity = baseOpacity * opacity;
       material.transparent = true;
+      material.depthWrite = false;
     }
   }
 }

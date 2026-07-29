@@ -77,7 +77,7 @@ export class GameAudio {
     }
 
     const speed = Math.hypot(state.velocity.x, state.velocity.z);
-    const normalized = Math.min(1, speed / 6.8);
+    const normalized = Math.min(1, speed / 11.5);
     const now = this.context.currentTime;
 
     // Pitch and loudness rise with speed. The car sits lower in the mix than
@@ -85,18 +85,18 @@ export class GameAudio {
     const basePitch = state.vehicleMode === "car" ? 62 : 40;
     const pitchSpan = state.vehicleMode === "car" ? 74 : 40;
     this.engineOsc?.frequency.setTargetAtTime(
-      basePitch + normalized * pitchSpan,
+      basePitch + normalized * pitchSpan + (state.boosting ? 42 : 0),
       now,
       0.08,
     );
     this.engineSubOsc?.frequency.setTargetAtTime(
-      (basePitch + normalized * pitchSpan) * 0.5,
+      (basePitch + normalized * pitchSpan + (state.boosting ? 42 : 0)) * 0.5,
       now,
       0.08,
     );
     const driveGain =
       state.vehicleMode === "car"
-        ? 0.025 + normalized * 0.075
+        ? 0.025 + normalized * 0.075 + (state.boosting ? 0.035 : 0)
         : 0.05 + normalized * 0.14;
     this.engineGain.gain.setTargetAtTime(driveGain, now, 0.1);
     this.engineFilter?.frequency.setTargetAtTime(
@@ -171,6 +171,50 @@ export class GameAudio {
 
   onMapEdge(): void {
     this.playTone(150, 0.18, "sine", 0.1);
+  }
+
+  onBoostStarted(): void {
+    this.playNoiseBurst(0.22, 2800, 0.08, true);
+    this.playTone(196, 0.12, "sawtooth", 0.055);
+    window.setTimeout(() => this.playTone(392, 0.18, "sawtooth", 0.045), 70);
+  }
+
+  onRampLaunch(): void {
+    this.playTone(330, 0.09, "square", 0.06);
+    window.setTimeout(() => this.playTone(660, 0.2, "triangle", 0.055), 65);
+  }
+
+  onArcadeHit(combo: number): void {
+    this.playNoiseBurst(0.085, 1800 + combo * 90, 0.12);
+    this.playTone(150 + combo * 18, 0.1, "square", 0.055);
+  }
+
+  onNearMiss(): void {
+    this.playNoiseBurst(0.12, 3400, 0.04, true);
+    this.playTone(740, 0.1, "sine", 0.035);
+  }
+
+  onDriftCompleted(combo: number): void {
+    this.playTone(260 + combo * 22, 0.11, "triangle", 0.045);
+    window.setTimeout(
+      () => this.playTone(390 + combo * 26, 0.13, "triangle", 0.04),
+      75,
+    );
+  }
+
+  onJumpLanded(combo: number): void {
+    this.playNoiseBurst(0.11, 900, 0.15);
+    this.playTone(110 + combo * 12, 0.16, "square", 0.07);
+  }
+
+  onWaterRebound(): void {
+    this.playSplash();
+    window.setTimeout(() => this.playTone(520, 0.15, "triangle", 0.05), 90);
+  }
+
+  onSpecialEvent(): void {
+    this.playArpeggio([220, 329.63, 493.88, 739.99], 0.1, "sine", 0.15);
+    this.playNoiseBurst(0.32, 3600, 0.05, true);
   }
 
   private ensureContext(): void {

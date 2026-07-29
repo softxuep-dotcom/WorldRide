@@ -39,6 +39,7 @@
         id="game-canvas"
         aria-label="Pocket Planet 3D game view"
         data-i18n-attr="aria-label:canvas.label"
+        tabindex="0"
       ></canvas>
 
       <div id="travel-hud" class="travel-hud">
@@ -114,6 +115,30 @@
         </div>
       </div>
 
+      <section id="arcade-hud" class="arcade-hud" aria-label="Arcade score">
+        <div class="arcade-score">
+          <span aria-hidden="true">★</span>
+          <strong id="arcade-score">0</strong>
+        </div>
+        <div class="arcade-combo-wrap" aria-live="polite">
+          <strong id="arcade-combo" class="arcade-combo">×1</strong>
+          <small id="arcade-combo-label">↑ &nbsp;🛫</small>
+        </div>
+        <div
+          id="arcade-event"
+          class="arcade-event"
+          aria-live="assertive"
+          aria-hidden="true"
+        >
+          <strong id="arcade-event-title">🛸 ×2</strong>
+          <span id="arcade-event-timer">12s</span>
+        </div>
+        <div class="boost-meter" aria-label="Boost energy">
+          <span aria-hidden="true">⚡</span>
+          <i><b id="boost-meter-fill"></b></i>
+        </div>
+      </section>
+
       <div id="cruise-veil" class="cruise-veil" aria-hidden="true"></div>
 
       <div id="postcard-reveals" class="postcard-reveals" aria-live="polite"></div>
@@ -121,11 +146,20 @@
       <div class="feedback-zone">
         <div id="toast" class="toast" role="status" aria-live="polite"></div>
         <section id="controls-hint" class="controls-hint">
-          <span class="desktop-hint" data-i18n="controls.desktop">Move with WASD / arrow keys · M opens the world map · Space explores nearby landmarks</span>
-          <span class="touch-hint" data-i18n="controls.touch">Hold and drag anywhere to travel · Approach a diamond marker to explore a landmark</span>
+          <span class="desktop-hint">W / ↑ 🏁 &nbsp;·&nbsp; A D / ← → ↔ &nbsp;·&nbsp; SPACE ⚡</span>
+          <span class="touch-hint">☝️ ↑ + ↔ &nbsp;·&nbsp; HOLD ⚡</span>
         </section>
       </div>
       <div id="flash" class="camera-flash" aria-hidden="true"></div>
+
+      <button
+        id="boost-button"
+        class="boost-button"
+        type="button"
+        aria-label="Boost"
+      >
+        <span aria-hidden="true">⚡</span>
+      </button>
 
       <div
         id="celebration"

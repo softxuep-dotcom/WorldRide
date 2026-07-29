@@ -47,6 +47,9 @@ import {
   type VehiclePaint,
 } from "./progression";
 
+const CHALLENGE_ATTENTION_SECONDS = 120;
+const CHALLENGE_ATTENTION_MAX_OPENS = 3;
+
 interface QuizSubject {
   quiz: QuizSet;
   label: string;
@@ -174,15 +177,10 @@ export class GameUI {
   private worldOverviewActive = false;
   private availableQuiz?: QuizSubject;
   private activeQuiz?: QuizSubject;
-  /** Set while the open panel is an arrival question rather than a full set. */
-  private arrivalQuizSpot?: PhotoSpotDefinition;
-  private arrivalQuizCorrect = false;
-  /** Held across the lazy quiz-module load so arrivals cannot race. */
-  private arrivalQuizPending = false;
-  /** Landmarks whose arrival question was answered correctly. Persisted. */
+  private challengeAttentionStartElapsed?: number;
+  private challengeOpenCount = 0;
+  /** Retained for compatibility with saves created by the retired arrival quiz. */
   private readonly goldStamps = new Set<string>();
-  /** Consecutive correct arrivals; session-only, resets on a wrong answer. */
-  private arrivalStreak = 0;
   private quizIndex = 0;
   private quizCorrect = 0;
   private quizAnswered = false;
@@ -315,7 +313,7 @@ export class GameUI {
       garageGrid: requireElement("garage-grid"),
     };
 
-    this.syncQuizOnboardingState();
+    this.syncChallengeAttentionState();
     this.buildLanguageSelector();
     const { halo, dot } = this.buildMiniMap();
     this.playerHalo = halo;
@@ -411,6 +409,7 @@ export class GameUI {
 
   update(state: GameState): void {
     this.latestState = state;
+    this.updateChallengeAttention(state.elapsed);
     const geoPosition = getCurrentGeoPosition(state);
     const currentWorldCountry = state.currentCountryProfile
       ? WORLD_COUNTRIES.find(
@@ -1167,14 +1166,14 @@ export class GameUI {
     for (const id of ids) {
       this.completedQuizzes.add(id);
     }
-    this.syncQuizOnboardingState();
+    this.syncChallengeAttentionState();
   }
 
   private refreshQuizAvailability(
     profile: CountryProfile | undefined,
     spot: PhotoSpotDefinition | undefined,
   ): void {
-    this.syncQuizOnboardingState();
+    this.syncChallengeAttentionState();
     const quizModule = this.quizModule;
     if (!quizModule) {
       this.availableQuiz = undefined;
@@ -1229,6 +1228,8 @@ export class GameUI {
     if (!this.availableQuiz) {
       return;
     }
+    this.challengeOpenCount += 1;
+    this.syncChallengeAttentionState();
     this.setSettingsOpen(false);
     this.setWishlistOpen(false);
     this.togglePassport(false);
@@ -1251,15 +1252,6 @@ export class GameUI {
     if (!active) {
       return;
     }
-    // Skipping an arrival question still hands over the postcard; it just
-    // forfeits the stamp. It must not run the normal completion bookkeeping,
-    // which would mark the landmark's whole quiz set as done.
-    if (this.arrivalQuizSpot) {
-      this.arrivalQuizCorrect = false;
-      this.elements.quizSkip.hidden = false;
-      this.finishArrivalQuiz();
-      return;
-    }
     const worldFlowCompleted =
       this.isWorldQuiz(active) && this.quizQuestionsAnswered > 0;
     const completedFlow =
@@ -1269,7 +1261,7 @@ export class GameUI {
       const firstChallenge = this.completedQuizzes.size === 0;
       this.completedQuizzes.add(active.quiz.id);
       this.pendingFirstQuizReward ||= firstChallenge;
-      this.syncQuizOnboardingState();
+      this.syncChallengeAttentionState();
       this.onProgressionChanged();
     }
     if (this.quizFinishTimer !== undefined) {
@@ -1388,14 +1380,6 @@ export class GameUI {
       correct ? t("quiz.correct") : t("quiz.wrong")
     } ${this.quizModule?.localizeText(question.explain, locale) ?? ""}`;
 
-    if (this.arrivalQuizSpot) {
-      this.arrivalQuizCorrect = correct;
-      this.elements.quizSkip.hidden = true;
-      this.elements.quizNext.hidden = false;
-      this.elements.quizNext.textContent = t("quiz.arrivalContinue");
-      return;
-    }
-
     const isLast =
       !this.isWorldQuiz(active) &&
       this.quizIndex >= active.quiz.questions.length - 1;
@@ -1408,11 +1392,6 @@ export class GameUI {
   private advanceQuiz(): void {
     const active = this.activeQuiz;
     if (!active) {
-      return;
-    }
-
-    if (this.arrivalQuizSpot) {
-      this.finishArrivalQuiz();
       return;
     }
 
@@ -1438,7 +1417,7 @@ export class GameUI {
     this.completedQuizzes.add(active.quiz.id);
     this.pendingFirstQuizReward ||= firstChallenge;
     this.quizFlowCompleted = true;
-    this.syncQuizOnboardingState();
+    this.syncChallengeAttentionState();
     this.onProgressionChanged();
 
     this.elements.quizOptions.replaceChildren();
@@ -1458,12 +1437,21 @@ export class GameUI {
     }, 1800);
   }
 
-  private syncQuizOnboardingState(): void {
-    // Arrival questions are deliberately lightweight; keep inviting the player
-    // to try a full challenge until one of those flows has been completed.
+  private updateChallengeAttention(elapsed: number): void {
+    this.challengeAttentionStartElapsed ??= elapsed;
+    this.syncChallengeAttentionState();
+  }
+
+  private syncChallengeAttentionState(): void {
+    const elapsed = this.latestState?.elapsed;
+    const attentionElapsed =
+      elapsed !== undefined && this.challengeAttentionStartElapsed !== undefined
+        ? elapsed - this.challengeAttentionStartElapsed
+        : 0;
     this.elements.quizButton.classList.toggle(
-      "is-onboarding",
-      this.completedQuizzes.size === 0,
+      "is-attention",
+      this.challengeOpenCount < CHALLENGE_ATTENTION_MAX_OPENS &&
+        attentionElapsed < CHALLENGE_ATTENTION_SECONDS,
     );
   }
 
@@ -1515,7 +1503,6 @@ export class GameUI {
           event.spot,
           event.firstCollection,
           event.automatic ?? false,
-          event.arrivalQuizEligible ?? false,
         );
         break;
       case "specialty-discovered":
@@ -1581,11 +1568,7 @@ export class GameUI {
       this.elements.landmarkDetail.classList.contains("is-visible") ||
       this.elements.passportPanel.classList.contains("is-visible") ||
       this.elements.postcardAlbum.classList.contains("is-visible") ||
-      Boolean(this.activeQuiz) ||
-      // Hold the car the moment an arrival begins, not once the lazily loaded
-      // quiz module finally resolves: otherwise it coasts on through the next
-      // landmarks and hands out their postcards unasked.
-      this.arrivalQuizPending
+      Boolean(this.activeQuiz)
     );
   }
 
@@ -1696,7 +1679,6 @@ export class GameUI {
     spot: PhotoSpotDefinition,
     firstCollection: boolean,
     automatic: boolean,
-    arrivalQuizEligible: boolean,
   ): void {
     if (spot.visitMode !== "reflection") {
       this.elements.flash.classList.remove("is-active");
@@ -1704,104 +1686,12 @@ export class GameUI {
       this.elements.flash.classList.add("is-active");
     }
 
-    // New players spawn directly on the Eiffel Tower, so automatic collection
-    // must remain a lightweight first win. Route questions only begin after
-    // enough active driving time has accumulated; before then the postcard
-    // animation plays without blocking the car.
-    if (automatic && arrivalQuizEligible) {
-      void this.startArrivalQuiz(spot);
-      return;
-    }
-
     if (automatic) {
-      this.revealPostcard(spot, "plain");
+      this.revealPostcard(spot);
       return;
     }
 
     this.showLandmarkDetail(spot, firstCollection);
-  }
-
-  /**
-   * One question, never a whole set: the arrival has to stay swallowable, and
-   * 54 landmarks already supply a long tail. The postcard is granted no matter
-   * what — being weak at geography must not block collection — so a correct
-   * answer buys the gold stamp and the streak, not the card itself.
-   */
-  private async startArrivalQuiz(spot: PhotoSpotDefinition): Promise<void> {
-    // The guard has to be set synchronously: the quiz module loads lazily, and
-    // the car keeps driving across that await, so a second landmark can arrive
-    // before `activeQuiz` exists and open a competing question.
-    if (this.activeQuiz || this.arrivalQuizPending || spot.visitMode === "reflection") {
-      this.revealPostcard(spot, "plain");
-      return;
-    }
-    this.arrivalQuizPending = true;
-
-    await this.ensureQuizLoaded();
-    this.arrivalQuizPending = false;
-    const module = this.quizModule;
-    const set = module?.getSpotQuiz(spot.id);
-    const question = set?.questions.length
-      ? set.questions[Math.floor(Math.random() * set.questions.length)]
-      : undefined;
-    if (!module || !question) {
-      this.revealPostcard(spot, "plain");
-      return;
-    }
-
-    this.setSettingsOpen(false);
-    this.setWishlistOpen(false);
-    this.togglePassport(false);
-    this.toggleLandmarkDetail(false);
-    this.toggleAlbum(false);
-
-    this.arrivalQuizSpot = spot;
-    this.arrivalQuizCorrect = false;
-    this.activeQuiz = {
-      quiz: { id: `arrival:${spot.id}`, questions: [question] },
-      label: localizePhotoSpot(spot).name,
-    };
-    this.quizIndex = 0;
-    this.quizCorrect = 0;
-    this.quizQuestionsAnswered = 0;
-    this.quizFlowCompleted = false;
-    this.elements.quizSkip.textContent = t("quiz.arrivalSkip");
-    this.elements.quizPanel.classList.add("is-visible");
-    this.elements.quizPanel.setAttribute("aria-hidden", "false");
-    this.syncSurfaceState();
-    this.renderQuizQuestion();
-  }
-
-  /** Closes an arrival question and hands over the postcard it was gating. */
-  private finishArrivalQuiz(): void {
-    const spot = this.arrivalQuizSpot;
-    if (!spot) {
-      return;
-    }
-    const correct = this.arrivalQuizCorrect;
-    this.arrivalQuizSpot = undefined;
-    this.arrivalQuizCorrect = false;
-
-    if (correct) {
-      this.goldStamps.add(spot.id);
-      this.arrivalStreak += 1;
-      this.onProgressionChanged();
-    } else {
-      this.arrivalStreak = 0;
-    }
-
-    this.activeQuiz = undefined;
-    this.quizFlowCompleted = false;
-    this.quizQuestionsAnswered = 0;
-    this.elements.quizSkip.textContent = t("quiz.leave");
-    this.elements.quizPanel.classList.remove("is-visible");
-    this.elements.quizPanel.setAttribute("aria-hidden", "true");
-    this.syncSurfaceState();
-    this.refreshQuizAvailability(
-      this.currentCountry,
-      this.currentNearestPhotoSpot,
-    );
-    this.revealPostcard(spot, correct ? "gold" : "plain");
   }
 
   /**
@@ -1827,10 +1717,7 @@ export class GameUI {
     this.elements.cruiseVeil.style.opacity = (level * 0.9).toFixed(2);
   }
 
-  private revealPostcard(
-    spot: PhotoSpotDefinition,
-    stampKind: "gold" | "plain" = "plain",
-  ): void {
+  private revealPostcard(spot: PhotoSpotDefinition): void {
     const loadingScreen = document.getElementById("loading-screen");
     const loadingParent = loadingScreen?.parentElement;
     if (loadingScreen && loadingParent) {
@@ -1842,7 +1729,7 @@ export class GameUI {
           return;
         }
         observer.disconnect();
-        this.revealPostcard(spot, stampKind);
+        this.revealPostcard(spot);
       });
       observer.observe(loadingParent, { childList: true });
       return;
@@ -1851,7 +1738,6 @@ export class GameUI {
     const localized = localizePhotoSpot(spot);
     const card = document.createElement("div");
     card.className = "postcard-reveal";
-    card.classList.toggle("is-gold", stampKind === "gold");
 
     const art = buildPostcardArt(spot, this.spotCountry(spot));
     art.classList.add("postcard-reveal__art");
@@ -1867,18 +1753,9 @@ export class GameUI {
     const stamp = document.createElement("span");
     stamp.className = "postcard-reveal__stamp";
     stamp.setAttribute("aria-hidden", "true");
-    stamp.textContent = stampKind === "gold" ? "★" : "✦";
+    stamp.textContent = "✦";
 
     card.append(art, caption, stamp);
-    if (stampKind === "gold") {
-      const badge = document.createElement("span");
-      badge.className = "postcard-reveal__badge";
-      badge.textContent =
-        this.arrivalStreak > 1
-          ? t("quiz.arrivalStreak", { count: this.arrivalStreak })
-          : t("quiz.arrivalGold");
-      card.append(badge);
-    }
     this.elements.postcardReveals.append(card);
     card.addEventListener("animationend", () => card.remove());
   }

@@ -8,8 +8,13 @@ export class InputController {
   private dragOrigin = { x: 0, y: 0 };
   private dragVector = { x: 0, z: 0 };
   private interactRequested = false;
+  private readonly boostPointerIds = new Set<number>();
+  private readonly boostButton?: HTMLButtonElement;
 
   constructor(private readonly surface: HTMLElement) {
+    const boostButton = document.getElementById("boost-button");
+    this.boostButton =
+      boostButton instanceof HTMLButtonElement ? boostButton : undefined;
     window.addEventListener("keydown", this.onKeyDown, { passive: false });
     window.addEventListener("keyup", this.onKeyUp);
     window.addEventListener("blur", this.onBlur);
@@ -19,12 +24,17 @@ export class InputController {
     surface.addEventListener("pointerup", this.onDragEnd);
     surface.addEventListener("pointercancel", this.onDragEnd);
     surface.addEventListener("lostpointercapture", this.onDragEnd);
+    this.boostButton?.addEventListener("pointerdown", this.onBoostStart);
+    this.boostButton?.addEventListener("pointerup", this.onBoostEnd);
+    this.boostButton?.addEventListener("pointercancel", this.onBoostEnd);
+    this.boostButton?.addEventListener("lostpointercapture", this.onBoostEnd);
   }
 
   update(): MovementInput {
     if (!this.enabled) {
       this.movement.x = 0;
       this.movement.z = 0;
+      this.movement.boost = false;
       return this.movement;
     }
     const keyboardX =
@@ -36,6 +46,10 @@ export class InputController {
 
     this.movement.x = keyboardX || this.dragVector.x;
     this.movement.z = keyboardZ || this.dragVector.z;
+    this.movement.boost =
+      this.pressedKeys.has("Space") ||
+      this.pressedKeys.has("ShiftLeft") ||
+      this.boostPointerIds.size > 0;
     return this.movement;
   }
 
@@ -57,6 +71,10 @@ export class InputController {
     this.surface.removeEventListener("pointerup", this.onDragEnd);
     this.surface.removeEventListener("pointercancel", this.onDragEnd);
     this.surface.removeEventListener("lostpointercapture", this.onDragEnd);
+    this.boostButton?.removeEventListener("pointerdown", this.onBoostStart);
+    this.boostButton?.removeEventListener("pointerup", this.onBoostEnd);
+    this.boostButton?.removeEventListener("pointercancel", this.onBoostEnd);
+    this.boostButton?.removeEventListener("lostpointercapture", this.onBoostEnd);
   }
 
   setEnabled(enabled: boolean): void {
@@ -67,13 +85,14 @@ export class InputController {
     if (!enabled) {
       this.pressedKeys.clear();
       this.interactRequested = false;
+      this.boostPointerIds.clear();
       this.resetDrag();
     }
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (
-      ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "KeyW", "KeyA", "KeyS", "KeyD"].includes(
+      ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "ShiftLeft", "KeyW", "KeyA", "KeyS", "KeyD"].includes(
         event.code,
       )
     ) {
@@ -84,7 +103,7 @@ export class InputController {
       return;
     }
     this.pressedKeys.add(event.code);
-    if (event.code === "Space" || event.code === "KeyE") {
+    if (event.code === "KeyE") {
       this.interactRequested = true;
     }
   };
@@ -95,7 +114,27 @@ export class InputController {
 
   private readonly onBlur = (): void => {
     this.pressedKeys.clear();
+    this.boostPointerIds.clear();
     this.resetDrag();
+  };
+
+  private readonly onBoostStart = (event: PointerEvent): void => {
+    if (!this.enabled || !event.isPrimary) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    this.boostPointerIds.add(event.pointerId);
+    this.boostButton?.setPointerCapture(event.pointerId);
+  };
+
+  private readonly onBoostEnd = (event: PointerEvent): void => {
+    if (!this.boostPointerIds.has(event.pointerId)) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    this.boostPointerIds.delete(event.pointerId);
   };
 
   private readonly onDragStart = (event: PointerEvent): void => {
