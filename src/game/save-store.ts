@@ -24,6 +24,8 @@ export interface SaveSnapshot {
   unlockedPaints: string[];
   equippedPaint: string;
   goldStamps: string[];
+  activeCommission: string;
+  completedCommissions: string[];
 }
 
 function probeStorage(): Storage | undefined {
@@ -102,6 +104,11 @@ function parseSnapshot(raw: string): SaveSnapshot | undefined {
     equippedPaint:
       typeof candidate.equippedPaint === "string" ? candidate.equippedPaint : "",
     goldStamps: toStringArray(candidate.goldStamps),
+    activeCommission:
+      typeof candidate.activeCommission === "string"
+        ? candidate.activeCommission
+        : "",
+    completedCommissions: toStringArray(candidate.completedCommissions),
   };
 }
 

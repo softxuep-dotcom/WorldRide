@@ -294,23 +294,18 @@ export function updateLandmarkStandeeOverview(
   standee.root.rotation.z =
     standee.baseLean + Math.sin(elapsed * 0.72 + standee.swayPhase) * 0.008;
 
-  const overviewOpacity =
-    1 - THREE.MathUtils.smoothstep(overviewBlend, 0.3, 0.72);
-  const nearClear = THREE.MathUtils.smoothstep(
-    distanceToPlayer,
-    1.15,
-    2.05,
-  );
-  const farFade =
-    1 - THREE.MathUtils.smoothstep(distanceToPlayer, 4.35, 5.8);
-  const opacity = overviewOpacity * nearClear * farFade;
-  standee.root.visible = opacity > 0.01;
+  // Three stable distance tiers keep every landmark visible without drawing
+  // every placard at close-up size. Far landmarks keep the cheap flag texture;
+  // detailed artwork is still streamed only when the player approaches.
+  const localScale =
+    distanceToPlayer < 3.2
+      ? 0.43
+      : distanceToPlayer < 10
+        ? 0.31
+        : 0.19;
+  standee.root.visible = true;
   standee.root.scale.setScalar(
-    THREE.MathUtils.lerp(
-      0.38,
-      0.47,
-      THREE.MathUtils.smoothstep(distanceToPlayer, 1.5, 4.8),
-    ),
+    THREE.MathUtils.lerp(localScale, 0.105, overviewBlend),
   );
 
   for (const material of standee.fadeMaterials) {
@@ -322,9 +317,9 @@ export function updateLandmarkStandeeOverview(
         typeof material.userData.baseOpacity === "number"
           ? material.userData.baseOpacity
           : 1;
-      material.opacity = baseOpacity * opacity;
+      material.opacity = baseOpacity;
       material.transparent = true;
-      material.depthWrite = false;
+      material.depthWrite = true;
     }
   }
 }

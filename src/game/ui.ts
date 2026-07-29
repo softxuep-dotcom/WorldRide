@@ -32,6 +32,13 @@ import {
 } from "./regional-specialties";
 import { getSpecialtyCopy } from "./regional-specialty-copy";
 import {
+  COMMISSION_HINT_INTERVAL_SECONDS,
+  EGYPT_COMMISSION_EVIDENCE_IDS,
+  EGYPT_COMMISSION_HINT_KEYS,
+  EGYPT_COMMISSION_ID,
+  EGYPT_COMMISSION_TARGET_ID,
+} from "./commission";
+import {
   hasLandmarkIllustration,
   landmarkIllustrationUrl,
 } from "./landmark-assets";
@@ -128,6 +135,18 @@ interface UIElements {
   garageGrid: HTMLElement;
   gameOver: HTMLElement;
   gameOverRetry: HTMLButtonElement;
+  commissionPanel: HTMLElement;
+  commissionBackdrop: HTMLButtonElement;
+  commissionClose: HTMLButtonElement;
+  commissionAccept: HTMLButtonElement;
+  commissionEyebrow: HTMLElement;
+  commissionTitle: HTMLElement;
+  commissionBody: HTMLElement;
+  commissionEvidenceTitle: HTMLElement;
+  commissionEvidence: HTMLElement;
+  commissionHint: HTMLElement;
+  commissionHintLabel: HTMLElement;
+  commissionHintCopy: HTMLElement;
 }
 
 /** Everything the trip/paint loop needs to survive a reload. */
@@ -137,6 +156,8 @@ export interface ProgressionSnapshot {
   unlockedPaints: string[];
   equippedPaint: string;
   goldStamps: string[];
+  activeCommission: string;
+  completedCommissions: string[];
 }
 
 interface WishlistRow {
@@ -192,6 +213,7 @@ export class GameUI {
   private readonly completedQuizzes = new Set<string>();
   private latestState?: GameState;
   private selectedTargetId?: PhotoSpotId;
+  private activeCompassTargetId?: PhotoSpotId;
   private wishlistOpen = false;
   private settingsOpen = false;
   private wishlistRows: WishlistRow[] = [];
@@ -226,6 +248,14 @@ export class GameUI {
   private deferredLoad?: Promise<void>;
   private miniMapCountriesBuilt = false;
   private passportBuilt = false;
+  private activeCommission = "";
+  private readonly completedCommissions = new Set<string>();
+  private commissionOfferShown = false;
+  private commissionHintClock = 0;
+  private commissionHintIndex = 0;
+  private commissionLastElapsed?: number;
+  private commissionEvidenceSignature?: string;
+  private commissionHintTimer?: number;
 
   constructor(
     onInteract: () => void,
@@ -316,6 +346,18 @@ export class GameUI {
       garageGrid: requireElement("garage-grid"),
       gameOver: requireElement("game-over"),
       gameOverRetry: requireButton("game-over-retry"),
+      commissionPanel: requireElement("commission-panel"),
+      commissionBackdrop: requireButton("commission-backdrop"),
+      commissionClose: requireButton("commission-close"),
+      commissionAccept: requireButton("commission-accept"),
+      commissionEyebrow: requireElement("commission-eyebrow"),
+      commissionTitle: requireElement("commission-title"),
+      commissionBody: requireElement("commission-body"),
+      commissionEvidenceTitle: requireElement("commission-evidence-title"),
+      commissionEvidence: requireElement("commission-evidence"),
+      commissionHint: requireElement("commission-hint"),
+      commissionHintLabel: requireElement("commission-hint-label"),
+      commissionHintCopy: requireElement("commission-hint-copy"),
     };
 
     this.syncChallengeAttentionState();
@@ -362,6 +404,30 @@ export class GameUI {
       this.onRetry();
       this.toggleGameOver(false);
     });
+    this.elements.commissionBackdrop.addEventListener("click", () =>
+      this.toggleCommissionPanel(false),
+    );
+    this.elements.commissionClose.addEventListener("click", () =>
+      this.toggleCommissionPanel(false),
+    );
+    this.elements.commissionAccept.addEventListener("click", () =>
+      this.acceptCommission(),
+    );
+    this.elements.compass.addEventListener("click", () => {
+      if (this.commissionOfferShown && !this.commissionIsComplete()) {
+        this.toggleCommissionPanel(true);
+      }
+    });
+    this.elements.compass.addEventListener("keydown", (event) => {
+      if (
+        this.commissionOfferShown &&
+        !this.commissionIsComplete() &&
+        (event.key === "Enter" || event.key === " ")
+      ) {
+        event.preventDefault();
+        this.toggleCommissionPanel(true);
+      }
+    });
     this.elements.albumOpen.addEventListener("click", () => this.openAlbum());
     this.elements.albumBackdrop.addEventListener("click", () =>
       this.toggleAlbum(false),
@@ -394,6 +460,7 @@ export class GameUI {
         this.setWishlistOpen(false);
         this.setSettingsOpen(false);
         this.toggleAlbum(false);
+        this.toggleCommissionPanel(false);
       }
     });
 
@@ -483,6 +550,7 @@ export class GameUI {
     this.refreshQuizAvailability(profile, state.nearestPhotoSpot);
     this.updateCruiseVeil(state.cruiseFlow);
     this.checkMilestones(state);
+    this.updateCommission(state);
     this.updateProgression(state);
     this.updateCompass(state);
   }
@@ -512,6 +580,10 @@ export class GameUI {
     this.setWishlistOpen(false);
   }
 
+  getActiveCompassTargetId(): PhotoSpotId | undefined {
+    return this.activeCompassTargetId;
+  }
+
   /**
    * The compass turns aimless roaming into a route: it always points at one
    * uncollected landmark — the player's pick, or the nearest one otherwise —
@@ -519,10 +591,50 @@ export class GameUI {
    */
   private updateCompass(state: GameState): void {
     const dock = this.elements.compassDock;
+    const commissionChipAvailable =
+      this.commissionOfferShown && !this.commissionIsComplete();
     const blocked =
-      !this.compassAvailable ||
+      (!this.compassAvailable && !commissionChipAvailable) ||
       this.worldOverviewActive ||
-      this.hasPrimarySurface();
+      this.hasPrimarySurface() ||
+      state.channelChallenge.active;
+
+    if (commissionChipAvailable && !blocked) {
+      const accepted = this.activeCommission === EGYPT_COMMISSION_ID;
+      const found = this.commissionEvidenceCount(state);
+      this.activeCompassTargetId = undefined;
+      dock.hidden = false;
+      this.setWishlistOpen(false);
+      this.elements.compass.classList.toggle("is-commission", accepted);
+      this.elements.compass.classList.toggle("is-new-commission", !accepted);
+      this.elements.compass.setAttribute("role", "button");
+      this.elements.compass.setAttribute("aria-live", "off");
+      this.elements.compass.setAttribute(
+        "aria-label",
+        accepted ? t("commission.objective") : t("commission.new"),
+      );
+      this.elements.compass.tabIndex = 0;
+      this.elements.compassTarget.textContent = accepted
+        ? t("commission.objective")
+        : t("commission.new");
+      this.elements.compassDistance.textContent = accepted
+        ? t("commission.progress", {
+            found,
+            total: EGYPT_COMMISSION_EVIDENCE_IDS.length,
+          })
+        : t("commission.reopen");
+      this.compassSignature = undefined;
+      return;
+    }
+
+    this.elements.compass.classList.remove(
+      "is-commission",
+      "is-new-commission",
+    );
+    this.elements.compass.setAttribute("role", "status");
+    this.elements.compass.setAttribute("aria-live", "polite");
+    this.elements.compass.setAttribute("aria-label", t("wishlist.title"));
+    this.elements.compass.tabIndex = -1;
     // The itinerary drives the compass; the nearest uncollected spot is only a
     // fallback for the endgame, once no trip can be formed any more.
     const stops = blocked ? [] : this.tripStops(state);
@@ -537,6 +649,7 @@ export class GameUI {
     const pointable = targets.length > 0 ? targets : fallback;
 
     if (pointable.length === 0) {
+      this.activeCompassTargetId = undefined;
       if (!dock.hidden) {
         dock.hidden = true;
         this.setWishlistOpen(false);
@@ -552,6 +665,7 @@ export class GameUI {
       this.selectedTargetId = undefined;
       target = pointable[0];
     }
+    this.activeCompassTargetId = target.spot.id;
 
     const targetWorld = geoToWorld(target.spot.point);
     const dx = wrappedDeltaX(targetWorld.x, state.position.x);
@@ -573,6 +687,201 @@ export class GameUI {
     }
 
     this.setWishlistOpen(false);
+  }
+
+  private updateCommission(state: GameState): void {
+    const previousElapsed = this.commissionLastElapsed ?? state.elapsed;
+    const elapsedDelta = Math.max(
+      0,
+      Math.min(1, state.elapsed - previousElapsed),
+    );
+    this.commissionLastElapsed = state.elapsed;
+
+    if (this.commissionIsComplete()) {
+      return;
+    }
+
+    if (
+      this.activeCommission === EGYPT_COMMISSION_ID &&
+      state.collectedPostcards.has(EGYPT_COMMISSION_TARGET_ID)
+    ) {
+      this.completeCommission();
+      return;
+    }
+
+    if (
+      !this.commissionOfferShown &&
+      !state.collectedPostcards.has(EGYPT_COMMISSION_TARGET_ID) &&
+      state.elapsed >= 1 &&
+      !this.worldOverviewActive &&
+      !this.hasPrimarySurface() &&
+      !state.channelChallenge.active
+    ) {
+      this.commissionOfferShown = true;
+      this.toggleCommissionPanel(true);
+      return;
+    }
+
+    if (this.activeCommission !== EGYPT_COMMISSION_ID) {
+      return;
+    }
+
+    if (this.elements.commissionPanel.classList.contains("is-visible")) {
+      this.renderCommissionPanel(state);
+    }
+
+    const gameplayIsClear =
+      !this.worldOverviewActive &&
+      !this.hasPrimarySurface() &&
+      !this.wishlistOpen &&
+      !this.settingsOpen &&
+      !state.channelChallenge.active;
+    if (!gameplayIsClear) {
+      return;
+    }
+
+    this.commissionHintClock += elapsedDelta;
+    if (this.commissionHintClock < COMMISSION_HINT_INTERVAL_SECONDS) {
+      return;
+    }
+
+    this.commissionHintClock %= COMMISSION_HINT_INTERVAL_SECONDS;
+    const key =
+      EGYPT_COMMISSION_HINT_KEYS[
+        this.commissionHintIndex % EGYPT_COMMISSION_HINT_KEYS.length
+      ];
+    this.commissionHintIndex += 1;
+    this.showCommissionHint(t(key));
+  }
+
+  private commissionIsComplete(): boolean {
+    return this.completedCommissions.has(EGYPT_COMMISSION_ID);
+  }
+
+  private commissionEvidenceCount(state: GameState): number {
+    return EGYPT_COMMISSION_EVIDENCE_IDS.filter((id) =>
+      state.discoveredSpecialties.has(id),
+    ).length;
+  }
+
+  private acceptCommission(): void {
+    if (this.activeCommission === EGYPT_COMMISSION_ID) {
+      this.toggleCommissionPanel(false);
+      return;
+    }
+    if (this.commissionIsComplete()) {
+      this.toggleCommissionPanel(false);
+      return;
+    }
+
+    this.activeCommission = EGYPT_COMMISSION_ID;
+    this.commissionOfferShown = true;
+    this.commissionHintClock = 0;
+    this.commissionHintIndex = 0;
+    this.renderCommissionPanel(this.latestState);
+    this.showToast(t("commission.acceptedToast"));
+    this.onProgressionChanged();
+    window.setTimeout(() => this.toggleCommissionPanel(false), 900);
+  }
+
+  private completeCommission(): void {
+    this.activeCommission = "";
+    this.completedCommissions.add(EGYPT_COMMISSION_ID);
+    window.clearTimeout(this.commissionHintTimer);
+    this.elements.commissionHint.classList.remove("is-visible");
+    this.elements.commissionHint.setAttribute("aria-hidden", "true");
+    this.showToast(t("commission.complete"));
+    this.onProgressionChanged();
+  }
+
+  private toggleCommissionPanel(force?: boolean): void {
+    const panel = this.elements.commissionPanel;
+    const shouldOpen =
+      force ?? !panel.classList.contains("is-visible");
+    if (shouldOpen && this.commissionIsComplete()) {
+      return;
+    }
+    if (shouldOpen) {
+      this.setSettingsOpen(false);
+      this.setWishlistOpen(false);
+      this.toggleLandmarkDetail(false);
+      this.togglePassport(false);
+      this.closeQuiz();
+      this.toggleAlbum(false);
+      this.renderCommissionPanel(this.latestState);
+    }
+    panel.classList.toggle("is-visible", shouldOpen);
+    panel.setAttribute("aria-hidden", String(!shouldOpen));
+    this.syncSurfaceState();
+  }
+
+  private renderCommissionPanel(state?: GameState): void {
+    const accepted = this.activeCommission === EGYPT_COMMISSION_ID;
+    this.elements.commissionPanel.classList.toggle("is-accepted", accepted);
+    this.elements.commissionEyebrow.textContent = t("commission.eyebrow");
+    this.elements.commissionTitle.textContent = t("commission.offerTitle");
+    this.elements.commissionBody.textContent = t("commission.offerBody");
+    this.elements.commissionEvidenceTitle.textContent = t(
+      "commission.evidenceTitle",
+    );
+    this.elements.commissionAccept.textContent = accepted
+      ? t("commission.accepted")
+      : t("commission.accept");
+
+    const discovered = state?.discoveredSpecialties ?? new Set<string>();
+    const signature = `${getLocale()}|${[...EGYPT_COMMISSION_EVIDENCE_IDS]
+      .map((id) => `${id}:${discovered.has(id) ? 1 : 0}`)
+      .join("|")}`;
+    if (signature === this.commissionEvidenceSignature) {
+      return;
+    }
+    this.commissionEvidenceSignature = signature;
+    this.elements.commissionEvidence.replaceChildren();
+
+    for (const id of EGYPT_COMMISSION_EVIDENCE_IDS) {
+      const specialty = REGIONAL_SPECIALTIES.find(
+        (candidate) => candidate.id === id,
+      );
+      if (!specialty) {
+        continue;
+      }
+      const found = discovered.has(id);
+      const copy = getSpecialtyCopy(id, getLocale(), specialty.name);
+      const item = document.createElement("li");
+      item.classList.toggle("is-found", found);
+
+      const imageWrap = document.createElement("span");
+      imageWrap.className = "commission-evidence__image";
+      const image = document.createElement("img");
+      image.src = `assets/regional-specialties/${id}.webp`;
+      image.alt = "";
+      imageWrap.append(image);
+
+      const label = document.createElement("span");
+      label.className = "commission-evidence__label";
+      label.textContent = found ? copy.name : "???";
+
+      const status = document.createElement("small");
+      status.textContent = found ? t("commission.evidenceFound") : "?";
+
+      item.append(imageWrap, label, status);
+      this.elements.commissionEvidence.append(item);
+    }
+  }
+
+  private showCommissionHint(message: string): void {
+    window.clearTimeout(this.commissionHintTimer);
+    this.elements.commissionHintLabel.textContent = t("commission.hintLabel");
+    this.elements.commissionHintCopy.textContent = message;
+    this.elements.commissionHint.classList.remove("is-visible");
+    // Restart the entrance animation even when one clue replaces another.
+    void this.elements.commissionHint.offsetWidth;
+    this.elements.commissionHint.classList.add("is-visible");
+    this.elements.commissionHint.setAttribute("aria-hidden", "false");
+    this.commissionHintTimer = window.setTimeout(() => {
+      this.elements.commissionHint.classList.remove("is-visible");
+      this.elements.commissionHint.setAttribute("aria-hidden", "true");
+    }, 4500);
   }
 
   /** The active itinerary, in order, with live distance and visited state. */
@@ -902,6 +1211,16 @@ export class GameUI {
         this.goldStamps.add(id);
       }
     }
+    this.activeCommission =
+      snapshot.activeCommission === EGYPT_COMMISSION_ID
+        ? EGYPT_COMMISSION_ID
+        : "";
+    for (const id of snapshot.completedCommissions ?? []) {
+      this.completedCommissions.add(id);
+    }
+    this.commissionOfferShown =
+      this.activeCommission === EGYPT_COMMISSION_ID ||
+      this.completedCommissions.has(EGYPT_COMMISSION_ID);
     this.tripStructureSig = undefined;
     this.onPaintChange(getPaint(this.equippedPaint).color);
     this.buildGarageGrid();
@@ -914,6 +1233,8 @@ export class GameUI {
       unlockedPaints: [...this.unlockedPaints],
       equippedPaint: this.equippedPaint,
       goldStamps: [...this.goldStamps],
+      activeCommission: this.activeCommission,
+      completedCommissions: [...this.completedCommissions],
     };
   }
 
@@ -1518,6 +1839,15 @@ export class GameUI {
           }),
         );
         break;
+      case "channel-challenge-started":
+        this.showToast(t("channel.choose"));
+        break;
+      case "channel-route-chosen":
+        this.showToast(t(`channel.route.${event.route}`));
+        break;
+      case "channel-challenge-completed":
+        this.showToast(t("channel.complete"));
+        break;
       case "game-over":
         this.toggleGameOver(true);
         break;
@@ -1582,6 +1912,7 @@ export class GameUI {
       this.elements.passportPanel.classList.contains("is-visible") ||
       this.elements.postcardAlbum.classList.contains("is-visible") ||
       this.elements.gameOver.classList.contains("is-visible") ||
+      this.elements.commissionPanel.classList.contains("is-visible") ||
       Boolean(this.activeQuiz)
     );
   }
@@ -2118,6 +2449,10 @@ export class GameUI {
     this.buildGarageGrid();
     this.tripStructureSig = undefined;
     this.compassSignature = undefined;
+    this.commissionEvidenceSignature = undefined;
+    if (this.commissionOfferShown && !this.commissionIsComplete()) {
+      this.renderCommissionPanel(this.latestState);
+    }
     if (this.elements.postcardAlbum.classList.contains("is-visible")) {
       this.buildAlbumGrid();
     }

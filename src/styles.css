@@ -3641,3 +3641,597 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
     transition: none;
   }
 }
+
+/* Compact arcade HUD: the world stays visible; only the current decision gets space. */
+.arcade-combo-wrap {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 140ms ease, visibility 140ms ease;
+}
+
+.arcade-combo-wrap.is-active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.boost-meter {
+  right: max(4px, env(safe-area-inset-right));
+  bottom: calc(max(76px, env(safe-area-inset-bottom)) + 6px);
+  display: grid;
+  width: 82px;
+  height: 82px;
+  padding: 5px;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(
+    from -90deg,
+    #ffef69 var(--boost, 0%),
+    rgba(17, 51, 65, 0.32) 0
+  );
+  box-shadow: 0 5px 16px rgba(16, 43, 56, 0.2);
+}
+
+.boost-meter::after {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  content: "";
+  background: rgba(21, 51, 65, 0.64);
+}
+
+.boost-meter > span,
+.boost-meter i {
+  display: none;
+}
+
+.travel-hud .compass {
+  min-height: 38px;
+  padding-block: 4px;
+}
+
+.travel-hud .compass__target {
+  font-size: 12px;
+}
+
+.travel-hud .compass__distance {
+  font-size: 9px;
+}
+
+.action-dock {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: block;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  pointer-events: none;
+}
+
+.action-dock .settings-control,
+.action-dock .passport-button,
+.action-dock .quiz-button {
+  pointer-events: auto;
+}
+
+.action-dock .settings-control {
+  position: absolute;
+  top: max(9px, env(safe-area-inset-top));
+  right: max(108px, calc(env(safe-area-inset-right) + 108px));
+}
+
+.action-dock .settings-control > .action-dock__button,
+.action-dock .passport-button {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  border-radius: 14px;
+  background: rgba(250, 255, 252, 0.9);
+  box-shadow: 0 6px 15px rgba(17, 48, 65, 0.16);
+  color: var(--ink);
+}
+
+.action-dock .passport-button {
+  position: absolute;
+  top: max(9px, env(safe-area-inset-top));
+  right: max(58px, calc(env(safe-area-inset-right) + 58px));
+}
+
+.action-dock .action-dock__button--compact > span:not(.action-dock__icon) {
+  display: none;
+}
+
+.action-dock .action-dock__icon {
+  font-size: 21px;
+}
+
+.action-dock .quiz-button {
+  position: absolute;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  left: 50%;
+  width: min(196px, calc(100vw - 184px));
+  height: 50px;
+  padding: 5px 12px;
+  transform: translateX(-50%);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  background: rgba(226, 238, 237, 0.96);
+  box-shadow: 0 8px 20px rgba(17, 48, 65, 0.22);
+}
+
+.action-dock .quiz-button small {
+  font-size: 9px;
+}
+
+.action-dock .quiz-button strong {
+  font-size: 13px;
+}
+
+@media (pointer: coarse), (max-width: 760px) {
+  #travel-hud {
+    top: max(8px, env(safe-area-inset-top));
+    left: max(8px, env(safe-area-inset-left));
+    width: 150px;
+  }
+
+  #travel-hud .country-reveal,
+  #travel-hud .travel-info {
+    width: 150px;
+  }
+
+  .compass-dock {
+    top: calc(max(8px, env(safe-area-inset-top)) + 48px);
+    right: max(8px, env(safe-area-inset-right));
+    left: max(8px, env(safe-area-inset-left));
+    width: auto;
+    justify-content: stretch;
+    transform: none;
+  }
+
+  .compass-dock .compass {
+    width: 100%;
+    max-width: none;
+    min-height: 36px;
+  }
+
+  #world-map-button {
+    position: absolute;
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    display: grid;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    place-items: center;
+    border-radius: 15px;
+  }
+
+  #world-map-button .mini-map__title {
+    display: grid;
+    margin: 0;
+    place-items: center;
+  }
+
+  #world-map-button #map-view-label,
+  #world-map-button #visited-count,
+  #world-map-button #mini-map-svg {
+    display: none;
+  }
+
+  .travel-hud .compass-dock {
+    grid-row: 2;
+  }
+
+  .arcade-event {
+    top: max(132px, calc(env(safe-area-inset-top) + 124px));
+    max-width: calc(100vw - 32px);
+  }
+
+  .action-dock .settings-control {
+    right: max(108px, calc(env(safe-area-inset-right) + 108px));
+  }
+}
+
+/* ---------- Travel radio commission ---------- */
+
+.travel-hud .compass.is-commission,
+.travel-hud .compass.is-new-commission {
+  cursor: pointer;
+  border-color: rgba(238, 112, 68, 0.88);
+  background:
+    linear-gradient(105deg, rgba(255, 242, 205, 0.98), rgba(255, 252, 244, 0.96));
+  box-shadow:
+    0 10px 26px rgba(91, 42, 21, 0.2),
+    0 0 0 3px rgba(255, 177, 76, 0.2);
+}
+
+.travel-hud .compass.is-new-commission {
+  animation: commission-chip-pulse 1.8s ease-in-out infinite;
+}
+
+.travel-hud .compass.is-commission .compass__rose,
+.travel-hud .compass.is-new-commission .compass__rose {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #fff4c7, #ffbf62);
+  box-shadow: inset 0 0 0 2px rgba(188, 80, 42, 0.2);
+}
+
+.travel-hud .compass.is-commission .compass__rose::before {
+  content: "📷";
+  font-size: 18px;
+}
+
+.travel-hud .compass.is-new-commission .compass__rose::before {
+  content: "✉";
+  color: #a8422c;
+  font-size: 20px;
+  font-weight: 1000;
+}
+
+.travel-hud .compass.is-commission .compass__arrow,
+.travel-hud .compass.is-new-commission .compass__arrow {
+  display: none;
+}
+
+.commission-hint {
+  position: absolute;
+  top: max(64px, calc(env(safe-area-inset-top) + 58px));
+  left: 50%;
+  z-index: 35;
+  display: grid;
+  width: min(430px, calc(100vw - 32px));
+  gap: 3px;
+  padding: 11px 18px 12px;
+  border: 1px solid rgba(255, 213, 117, 0.84);
+  border-radius: 16px;
+  background: rgba(31, 46, 53, 0.92);
+  box-shadow: 0 14px 34px rgba(12, 27, 34, 0.28);
+  color: #fffdf2;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -8px) scale(0.98);
+}
+
+.commission-hint.is-visible {
+  animation: commission-hint-in 4.5s ease both;
+}
+
+.commission-hint small {
+  color: #ffc966;
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: 0.15em;
+}
+
+.commission-hint strong {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.commission-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  padding:
+    max(18px, env(safe-area-inset-top))
+    max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
+  place-items: center;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.commission-panel.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.commission-panel__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(20, 27, 29, 0.38);
+  backdrop-filter: blur(16px) saturate(0.82);
+  -webkit-backdrop-filter: blur(16px) saturate(0.82);
+}
+
+.commission-card {
+  position: relative;
+  width: min(460px, 100%);
+  max-height: min(720px, calc(100vh - 36px));
+  overflow-y: auto;
+  padding: 30px;
+  border: 1px solid rgba(255, 239, 194, 0.96);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(255, 194, 85, 0.18), transparent 36%),
+    rgba(255, 251, 237, 0.97);
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 #fff;
+  color: #233c43;
+  transform: translateY(14px) scale(0.985);
+  transition: transform 240ms cubic-bezier(0.22, 0.9, 0.22, 1);
+}
+
+.commission-panel.is-visible .commission-card {
+  transform: translateY(0) scale(1);
+}
+
+.commission-card__close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(39, 56, 60, 0.08);
+  color: #42585d;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.commission-card__eyebrow {
+  display: block;
+  margin: 0 42px 8px 0;
+  color: #d76539;
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: 0.16em;
+}
+
+.commission-card__accepted-mark {
+  position: absolute;
+  top: 52px;
+  right: 25px;
+  display: none;
+  width: 37px;
+  height: 37px;
+  border-radius: 50%;
+  background: #2f9b68;
+  color: white;
+  font-size: 23px;
+  font-weight: 1000;
+  line-height: 37px;
+  text-align: center;
+  transform: rotate(-8deg);
+}
+
+.commission-panel.is-accepted .commission-card__accepted-mark {
+  display: block;
+  animation: commission-accepted 420ms cubic-bezier(0.2, 1.25, 0.3, 1);
+}
+
+.commission-card h2 {
+  max-width: 360px;
+  margin: 0 42px 10px 0;
+  font-size: clamp(22px, 4vw, 30px);
+  line-height: 1.13;
+}
+
+.commission-card__body {
+  margin: 0;
+  color: #56686b;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.65;
+}
+
+.commission-card__clue-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 18px 0;
+  padding: 11px;
+  border: 1px dashed rgba(193, 105, 44, 0.34);
+  border-radius: 15px;
+  background: rgba(255, 226, 160, 0.25);
+  font-size: 21px;
+}
+
+.commission-card__clue-strip i {
+  color: #bd7445;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 1000;
+}
+
+.commission-card__evidence h3 {
+  margin: 0 0 9px;
+  color: #7a5b43;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: 0.1em;
+}
+
+.commission-card__evidence ul {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.commission-card__evidence li {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding: 6px 5px 7px;
+  border: 1px solid rgba(71, 84, 81, 0.12);
+  border-radius: 13px;
+  background: rgba(77, 89, 84, 0.055);
+  color: #8c9695;
+  text-align: center;
+}
+
+.commission-evidence__image {
+  position: relative;
+  display: grid;
+  aspect-ratio: 1;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 9px;
+  background: rgba(81, 91, 84, 0.08);
+}
+
+.commission-evidence__image::after {
+  position: absolute;
+  content: "?";
+  color: rgba(65, 78, 76, 0.42);
+  font-size: 24px;
+  font-weight: 1000;
+}
+
+.commission-evidence__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+}
+
+.commission-card__evidence li.is-found {
+  border-color: rgba(58, 154, 104, 0.34);
+  background: rgba(66, 174, 117, 0.1);
+  color: #246c4b;
+}
+
+.commission-card__evidence li.is-found .commission-evidence__image::after {
+  display: none;
+}
+
+.commission-card__evidence li.is-found img {
+  opacity: 1;
+}
+
+.commission-evidence__label {
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commission-card__evidence small {
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.commission-card__accept {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 18px;
+  border: 0;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #ec7147, #d95636);
+  box-shadow: 0 9px 20px rgba(188, 73, 39, 0.25);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.commission-panel.is-accepted .commission-card__accept {
+  background: linear-gradient(135deg, #3dac78, #27885e);
+  box-shadow: 0 9px 20px rgba(38, 126, 86, 0.23);
+}
+
+@keyframes commission-chip-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+@keyframes commission-hint-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.98);
+  }
+  8%,
+  86% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -4px) scale(0.99);
+  }
+}
+
+@keyframes commission-accepted {
+  from {
+    opacity: 0;
+    transform: rotate(-18deg) scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-8deg) scale(1);
+  }
+}
+
+@media (pointer: coarse), (max-width: 760px) {
+  #world-map-button {
+    position: fixed;
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    left: auto;
+  }
+
+  .commission-hint {
+    top: calc(max(8px, env(safe-area-inset-top)) + 92px);
+    width: calc(100vw - 24px);
+    padding: 10px 14px 11px;
+  }
+
+  .commission-card {
+    padding: 25px 20px 21px;
+    border-radius: 23px;
+  }
+
+  .commission-card__evidence ul {
+    gap: 5px;
+  }
+
+  .commission-card__clue-strip {
+    gap: 5px;
+    font-size: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .travel-hud .compass.is-new-commission,
+  .commission-hint.is-visible,
+  .commission-panel.is-accepted .commission-card__accepted-mark {
+    animation: none;
+  }
+
+  .commission-hint.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}

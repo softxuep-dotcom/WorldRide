@@ -1,4 +1,6 @@
 import type { GameEvent, GameState } from "./simulation";
+import { t } from "../i18n";
+import type { ChannelRoute } from "./channel-challenge";
 
 export class ArcadeHUD {
   private readonly root = requireElement("arcade-hud");
@@ -6,6 +8,9 @@ export class ArcadeHUD {
   private readonly durability = requireElement("arcade-durability");
   private readonly combo = requireElement("arcade-combo");
   private readonly comboLabel = requireElement("arcade-combo-label");
+  private readonly comboWrap = requireElement("arcade-combo").parentElement!;
+  private readonly boostMeter = requireElement("boost-meter-fill").parentElement!
+    .parentElement!;
   private readonly boostFill = requireElement("boost-meter-fill");
   private readonly boostButton = requireElement("boost-button");
   private readonly eventBanner = requireElement("arcade-event");
@@ -33,6 +38,7 @@ export class ArcadeHUD {
       `${"♥".repeat(state.health)}${"♡".repeat(3 - state.health)}`;
     this.combo.textContent = `×${Math.max(1, state.combo)}`;
     this.combo.classList.toggle("is-active", state.combo > 1);
+    this.comboWrap.classList.toggle("is-active", state.combo > 1);
     this.comboLabel.textContent =
       state.combo > 1
         ? `+${state.lastComboAward}`
@@ -45,13 +51,24 @@ export class ArcadeHUD {
       "--boost",
       `${Math.round(state.boostCharge * 100)}%`,
     );
+    this.boostMeter.style.setProperty(
+      "--boost",
+      `${Math.round(state.boostCharge * 100)}%`,
+    );
     this.boostButton.classList.toggle("is-ready", state.boostCharge >= 0.18);
     this.boostButton.classList.toggle("is-firing", state.boosting);
 
-    const eventActive = state.specialEvent === "ufo";
+    const channel = state.channelChallenge;
+    const eventActive = state.specialEvent === "ufo" || channel.active;
     this.eventBanner.classList.toggle("is-visible", eventActive);
     this.eventBanner.setAttribute("aria-hidden", String(!eventActive));
-    if (eventActive) {
+    if (channel.active) {
+      const route = channel.route;
+      this.eventTitle.textContent = route
+        ? `${routeIcon(route)} ${t(routeMessage(route))}`
+        : `🛫  🚢  🌊  ${t("channel.choose")}`;
+      this.eventTimer.textContent = `${Math.ceil(channel.remaining)}s`;
+    } else if (eventActive) {
       this.eventTitle.textContent = "🛸 ×2";
       this.eventTimer.textContent = `${Math.ceil(state.specialEventRemaining)}s`;
     }
@@ -78,7 +95,11 @@ export class ArcadeHUD {
       case "jump-landed":
       case "drift-completed":
       case "water-rebound":
+      case "channel-checkpoint":
         this.pulseCombo();
+        break;
+      case "channel-challenge-completed":
+        this.flashImpact();
         break;
       case "special-event-started":
         this.eventTitle.textContent = "🛸 ×2";
@@ -113,6 +134,17 @@ export class ArcadeHUD {
       260,
     );
   }
+}
+
+function routeMessage(route: ChannelRoute):
+  | "channel.route.sky"
+  | "channel.route.cargo"
+  | "channel.route.wave" {
+  return `channel.route.${route}`;
+}
+
+function routeIcon(route: ChannelRoute): string {
+  return route === "sky" ? "🛫" : route === "cargo" ? "🚢" : "🌊";
 }
 
 function requireElement(id: string): HTMLElement {

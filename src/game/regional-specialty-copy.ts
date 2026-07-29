@@ -146,6 +146,22 @@ const COPY: Readonly<Record<string, BilingualEntry>> = {
     en: { name: "Malagasy Vanilla", blurb: "Each vanilla flower is pollinated by hand before its pod is slowly cured." },
     "zh-CN": { name: "马达加斯加香草", blurb: "每朵香草花都要人工授粉，结出的豆荚还需慢慢发酵晾制。" },
   },
+  "dromedary-camel": {
+    en: { name: "Dromedary Camel", blurb: "Its single hump stores fat, helping it cross the hot deserts of North Africa." },
+    "zh-CN": { name: "单峰骆驼", blurb: "一个驼峰储存脂肪，帮助它穿越北非炎热的沙漠。" },
+  },
+  papyrus: {
+    en: { name: "Papyrus", blurb: "This Nile wetland plant was made into one of the ancient world's best-known writing materials." },
+    "zh-CN": { name: "纸莎草", blurb: "这种尼罗河湿地植物，曾被制成古代世界著名的书写材料。" },
+  },
+  "date-palm": {
+    en: { name: "Date Palm", blurb: "Its shade and sweet fruit thrive beside oases and the Nile's green riverbanks." },
+    "zh-CN": { name: "椰枣", blurb: "它在绿洲与尼罗河岸带来树荫，也结出香甜耐存的果实。" },
+  },
+  "hibiscus-tea": {
+    en: { name: "Hibiscus Tea", blurb: "Ruby-red hibiscus calyces become a tart drink enjoyed throughout Egypt and the Nile Valley." },
+    "zh-CN": { name: "洛神花茶", blurb: "深红花萼泡成酸甜饮料，在埃及与尼罗河谷十分常见。" },
+  },
   "uzbek-ceramics": {
     en: { name: "Uzbek Ceramics", blurb: "Cobalt and turquoise patterns turn everyday bowls into bright Silk Road craft." },
     "zh-CN": { name: "乌兹别克彩陶", blurb: "钴蓝与青绿色纹样让日常陶碗带上鲜明的丝路色彩。" },

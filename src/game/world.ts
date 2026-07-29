@@ -3,6 +3,7 @@ import {
   PHOTO_SPOTS,
   type GeoPoint,
   type PhotoSpotDefinition,
+  type PhotoSpotId,
   geoToWorld,
   worldToGeo,
 } from "./data";
@@ -35,6 +36,16 @@ import {
   type ArcadeObjectKind,
 } from "./arcade-course";
 import type { GameEvent } from "./simulation";
+import {
+  CHANNEL_FINISH_Z,
+  CHANNEL_GATE_Z,
+  CHANNEL_ROUTE_LANES,
+  CHANNEL_ROUTE_ORDER,
+  CHANNEL_START,
+  createChannelChallengeState,
+  type ChannelChallengeState,
+  type ChannelRoute,
+} from "./channel-challenge";
 
 const RESERVED_MAP_MARKER_POSITIONS = [
   ...PHOTO_SPOTS.map((spot) => geoToWorld(spot.point)),
@@ -62,10 +73,9 @@ interface VehicleTrailParticle {
 }
 
 interface LandmarkEffect {
-  lightField: THREE.Mesh;
   marker: THREE.Mesh;
-  lightFieldMaterial: THREE.MeshBasicMaterial;
   markerMaterial: THREE.MeshStandardMaterial;
+  spotId: PhotoSpotId;
   anchorX: number;
   anchorZ: number;
   phase: number;
@@ -105,6 +115,7 @@ export interface ArcadeVisualState {
   boostCharge: number;
   specialEvent?: "ufo";
   specialEventRemaining: number;
+  channelChallenge: ChannelChallengeState;
 }
 
 type CreateLandmarkStandee =
@@ -144,6 +155,9 @@ export class WorldView {
   private readonly arcadeProps = new Map<string, ArcadePropView>();
   private readonly impactParticles: ImpactParticle[] = [];
   private impactParticleCursor = 0;
+  private readonly channelChallengeRoot = new THREE.Group();
+  private readonly channelWaves: THREE.Mesh[] = [];
+  private readonly channelGates = new Map<ChannelRoute, THREE.Group>();
   private readonly ufo = new THREE.Group();
   private readonly ufoBeamMaterial = new THREE.MeshBasicMaterial({
     color: 0x74ffe1,
@@ -157,6 +171,7 @@ export class WorldView {
     this.root.name = "Pocket Planet world";
     this.addBoard();
     this.buildArcadePlayground();
+    this.buildChannelChallenge();
     this.buildImpactParticles();
     this.vehicle = this.createVehicle();
     this.root.add(this.vehicle.root);
@@ -253,6 +268,7 @@ export class WorldView {
     modeTransition = 0,
     overviewBlend = 0,
     arcade?: ArcadeVisualState,
+    activeTargetId?: PhotoSpotId,
   ): void {
     const arcadeState = arcade ?? DEFAULT_ARCADE_VISUAL_STATE;
     this.modeBlend += ((boatMode ? 1 : 0) - this.modeBlend) * (1 - Math.exp(-7 * delta));
@@ -358,6 +374,7 @@ export class WorldView {
       arcadeState,
       overviewBlend,
     );
+    this.updateChannelChallengeVisuals(elapsed, arcadeState.channelChallenge);
 
     for (const [index, wavelet] of this.wavelets.entries()) {
       wavelet.position.y = 0.09 + Math.sin(elapsed * 1.2 + index) * 0.025;
@@ -395,21 +412,20 @@ export class WorldView {
         wrappedDeltaX(effect.anchorX, position.x),
         effect.anchorZ - position.z,
       );
-      const strength = THREE.MathUtils.clamp((18 - distance) / 13, 0, 1);
-      const acquire = THREE.MathUtils.smoothstep(strength, 0.03, 0.4);
-      const focus = THREE.MathUtils.smoothstep(strength, 0.38, 0.9);
-      const targetReveal = THREE.MathUtils.smoothstep(strength, 0.18, 0.72);
+      const target = effect.spotId === activeTargetId;
+      const strength = THREE.MathUtils.clamp((22 - distance) / 17, 0, 1);
+      const acquire = THREE.MathUtils.smoothstep(strength, 0.02, 0.34);
+      const focus = THREE.MathUtils.smoothstep(strength, 0.3, 0.86);
+      const targetReveal = target
+        ? THREE.MathUtils.smoothstep(strength, 0.08, 0.62)
+        : 0;
       effect.reveal +=
         (targetReveal - effect.reveal) * (1 - Math.exp(-4.8 * delta));
 
-      const visible = acquire > 0.002;
-      effect.lightField.visible = visible && !effect.quiet;
-      effect.marker.visible = visible;
-
-      effect.lightField.scale.y = 0.72 + effect.reveal * 0.28;
-      effect.lightFieldMaterial.opacity = effect.quiet
-        ? 0
-        : effect.reveal * (0.018 + focus * 0.052);
+      effect.marker.visible =
+        target &&
+        !arcadeState.channelChallenge.active &&
+        overviewBlend < 0.78;
 
       effect.marker.position.y =
         2.54 - effect.reveal * 0.24 +
@@ -422,8 +438,8 @@ export class WorldView {
         : Math.sin(elapsed * 0.55 + effect.phase) * 0.08;
       effect.marker.scale.setScalar(
         effect.quiet
-          ? 0.52 + acquire * 0.12
-          : 0.58 + acquire * 0.24 + focus * 0.14,
+          ? 0.48 + acquire * 0.1
+          : 0.54 + acquire * 0.2 + focus * 0.12,
       );
       effect.markerMaterial.emissiveIntensity = effect.quiet
         ? 0.05 + focus * 0.08
@@ -630,21 +646,6 @@ export class WorldView {
     world: { x: number; z: number },
   ): void {
     const quiet = spot.visitMode === "reflection";
-    const lightFieldMaterial = new THREE.MeshBasicMaterial({
-      color: accent,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      toneMapped: false,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-    });
-    const lightField = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.36, 0.88, 2.25, 24, 1, true),
-      lightFieldMaterial,
-    );
-    lightField.position.y = 1.18;
-    lightField.renderOrder = 3;
 
     const markerMaterial = new THREE.MeshStandardMaterial({
       color: accent,
@@ -663,12 +664,11 @@ export class WorldView {
     marker.position.y = 2.25;
     marker.castShadow = true;
 
-    group.add(lightField, marker);
+    group.add(marker);
     this.landmarkEffects.push({
-      lightField,
       marker,
-      lightFieldMaterial,
       markerMaterial,
+      spotId: spot.id,
       anchorX: world.x,
       anchorZ: world.z,
       phase: this.landmarkEffects.length * 0.83,
@@ -969,6 +969,272 @@ export class WorldView {
     prop.spinY = -4.2 + (hash % 11) * 0.7;
     prop.spinZ = 2.8 + (hash % 5) * 0.6;
     this.spawnImpactBurst(event);
+  }
+
+  private buildChannelChallenge(): void {
+    const root = this.channelChallengeRoot;
+    root.name = "English Channel enlarged challenge";
+    root.visible = false;
+
+    const water = new THREE.Mesh(
+      new THREE.BoxGeometry(
+        15,
+        0.18,
+        Math.abs(CHANNEL_FINISH_Z - CHANNEL_START.z) + 24,
+      ),
+      new THREE.MeshStandardMaterial({
+        color: 0x55c8d2,
+        roughness: 0.72,
+        metalness: 0.02,
+      }),
+    );
+    water.position.set(
+      0,
+      -0.22,
+      (CHANNEL_START.z + CHANNEL_FINISH_Z) / 2,
+    );
+    water.receiveShadow = true;
+    root.add(water);
+
+    const dark = new THREE.MeshStandardMaterial({
+      color: 0x254758,
+      roughness: 0.78,
+    });
+    const cream = new THREE.MeshStandardMaterial({
+      color: 0xffefc2,
+      roughness: 0.8,
+    });
+    const coral = new THREE.MeshStandardMaterial({
+      color: 0xff6b4d,
+      roughness: 0.62,
+      emissive: 0x6d160b,
+      emissiveIntensity: 0.13,
+    });
+    const yellow = new THREE.MeshStandardMaterial({
+      color: 0xffd64d,
+      roughness: 0.66,
+      emissive: 0x74520b,
+      emissiveIntensity: 0.12,
+    });
+    const cyan = new THREE.MeshStandardMaterial({
+      color: 0x55e5dc,
+      roughness: 0.5,
+      emissive: 0x146d70,
+      emissiveIntensity: 0.22,
+    });
+    const routeMaterials: Readonly<Record<ChannelRoute, THREE.Material>> = {
+      sky: cyan,
+      cargo: yellow,
+      wave: coral,
+    };
+    const addMesh = (
+      geometry: THREE.BufferGeometry,
+      material: THREE.Material,
+      x: number,
+      y: number,
+      z: number,
+      parent: THREE.Object3D = root,
+    ): THREE.Mesh => {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    };
+
+    addMesh(
+      new THREE.BoxGeometry(12.4, 0.28, 9),
+      cream,
+      0,
+      0,
+      CHANNEL_START.z + 2.7,
+    );
+    for (const x of [-4.2, -2.8, 0, 2.8, 4.2]) {
+      addMesh(
+        new THREE.BoxGeometry(0.34, 0.04, 6.8),
+        x === 0 ? dark : coral,
+        x,
+        0.18,
+        CHANNEL_START.z + 1.8,
+      );
+    }
+
+    for (const route of CHANNEL_ROUTE_ORDER) {
+      const gate = new THREE.Group();
+      gate.name = `Channel ${route} entrance`;
+      gate.position.set(CHANNEL_ROUTE_LANES[route], 0, CHANNEL_GATE_Z);
+      const material = routeMaterials[route];
+      addMesh(
+        new THREE.BoxGeometry(0.2, 2.5, 0.25),
+        material,
+        -1.15,
+        1.25,
+        0,
+        gate,
+      );
+      addMesh(
+        new THREE.BoxGeometry(0.2, 2.5, 0.25),
+        material,
+        1.15,
+        1.25,
+        0,
+        gate,
+      );
+      addMesh(
+        new THREE.BoxGeometry(2.5, 0.24, 0.25),
+        material,
+        0,
+        2.44,
+        0,
+        gate,
+      );
+      if (route === "sky") {
+        addMesh(
+          new THREE.SphereGeometry(0.42, 10, 7),
+          cyan,
+          0,
+          3.2,
+          0,
+          gate,
+        );
+      } else if (route === "cargo") {
+        addMesh(
+          new THREE.BoxGeometry(0.72, 0.58, 0.72),
+          yellow,
+          0,
+          3.05,
+          0,
+          gate,
+        );
+        addMesh(
+          new THREE.BoxGeometry(0.12, 0.64, 0.76),
+          coral,
+          0,
+          3.05,
+          0,
+          gate,
+        );
+      } else {
+        const waveIcon = addMesh(
+          new THREE.TorusGeometry(0.46, 0.09, 6, 14, Math.PI),
+          coral,
+          0,
+          3.02,
+          0,
+          gate,
+        );
+        waveIcon.rotation.z = Math.PI * 0.18;
+      }
+      root.add(gate);
+      this.channelGates.set(route, gate);
+    }
+
+    const routeStartZ = CHANNEL_GATE_Z - 10;
+    const routeLength = Math.abs(CHANNEL_FINISH_Z - routeStartZ);
+    for (let index = 0; index < 9; index += 1) {
+      const progress = index / 8;
+      const z = routeStartZ - progress * routeLength;
+
+      const skyX =
+        CHANNEL_ROUTE_LANES.sky + Math.sin(index * 1.75) * 0.82;
+      addMesh(
+        new THREE.SphereGeometry(0.48, 10, 7),
+        index % 2 === 0 ? cyan : yellow,
+        skyX,
+        1.75 + (index % 3) * 0.28,
+        z,
+      );
+      addMesh(
+        new THREE.CylinderGeometry(0.018, 0.018, 1.05, 5),
+        cream,
+        skyX,
+        0.98,
+        z,
+      );
+      addMesh(
+        new THREE.BoxGeometry(0.25, 0.2, 0.25),
+        coral,
+        skyX,
+        0.38,
+        z,
+      );
+
+      const cargoDeck = addMesh(
+        new THREE.BoxGeometry(2.8, 0.26, 6.4),
+        dark,
+        CHANNEL_ROUTE_LANES.cargo,
+        0.02 + (index % 2) * 0.08,
+        z,
+      );
+      cargoDeck.rotation.y = (index % 2 === 0 ? -1 : 1) * 0.035;
+      for (const side of [-0.66, 0.66]) {
+        addMesh(
+          new THREE.BoxGeometry(0.82, 0.7, 1.1),
+          index % 2 === 0 ? yellow : coral,
+          CHANNEL_ROUTE_LANES.cargo + side,
+          0.49,
+          z + (index % 2 === 0 ? 0.72 : -0.72),
+        );
+      }
+
+      const wave = addMesh(
+        new THREE.BoxGeometry(2.65, 0.2, 4.4),
+        cyan,
+        CHANNEL_ROUTE_LANES.wave,
+        0.1,
+        z,
+      );
+      wave.rotation.x = -0.16;
+      this.channelWaves.push(wave);
+    }
+
+    addMesh(
+      new THREE.BoxGeometry(12.5, 0.34, 10),
+      cream,
+      0,
+      0.02,
+      CHANNEL_FINISH_Z - 1.5,
+    );
+    for (const x of [-4.2, 0, 4.2]) {
+      addMesh(
+        new THREE.BoxGeometry(2.65, 0.18, 3.5),
+        routeMaterials[
+          x < 0 ? "sky" : x > 0 ? "wave" : "cargo"
+        ],
+        x,
+        0.26,
+        CHANNEL_FINISH_Z + 3,
+      ).rotation.x = -0.13;
+    }
+
+    this.root.add(root);
+  }
+
+  private updateChannelChallengeVisuals(
+    elapsed: number,
+    challenge: ChannelChallengeState,
+  ): void {
+    this.channelChallengeRoot.visible = challenge.active;
+    if (!challenge.active) {
+      return;
+    }
+    for (const [route, gate] of this.channelGates) {
+      const chosen = challenge.route === route;
+      const inactive = challenge.route !== undefined && !chosen;
+      const targetScale = inactive ? 0.72 : chosen ? 1.12 : 1;
+      const pulse =
+        challenge.phase === "approach"
+          ? 1 + Math.sin(elapsed * 3.2 + CHANNEL_ROUTE_LANES[route]) * 0.035
+          : 1;
+      gate.scale.setScalar(targetScale * pulse);
+      gate.visible = !inactive || challenge.elapsed < 6;
+    }
+    for (const [index, wave] of this.channelWaves.entries()) {
+      wave.position.y =
+        0.1 + Math.sin(elapsed * 2.8 + index * 0.9) * 0.22;
+      wave.rotation.z = Math.sin(elapsed * 1.9 + index) * 0.045;
+    }
   }
 
   private buildArcadePlayground(): void {
@@ -1689,6 +1955,7 @@ const DEFAULT_ARCADE_VISUAL_STATE: ArcadeVisualState = {
   boostCharge: 0,
   specialEvent: undefined,
   specialEventRemaining: 0,
+  channelChallenge: createChannelChallengeState(),
 };
 
 function hashString(value: string): number {

@@ -26,8 +26,8 @@ export class PocketEarthGame {
   private readonly ui: GameUI;
   private readonly arcadeHud = new ArcadeHUD();
   private cameraViewSize =
-    document.documentElement.dataset.coverCapture === "true" ? 5.5 : 13.2;
-  private projectionViewSize = 13.2;
+    document.documentElement.dataset.coverCapture === "true" ? 5.5 : 16.5;
+  private projectionViewSize = 16.5;
   private overviewBlend = 0;
   private hasSizedCamera = false;
   private worldOverview = false;
@@ -83,7 +83,7 @@ export class PocketEarthGame {
 
     this.camera.near = 0.1;
     this.camera.far = 600;
-    this.camera.position.set(0, 14.5, 11);
+    this.camera.position.set(0, 17.8, 13.6);
     this.camera.lookAt(0, 0, -2);
     this.scene.add(this.camera);
 
@@ -151,6 +151,8 @@ export class PocketEarthGame {
       unlockedPaints: snapshot.unlockedPaints,
       equippedPaint: snapshot.equippedPaint,
       goldStamps: snapshot.goldStamps,
+      activeCommission: snapshot.activeCommission,
+      completedCommissions: snapshot.completedCommissions,
     });
     this.restoredFromSave = true;
   }
@@ -158,6 +160,9 @@ export class PocketEarthGame {
   /** `immediate` is used for milestones so progress survives an instant close. */
   private persist(immediate = false): void {
     const { state } = this.simulation;
+    if (state.channelChallenge.active) {
+      return;
+    }
     const progression = this.ui.getProgression();
     this.saveStore.save(
       {
@@ -196,6 +201,7 @@ export class PocketEarthGame {
       state.modeTransition,
       this.overviewBlend,
       state,
+      this.ui.getActiveCompassTargetId(),
     );
     this.updateCamera(1);
     this.renderer.render(this.scene, this.camera);
@@ -239,7 +245,11 @@ export class PocketEarthGame {
   }
 
   toggleWorldOverview(): void {
-    if (this.platformSuspended || this.ui.isInputBlocked()) {
+    if (
+      this.platformSuspended ||
+      this.ui.isInputBlocked() ||
+      this.simulation.state.channelChallenge.active
+    ) {
       return;
     }
     this.worldOverview = !this.worldOverview;
@@ -312,6 +322,7 @@ export class PocketEarthGame {
       state.modeTransition,
       this.overviewBlend,
       state,
+      this.ui.getActiveCompassTargetId(),
     );
     this.updateCamera(delta);
     this.ui.update(state);
@@ -414,6 +425,14 @@ export class PocketEarthGame {
       case "ramp-launched":
         this.audio.onRampLaunch();
         break;
+      case "channel-challenge-started":
+      case "channel-route-chosen":
+        this.audio.onRampLaunch();
+        break;
+      case "channel-checkpoint":
+      case "channel-challenge-completed":
+        this.audio.onArcadeHit(event.combo);
+        break;
       case "arcade-hit":
         this.audio.onArcadeHit(event.combo);
         break;
@@ -451,6 +470,7 @@ export class PocketEarthGame {
       drift,
       boosting,
       airHeight,
+      channelChallenge,
     } =
       this.simulation.state;
     const transitionSmoothing = 1 - Math.exp(-3.2 * delta);
@@ -463,20 +483,21 @@ export class PocketEarthGame {
       1,
     );
     const localFactor = 1 - easedOverviewBlend;
-    const leadX = velocity.x * 0.2 * localFactor;
-    const leadZ = velocity.z * 0.2 * localFactor;
+    const challengeLead = channelChallenge.active ? 1.35 : 1;
+    const leadX = velocity.x * 0.2 * localFactor * challengeLead;
+    const leadZ = velocity.z * 0.2 * localFactor * challengeLead;
     const speed = Math.hypot(velocity.x, velocity.z);
     const targetPosition = new THREE.Vector3(
       position.x + leadX * 0.45,
-      14.2 + speed * 0.1 + airHeight * 0.42,
-      position.z + 10.7 + speed * 0.13 + leadZ * 0.45,
+      17.2 + speed * 0.11 + airHeight * 0.46,
+      position.z + 13.2 + speed * 0.15 + leadZ * 0.45,
     ).lerp(new THREE.Vector3(0, 240, 92), easedOverviewBlend);
     const smoothing = 1 - Math.exp(-4.5 * delta);
     this.camera.position.lerp(targetPosition, smoothing);
     const lookAtTarget = new THREE.Vector3(
       position.x + leadX,
       airHeight * 0.18,
-      position.z - 1.4 + leadZ,
+      position.z - (channelChallenge.active ? 2.8 : 1.8) + leadZ,
     ).lerp(new THREE.Vector3(0, 0, 0), easedOverviewBlend);
     this.camera.lookAt(lookAtTarget);
     this.cameraShake = Math.max(0, this.cameraShake - delta * 2.9);
@@ -510,7 +531,8 @@ export class PocketEarthGame {
         cruiseFlow * 2.2 +
         modeTransition * 1.25 +
         drift * 0.75 +
-        (boosting ? 2.4 : 0) +
+        (boosting ? 3 : 0) +
+        (channelChallenge.active ? 1.8 : 0) +
         Math.min(1.4, airHeight * 0.42)
       ) *
         localFactor;
@@ -568,8 +590,8 @@ export class PocketEarthGame {
     }
     this.cameraViewSize = THREE.MathUtils.clamp(
       this.cameraViewSize + Math.sign(event.deltaY) * 1.2,
-      12,
-      27,
+      15.5,
+      30,
     );
     this.onResize();
   };
@@ -578,7 +600,7 @@ export class PocketEarthGame {
     const width = window.innerWidth;
     const height = window.innerHeight;
     const aspect = width / height;
-    const mobileAdjustment = width < 700 ? 1.08 : 1;
+    const mobileAdjustment = width < 700 ? 1.12 : 1;
     const northWest = geoToWorld([
       MAP_BOUNDS.minLongitude,
       MAP_BOUNDS.maxLatitude,
@@ -593,9 +615,13 @@ export class PocketEarthGame {
       mapDepth * 1.24,
       (mapWidth + 18) / aspect,
     );
-    return this.worldOverview
-      ? overviewSize
-      : this.cameraViewSize * mobileAdjustment;
+    if (this.worldOverview) {
+      return overviewSize;
+    }
+    if (this.simulation.state.channelChallenge.active) {
+      return Math.max(23, this.cameraViewSize * mobileAdjustment);
+    }
+    return this.cameraViewSize * mobileAdjustment;
   }
 
   private applyCameraProjection(viewSize: number): void {

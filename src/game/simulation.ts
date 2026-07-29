@@ -22,6 +22,21 @@ import {
   ARCADE_COURSE_OBJECTS,
   type ArcadeCourseObject,
 } from "./arcade-course";
+import {
+  CHANNEL_CHALLENGE_DURATION,
+  CHANNEL_CHECKPOINT_PROGRESS,
+  CHANNEL_CHOICE_SECONDS,
+  CHANNEL_FINISH_Z,
+  CHANNEL_GATE_Z,
+  CHANNEL_HALF_WIDTH,
+  CHANNEL_ROUTE_HALF_WIDTH,
+  CHANNEL_ROUTE_LANES,
+  CHANNEL_START,
+  createChannelChallengeState,
+  nearestChannelRoute,
+  type ChannelChallengeState,
+  type ChannelRoute,
+} from "./channel-challenge";
 
 export interface MovementInput {
   x: number;
@@ -53,6 +68,21 @@ export type GameEvent =
     }
   | { type: "boost-started" }
   | { type: "ramp-launched"; ramp: ArcadeCourseObject }
+  | { type: "channel-challenge-started" }
+  | { type: "channel-route-chosen"; route: ChannelRoute }
+  | {
+      type: "channel-checkpoint";
+      route: ChannelRoute;
+      checkpoint: number;
+      points: number;
+      combo: number;
+    }
+  | {
+      type: "channel-challenge-completed";
+      route: ChannelRoute;
+      points: number;
+      combo: number;
+    }
   | {
       type: "arcade-hit";
       object: ArcadeCourseObject;
@@ -114,6 +144,7 @@ export interface GameState {
   arcadeScore: number;
   specialEvent?: "ufo";
   specialEventRemaining: number;
+  channelChallenge: ChannelChallengeState;
   health: number;
   damageCooldown: number;
   gameOver: boolean;
@@ -161,6 +192,7 @@ export class GameSimulation {
     arcadeScore: 0,
     specialEvent: undefined,
     specialEventRemaining: 0,
+    channelChallenge: createChannelChallengeState(),
     health: MAX_HEALTH,
     damageCooldown: 0,
     gameOver: false,
@@ -221,7 +253,7 @@ export class GameSimulation {
       desiredHeading,
     );
     const directionalAlignment = Math.cos(directionalHeadingError);
-    const throttle = input.directional
+    let throttle = input.directional
       ? directionalStrength *
         lerp(
           0.18,
@@ -229,6 +261,14 @@ export class GameSimulation {
           smoothstep(directionalAlignment, -0.08, 0.92),
         )
       : clamp(-input.z, -1, 1);
+    if (this.state.channelChallenge.active) {
+      // The enlarged channel course always advances. Steering still decides
+      // the entrance and line, but releasing the stick cannot stall the event.
+      throttle = Math.max(
+        throttle,
+        this.state.channelChallenge.phase === "approach" ? 0.58 : 0.76,
+      );
+    }
     const steering = input.directional
       ? clamp(
           -directionalHeadingError / DIRECTIONAL_FULL_STEER_ANGLE,
@@ -281,6 +321,9 @@ export class GameSimulation {
         ? 0.62 + speedFactor * 0.65
         : 0.28 + speedFactor * 0.72);
     this.state.heading -= steering * turnRate * directionSign * dt;
+    if (this.state.channelChallenge.active) {
+      this.state.heading = clamp(this.state.heading, -0.52, 0.52);
+    }
 
     const forwardX = -Math.sin(this.state.heading);
     const forwardZ = -Math.cos(this.state.heading);
@@ -371,8 +414,16 @@ export class GameSimulation {
       this.cruiseFlowActive = false;
     }
 
-    const normalLimit =
-      this.state.vehicleMode === "car" ? CAR_TOP_SPEED : BOAT_TOP_SPEED;
+    const challengeRoute = this.state.channelChallenge.route;
+    const normalLimit = this.state.channelChallenge.active
+      ? challengeRoute === "wave"
+        ? CHANNEL_WAVE_TOP_SPEED
+        : challengeRoute === "cargo"
+          ? CHANNEL_CARGO_TOP_SPEED
+          : CHANNEL_SKY_TOP_SPEED
+      : this.state.vehicleMode === "car"
+        ? CAR_TOP_SPEED
+        : BOAT_TOP_SPEED;
     const flowLimit =
       normalLimit * (1 + this.state.cruiseFlow * CRUISE_SPEED_BONUS);
     const boostLimit = this.state.boosting
@@ -388,6 +439,12 @@ export class GameSimulation {
     this.state.position.x += this.state.velocity.x * dt;
     this.state.position.z += this.state.velocity.z * dt;
     this.updateAir(dt);
+
+    if (this.state.channelChallenge.active) {
+      this.updateChannelChallenge(dt);
+      this.updateArcadeCollisions();
+      return;
+    }
 
     const unwrappedX = this.state.position.x;
     let wrappedX = unwrappedX;
@@ -438,6 +495,13 @@ export class GameSimulation {
   }
 
   retryFromCheckpoint(): void {
+    this.state.channelChallenge.active = false;
+    this.state.channelChallenge.phase = "approach";
+    this.state.channelChallenge.route = undefined;
+    this.state.channelChallenge.elapsed = 0;
+    this.state.channelChallenge.remaining = 0;
+    this.state.channelChallenge.progress = 0;
+    this.state.channelChallenge.checkpoints = 0;
     this.state.position.x = this.checkpoint.x;
     this.state.position.z = this.checkpoint.z;
     this.state.heading = this.checkpoint.heading;
@@ -502,6 +566,7 @@ export class GameSimulation {
     this.state.arcadeScore = 0;
     this.state.specialEvent = undefined;
     this.state.specialEventRemaining = 0;
+    this.state.channelChallenge = createChannelChallengeState();
     this.state.health = MAX_HEALTH;
     this.state.damageCooldown = 0;
     this.state.gameOver = false;
@@ -559,6 +624,7 @@ export class GameSimulation {
     this.state.airTime = 0;
     this.state.drift = 0;
     this.state.boosting = false;
+    this.state.channelChallenge.active = false;
     this.state.health = MAX_HEALTH;
     this.state.damageCooldown = RETRY_INVULNERABILITY_SECONDS;
     this.state.gameOver = false;
@@ -590,6 +656,9 @@ export class GameSimulation {
   }
 
   private updateSpecialEvent(dt: number): void {
+    if (this.state.channelChallenge.active) {
+      return;
+    }
     if (this.state.specialEvent === "ufo") {
       this.state.specialEventRemaining = Math.max(
         0,
@@ -642,7 +711,12 @@ export class GameSimulation {
     }
 
     this.state.airHeight += this.state.verticalVelocity * dt;
-    this.state.verticalVelocity -= ARCADE_GRAVITY * dt;
+    const gravity =
+      this.state.channelChallenge.active &&
+      this.state.channelChallenge.route === "sky"
+        ? CHANNEL_SKY_GRAVITY
+        : ARCADE_GRAVITY;
+    this.state.verticalVelocity -= gravity * dt;
     this.state.airTime += dt;
     if (this.state.airHeight > 0) {
       return;
@@ -661,6 +735,204 @@ export class GameSimulation {
         ...award,
       });
     }
+  }
+
+  private startChannelChallenge(): void {
+    const challenge = this.state.channelChallenge;
+    if (challenge.active || challenge.completed) {
+      return;
+    }
+
+    challenge.active = true;
+    challenge.phase = "approach";
+    challenge.route = undefined;
+    challenge.elapsed = 0;
+    challenge.remaining = CHANNEL_CHALLENGE_DURATION;
+    challenge.progress = 0;
+    challenge.checkpoints = 0;
+    this.state.position.x = CHANNEL_START.x;
+    this.state.position.z = CHANNEL_START.z;
+    this.state.heading = 0;
+    this.state.velocity.x = 0;
+    this.state.velocity.z = -CHANNEL_APPROACH_SPEED;
+    this.state.vehicleMode = "car";
+    this.state.modeTransition = 0;
+    this.state.airHeight = 0.12;
+    this.state.verticalVelocity = 0;
+    this.state.airTime = 0;
+    this.state.drift = 0;
+    this.state.cruiseFlow = 0;
+    this.state.nearestPhotoSpot = undefined;
+    this.state.nearestSpecialty = undefined;
+    this.events.push({ type: "channel-challenge-started" });
+  }
+
+  private updateChannelChallenge(dt: number): void {
+    const challenge = this.state.channelChallenge;
+    if (!challenge.active) {
+      return;
+    }
+
+    challenge.elapsed = Math.min(
+      CHANNEL_CHALLENGE_DURATION,
+      challenge.elapsed + dt,
+    );
+    challenge.remaining = Math.max(
+      0,
+      CHANNEL_CHALLENGE_DURATION - challenge.elapsed,
+    );
+    challenge.progress = challenge.elapsed / CHANNEL_CHALLENGE_DURATION;
+    this.state.position.x = clamp(
+      this.state.position.x,
+      -CHANNEL_HALF_WIDTH,
+      CHANNEL_HALF_WIDTH,
+    );
+
+    if (
+      challenge.phase === "approach" &&
+      (challenge.elapsed >= CHANNEL_CHOICE_SECONDS ||
+        this.state.position.z <= CHANNEL_GATE_Z)
+    ) {
+      this.chooseChannelRoute(nearestChannelRoute(this.state.position.x));
+    }
+
+    const route = challenge.route;
+    if (route) {
+      const laneX = CHANNEL_ROUTE_LANES[route];
+      const laneMin = laneX - CHANNEL_ROUTE_HALF_WIDTH;
+      const laneMax = laneX + CHANNEL_ROUTE_HALF_WIDTH;
+      this.state.position.x = clamp(this.state.position.x, laneMin, laneMax);
+      const laneGuide =
+        route === "cargo" ? CHANNEL_CARGO_GUIDE : CHANNEL_ROUTE_GUIDE;
+      this.state.velocity.x +=
+        (laneX - this.state.position.x) * laneGuide * dt;
+
+      if (route === "sky") {
+        this.state.velocity.x +=
+          Math.sin(challenge.elapsed * 2.15) * CHANNEL_SKY_WIND * dt;
+        if (
+          this.state.airHeight < 0.28 &&
+          challenge.progress < CHANNEL_FINAL_APPROACH_PROGRESS
+        ) {
+          this.state.airHeight = 0.28;
+          this.state.verticalVelocity = CHANNEL_SKY_RELAUNCH_VELOCITY;
+        }
+      } else if (route === "wave") {
+        this.state.boostCharge = Math.min(
+          1,
+          this.state.boostCharge + CHANNEL_WAVE_RECHARGE * dt,
+        );
+        this.state.velocity.x +=
+          Math.sin(challenge.elapsed * 3.7) * CHANNEL_WAVE_SWAY * dt;
+      }
+
+      while (
+        challenge.checkpoints < CHANNEL_CHECKPOINT_PROGRESS.length &&
+        challenge.progress >=
+          CHANNEL_CHECKPOINT_PROGRESS[challenge.checkpoints]
+      ) {
+        const checkpoint = challenge.checkpoints + 1;
+        challenge.checkpoints = checkpoint;
+        if (route === "wave") {
+          this.state.airHeight = Math.max(0.12, this.state.airHeight);
+          this.state.verticalVelocity = CHANNEL_WAVE_LAUNCH_VELOCITY;
+        } else if (route === "cargo") {
+          this.state.airHeight = Math.max(0.06, this.state.airHeight);
+          this.state.verticalVelocity = CHANNEL_CARGO_HOP_VELOCITY;
+        }
+        const rawPoints =
+          route === "sky"
+            ? CHANNEL_SKY_CHECKPOINT_POINTS
+            : route === "wave"
+              ? CHANNEL_WAVE_CHECKPOINT_POINTS
+              : CHANNEL_CARGO_CHECKPOINT_POINTS;
+        const award = this.awardCombo(rawPoints);
+        this.events.push({
+          type: "channel-checkpoint",
+          route,
+          checkpoint,
+          ...award,
+        });
+      }
+    }
+
+    if (
+      challenge.remaining === 0 ||
+      this.state.position.z <= CHANNEL_FINISH_Z
+    ) {
+      this.completeChannelChallenge();
+    }
+  }
+
+  private chooseChannelRoute(route: ChannelRoute): void {
+    const challenge = this.state.channelChallenge;
+    challenge.phase = "route";
+    challenge.route = route;
+    this.state.position.x = lerp(
+      this.state.position.x,
+      CHANNEL_ROUTE_LANES[route],
+      0.34,
+    );
+    this.state.heading = 0;
+    this.state.velocity.x *= 0.35;
+    if (route === "sky") {
+      this.state.airHeight = 0.42;
+      this.state.verticalVelocity = CHANNEL_SKY_ENTRY_VELOCITY;
+    } else if (route === "wave") {
+      this.state.boostCharge = Math.max(
+        this.state.boostCharge,
+        CHANNEL_WAVE_ENTRY_BOOST,
+      );
+    }
+    this.events.push({ type: "channel-route-chosen", route });
+  }
+
+  private completeChannelChallenge(): void {
+    const challenge = this.state.channelChallenge;
+    const route = challenge.route ?? nearestChannelRoute(this.state.position.x);
+    const rawPoints =
+      CHANNEL_COMPLETION_POINTS + challenge.checkpoints * 80;
+    const award = this.awardCombo(rawPoints);
+    challenge.active = false;
+    challenge.completed = true;
+    challenge.phase = "route";
+    challenge.route = route;
+    challenge.elapsed = CHANNEL_CHALLENGE_DURATION;
+    challenge.remaining = 0;
+    challenge.progress = 1;
+
+    const bigBen = PHOTO_SPOTS.find((spot) => spot.id === "big-ben");
+    if (bigBen) {
+      const landing = geoToWorld(bigBen.point);
+      this.state.position.x = landing.x + 0.7;
+      this.state.position.z = landing.z + 2.6;
+      this.state.heading = 0;
+      this.state.velocity.x = 0;
+      this.state.velocity.z = -CHANNEL_LANDING_SPEED;
+      this.state.airHeight = 1.15;
+      this.state.verticalVelocity = -1.8;
+      this.state.airTime = 0;
+      this.state.vehicleMode = "car";
+      const firstCollection =
+        !this.state.collectedPostcards.has(bigBen.id);
+      this.state.collectedPostcards.add(bigBen.id);
+      this.setCheckpoint(bigBen);
+      this.events.push({
+        type: "postcard-collected",
+        spot: bigBen,
+        firstCollection,
+        automatic: true,
+      });
+    }
+
+    this.updateLocation();
+    this.updateNearestPhotoSpot();
+    this.updateNearestSpecialty();
+    this.events.push({
+      type: "channel-challenge-completed",
+      route,
+      ...award,
+    });
   }
 
   private updateArcadeCollisions(): void {
@@ -701,6 +973,13 @@ export class GameSimulation {
           this.state.velocity.x *= 1.12;
           this.state.velocity.z *= 1.12;
           this.events.push({ type: "ramp-launched", ramp: object });
+          if (
+            object.id === "eiffel-tower-ramp" &&
+            !this.state.channelChallenge.completed
+          ) {
+            this.startChannelChallenge();
+            return;
+          }
         }
         continue;
       }
@@ -980,6 +1259,27 @@ const WATER_REBOUND_COOLDOWN_SECONDS = 2.5;
 const SPECIAL_EVENT_FIRST_SECONDS = 24;
 const SPECIAL_EVENT_DURATION_SECONDS = 12;
 const SPECIAL_EVENT_INTERVAL_SECONDS = 34;
+const CHANNEL_APPROACH_SPEED = 5.2;
+const CHANNEL_SKY_TOP_SPEED = 7.8;
+const CHANNEL_CARGO_TOP_SPEED = 6.8;
+const CHANNEL_WAVE_TOP_SPEED = 10.2;
+const CHANNEL_ROUTE_GUIDE = 1.15;
+const CHANNEL_CARGO_GUIDE = 1.75;
+const CHANNEL_SKY_GRAVITY = 3.15;
+const CHANNEL_SKY_ENTRY_VELOCITY = 4.7;
+const CHANNEL_SKY_RELAUNCH_VELOCITY = 3.8;
+const CHANNEL_SKY_WIND = 2.6;
+const CHANNEL_WAVE_SWAY = 1.45;
+const CHANNEL_WAVE_RECHARGE = 0.085;
+const CHANNEL_WAVE_ENTRY_BOOST = 0.58;
+const CHANNEL_WAVE_LAUNCH_VELOCITY = 3.25;
+const CHANNEL_CARGO_HOP_VELOCITY = 2.15;
+const CHANNEL_FINAL_APPROACH_PROGRESS = 0.9;
+const CHANNEL_SKY_CHECKPOINT_POINTS = 220;
+const CHANNEL_CARGO_CHECKPOINT_POINTS = 120;
+const CHANNEL_WAVE_CHECKPOINT_POINTS = 170;
+const CHANNEL_COMPLETION_POINTS = 520;
+const CHANNEL_LANDING_SPEED = 4.4;
 
 /**
  * Cruise flow rewards a clean line while the new drift meter rewards breaking
