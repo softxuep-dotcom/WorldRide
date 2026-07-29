@@ -1,6 +1,11 @@
 import { PHOTO_SPOTS, geoToWorld, type PhotoSpotId } from "./data";
 
-export type ArcadeObjectKind = "ramp" | "crate" | "barrier" | "balloon";
+export type ArcadeObjectKind =
+  | "ramp"
+  | "crate"
+  | "barrier"
+  | "balloon"
+  | "trap";
 
 export interface ArcadeCourseObject {
   id: string;
@@ -73,6 +78,7 @@ function createPlayground(
     at("crate-left", "crate", 4.5, -0.68, 0.42, 0.68, 120),
     at("crate-right", "crate", 4.5, 0.68, 0.42, 0.68, 120),
     at("balloon", "balloon", 5.8, 0, 1.65, 0.64, 260),
+    at("trap", "trap", 6.2, 0, 0.08, 0.74, 0),
     at("barrier-left", "barrier", 7.1, -1.02, 0.38, 0.64, 160),
     at("barrier-right", "barrier", 7.1, 1.02, 0.38, 0.64, 160),
     at("crate-finish", "crate", 8.4, 0, 0.42, 0.68, 180),

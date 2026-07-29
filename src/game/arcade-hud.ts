@@ -3,6 +3,7 @@ import type { GameEvent, GameState } from "./simulation";
 export class ArcadeHUD {
   private readonly root = requireElement("arcade-hud");
   private readonly score = requireElement("arcade-score");
+  private readonly durability = requireElement("arcade-durability");
   private readonly combo = requireElement("arcade-combo");
   private readonly comboLabel = requireElement("arcade-combo-label");
   private readonly boostFill = requireElement("boost-meter-fill");
@@ -12,6 +13,7 @@ export class ArcadeHUD {
   private readonly eventTimer = requireElement("arcade-event-timer");
   private comboPulseTimer?: number;
   private impactTimer?: number;
+  private durabilityTimer?: number;
 
   update(state: GameState): void {
     this.root.dataset.speed = Math.hypot(
@@ -22,10 +24,13 @@ export class ArcadeHUD {
     this.root.dataset.airHeight = state.airHeight.toFixed(2);
     this.root.dataset.boosting = String(state.boosting);
     this.root.dataset.destroyed = String(state.destroyedArcadeObjects.size);
+    this.root.dataset.health = String(state.health);
     this.root.dataset.heading = state.heading.toFixed(3);
     this.root.dataset.velocityX = state.velocity.x.toFixed(2);
     this.root.dataset.velocityZ = state.velocity.z.toFixed(2);
     this.score.textContent = Math.round(state.arcadeScore).toLocaleString();
+    this.durability.textContent =
+      `${"♥".repeat(state.health)}${"♡".repeat(3 - state.health)}`;
     this.combo.textContent = `×${Math.max(1, state.combo)}`;
     this.combo.classList.toggle("is-active", state.combo > 1);
     this.comboLabel.textContent =
@@ -57,6 +62,17 @@ export class ArcadeHUD {
       case "arcade-hit":
         this.flashImpact();
         this.pulseCombo();
+        break;
+      case "trap-hit":
+        this.flashImpact();
+        this.durability.classList.remove("is-hit");
+        void this.durability.offsetWidth;
+        this.durability.classList.add("is-hit");
+        window.clearTimeout(this.durabilityTimer);
+        this.durabilityTimer = window.setTimeout(
+          () => this.durability.classList.remove("is-hit"),
+          420,
+        );
         break;
       case "arcade-near-miss":
       case "jump-landed":

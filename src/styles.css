@@ -2698,14 +2698,26 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
 }
 
 .action-dock .quiz-button.is-attention:not(:disabled) {
-  background: rgba(226, 238, 237, 0.96);
-  outline: 0;
-  color: var(--ink);
-  animation: none;
+  background: linear-gradient(135deg, #ff654f 0%, #ff9838 58%, #ffd35a 100%);
+  outline: 2px solid rgba(255, 255, 255, 0.92);
+  color: #fff;
+  animation: quiz-attention-pulse 1.35s ease-in-out infinite;
 }
 
 .action-dock .quiz-button.is-attention:not(:disabled)::after {
-  display: none;
+  position: absolute;
+  inset: -30% auto -30% -34%;
+  display: block;
+  width: 18%;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.82),
+    transparent
+  );
+  transform: skewX(-18deg);
+  animation: quiz-attention-shine 2.15s ease-in-out infinite;
 }
 
 .action-dock .quiz-button > * {
@@ -2770,9 +2782,11 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
 
   .action-dock .quiz-button.is-attention:not(:disabled) {
     animation: none;
-    box-shadow: none;
+    box-shadow:
+      0 0 0 3px rgba(255, 215, 92, 0.48),
+      0 10px 22px rgba(255, 81, 63, 0.4);
     filter: none;
-    transform: none;
+    transform: scale(1.035);
   }
 
   .action-dock .quiz-button.is-attention:not(:disabled)::after {
@@ -3290,21 +3304,28 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
 
 .postcard-reveals {
   position: absolute;
-  left: 50%;
+  top: max(84px, calc(env(safe-area-inset-top) + 70px));
+  right: max(10px, env(safe-area-inset-right));
   bottom: calc(max(20px, env(safe-area-inset-bottom)) + 120px);
-  transform: translateX(-50%);
+  left: auto;
+  bottom: auto;
+  transform: none;
   z-index: 26;
   display: flex;
   flex-direction: column-reverse;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   pointer-events: none;
 }
 
 .postcard-reveal {
   position: relative;
-  width: min(206px, 56vw);
-  padding: 7px 7px 0;
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  align-items: center;
+  width: min(178px, 48vw);
+  padding: 6px;
+  gap: 8px;
   border-radius: 13px;
   background: #fffdf7;
   box-shadow: 0 14px 34px rgba(24, 62, 84, 0.32);
@@ -3313,7 +3334,8 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
 
 .postcard-reveal__art {
   display: block;
-  width: 100%;
+  width: 66px;
+  height: 66px;
   aspect-ratio: 1 / 1;
   object-fit: cover;
   border-radius: 8px;
@@ -3322,10 +3344,12 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
 
 .postcard-reveal__caption {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 3px 8px;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 24px 3px 0;
 }
 
 .postcard-reveal__caption strong {
@@ -3348,8 +3372,8 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
 
 .postcard-reveal__stamp {
   position: absolute;
-  top: 13px;
-  right: 13px;
+  top: 7px;
+  right: 7px;
   display: grid;
   place-items: center;
   width: 27px;
@@ -3380,7 +3404,9 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
 
 @media (max-width: 430px) {
   .postcard-reveals {
-    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 104px);
+    top: max(74px, calc(env(safe-area-inset-top) + 62px));
+    right: max(7px, env(safe-area-inset-right));
+    bottom: auto;
   }
 }
 
@@ -3428,5 +3454,190 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
       transparent 60%,
       rgba(120, 196, 220, 0.28) 100%
     );
+  }
+}
+
+/* ---------- Continuous route HUD and failure state ---------- */
+
+.travel-hud .country-reveal {
+  width: min(150px, 100%);
+}
+
+.travel-hud .travel-info {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+}
+
+.travel-hud .travel-info__kicker {
+  display: grid;
+  flex: 0 0 auto;
+  min-height: 0;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.travel-hud .travel-info__copy {
+  min-width: 0;
+}
+
+.travel-hud .country-reveal strong {
+  display: block;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.travel-hud .travel-info__action {
+  font-size: 14px;
+}
+
+.travel-hud .compass {
+  cursor: default;
+  border-color: rgba(255, 190, 54, 0.76);
+  background:
+    linear-gradient(105deg, rgba(255, 248, 220, 0.96), rgba(255, 255, 255, 0.92));
+  box-shadow:
+    0 10px 26px rgba(17, 48, 65, 0.16),
+    0 0 0 3px rgba(255, 195, 54, 0.12);
+}
+
+.travel-hud .compass__eyebrow {
+  color: #d75b39;
+}
+
+.wishlist {
+  display: none !important;
+}
+
+.arcade-durability {
+  position: absolute;
+  top: max(116px, calc(env(safe-area-inset-top) + 108px));
+  left: max(14px, env(safe-area-inset-left));
+  color: #ff6f5a;
+  font-size: 21px;
+  letter-spacing: 2px;
+  filter: drop-shadow(0 3px 0 rgba(109, 32, 27, 0.36));
+  transform-origin: left center;
+}
+
+.arcade-durability.is-hit {
+  animation: durability-hit 420ms cubic-bezier(0.2, 1.5, 0.3, 1);
+}
+
+.game-over {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  padding: 24px;
+  place-items: center;
+  background: rgba(13, 31, 42, 0.58);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  transition: opacity 180ms ease, visibility 180ms ease;
+}
+
+.game-over.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.game-over__card {
+  width: min(330px, calc(100vw - 38px));
+  padding: 27px 24px 23px;
+  border: 3px solid rgba(255, 255, 255, 0.88);
+  border-radius: 28px;
+  background: linear-gradient(155deg, #fff5d5, #ffd066);
+  box-shadow:
+    0 18px 0 rgba(80, 48, 31, 0.22),
+    0 26px 70px rgba(13, 31, 42, 0.38);
+  color: #263e4b;
+  text-align: center;
+  transform: translateY(12px) scale(0.9);
+  transition: transform 220ms cubic-bezier(0.2, 1.3, 0.3, 1);
+}
+
+.game-over.is-visible .game-over__card {
+  transform: translateY(0) scale(1);
+}
+
+.game-over__card small {
+  color: #d85439;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+}
+
+.game-over__card h2 {
+  margin: 5px 0 4px;
+  font-size: clamp(28px, 9vw, 42px);
+  line-height: 1;
+}
+
+.game-over__card p {
+  margin: 0 0 18px;
+  color: rgba(38, 62, 75, 0.72);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.game-over__card button {
+  min-width: 170px;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #ff7651, #e74d3f);
+  box-shadow: 0 7px 0 #a93632;
+  color: white;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.game-over__card button:active {
+  transform: translateY(5px);
+  box-shadow: 0 2px 0 #a93632;
+}
+
+@keyframes durability-hit {
+  0% { color: white; transform: scale(1); }
+  32% { color: #ff3e3e; transform: scale(1.42) rotate(-5deg); }
+  100% { color: #ff6f5a; transform: scale(1); }
+}
+
+@media (pointer: coarse), (max-width: 760px) {
+  .arcade-durability {
+    top: max(174px, calc(env(safe-area-inset-top) + 166px));
+  }
+}
+
+@media (min-width: 620px) and (pointer: fine) {
+  .travel-hud {
+    grid-template-columns: 150px minmax(230px, 360px) 48px;
+  }
+
+  .travel-hud .compass {
+    max-width: 360px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arcade-durability.is-hit {
+    animation: none;
+  }
+
+  .game-over,
+  .game-over__card {
+    transition: none;
   }
 }

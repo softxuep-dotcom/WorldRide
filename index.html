@@ -51,7 +51,6 @@
                 <strong id="country-name">France</strong>
                 <span class="travel-info__action" aria-hidden="true">›</span>
               </span>
-              <span id="country-intro" class="travel-info__intro">Southern ports, fields, and Mediterranean landscapes open the journey from Marseille.</span>
             </span>
             <span
               id="country-arrival"
@@ -86,12 +85,11 @@
         </button>
 
         <div id="compass-dock" class="compass-dock" hidden>
-          <button
+          <div
             id="compass"
             class="compass"
-            type="button"
-            aria-haspopup="true"
-            aria-expanded="false"
+            role="status"
+            aria-live="polite"
             aria-label="Places to go"
             data-i18n-attr="aria-label:wishlist.title"
           >
@@ -120,6 +118,13 @@
           <span aria-hidden="true">★</span>
           <strong id="arcade-score">0</strong>
         </div>
+        <div
+          id="arcade-durability"
+          class="arcade-durability"
+          role="status"
+          aria-live="polite"
+          data-i18n-attr="aria-label:arcade.durability"
+        >♥♥♥</div>
         <div class="arcade-combo-wrap" aria-live="polite">
           <strong id="arcade-combo" class="arcade-combo">×1</strong>
           <small id="arcade-combo-label">↑ &nbsp;🛫</small>
@@ -179,6 +184,24 @@
           <span id="celebration-detail" class="celebration__detail"></span>
         </div>
       </div>
+
+      <section
+        id="game-over"
+        class="game-over"
+        role="dialog"
+        aria-modal="true"
+        aria-hidden="true"
+        aria-labelledby="game-over-title"
+      >
+        <div class="game-over__card">
+          <small data-i18n="gameOver.eyebrow">RUN OVER</small>
+          <h2 id="game-over-title" data-i18n="gameOver.title">Wrecked!</h2>
+          <p data-i18n="gameOver.body">Retry from your last landmark.</p>
+          <button id="game-over-retry" type="button" data-i18n="gameOver.retry">
+            Retry
+          </div>
+        </div>
+      </section>
 
       <nav class="action-dock" aria-label="Travel actions" data-i18n-attr="aria-label:actions.label">
         <div class="settings-control">

@@ -78,6 +78,7 @@ export class PocketEarthGame {
       onCommercialBreak,
       onRewardedBreak,
       onGameplayPauseChange,
+      () => this.simulation.retryFromCheckpoint(),
     );
 
     this.camera.near = 0.1;
@@ -100,7 +101,7 @@ export class PocketEarthGame {
     this.onResize();
 
     this.restoreSave();
-    this.compassAvailable = this.restoredFromSave;
+    this.compassAvailable = true;
     this.ui.setCompassAvailable(this.compassAvailable);
     this.simulation.update(0, { x: 0, z: 0 });
     // Prime the UI before draining events: arriving at the spawn landmark
@@ -367,6 +368,10 @@ export class PocketEarthGame {
         );
         this.impactFreeze = Math.max(this.impactFreeze, 0.055);
         break;
+      case "trap-hit":
+        this.cameraShake = Math.max(this.cameraShake, 0.72);
+        this.impactFreeze = Math.max(this.impactFreeze, 0.09);
+        break;
       case "jump-landed":
       case "water-rebound":
         this.cameraShake = Math.max(this.cameraShake, 0.24);
@@ -412,6 +417,9 @@ export class PocketEarthGame {
       case "arcade-hit":
         this.audio.onArcadeHit(event.combo);
         break;
+      case "trap-hit":
+        this.audio.onArcadeHit(1);
+        break;
       case "arcade-near-miss":
         this.audio.onNearMiss();
         break;
@@ -429,6 +437,7 @@ export class PocketEarthGame {
         break;
       case "combo-ended":
       case "special-event-ended":
+      case "game-over":
         break;
     }
   }

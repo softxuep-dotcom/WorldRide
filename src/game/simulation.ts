@@ -79,6 +79,8 @@ export type GameEvent =
       combo: number;
     }
   | { type: "water-rebound"; points: number; combo: number }
+  | { type: "trap-hit"; health: number; maxHealth: number }
+  | { type: "game-over" }
   | { type: "combo-ended"; combo: number }
   | { type: "special-event-started"; event: "ufo" }
   | { type: "special-event-ended"; event: "ufo" };
@@ -112,6 +114,9 @@ export interface GameState {
   arcadeScore: number;
   specialEvent?: "ufo";
   specialEventRemaining: number;
+  health: number;
+  damageCooldown: number;
+  gameOver: boolean;
 }
 
 const startWorld = geoToWorld(START_POINT);
@@ -156,6 +161,9 @@ export class GameSimulation {
     arcadeScore: 0,
     specialEvent: undefined,
     specialEventRemaining: 0,
+    health: MAX_HEALTH,
+    damageCooldown: 0,
+    gameOver: false,
   };
 
   private events: GameEvent[] = [];
@@ -169,10 +177,25 @@ export class GameSimulation {
   private readonly nearMissedArcadeObjects = new Set<string>();
   private waterReboundCooldown = 0;
   private nextSpecialEventAt = SPECIAL_EVENT_FIRST_SECONDS;
+  private checkpoint = {
+    x: startWorld.x,
+    z: startWorld.z,
+    heading: START_HEADING,
+  };
 
   update(deltaSeconds: number, input: MovementInput): void {
     const dt = Math.min(deltaSeconds, 0.05);
+    if (this.state.gameOver) {
+      this.state.velocity.x = 0;
+      this.state.velocity.z = 0;
+      this.state.boosting = false;
+      return;
+    }
     this.state.elapsed += dt;
+    this.state.damageCooldown = Math.max(
+      0,
+      this.state.damageCooldown - dt,
+    );
     this.edgeCooldown = Math.max(0, this.edgeCooldown - dt);
     this.waterReboundCooldown = Math.max(0, this.waterReboundCooldown - dt);
     this.cruiseFlowCueCooldown = Math.max(
@@ -396,10 +419,10 @@ export class GameSimulation {
       }
     }
 
-    this.updateArcadeCollisions();
     this.updateLocation();
     this.updateNearestPhotoSpot();
     this.updateNearestSpecialty();
+    this.updateArcadeCollisions();
   }
 
   interact(): void {
@@ -410,7 +433,31 @@ export class GameSimulation {
 
     const firstCollection = !this.state.collectedPostcards.has(spot.id);
     this.state.collectedPostcards.add(spot.id);
+    this.setCheckpoint(spot);
     this.events.push({ type: "postcard-collected", spot, firstCollection });
+  }
+
+  retryFromCheckpoint(): void {
+    this.state.position.x = this.checkpoint.x;
+    this.state.position.z = this.checkpoint.z;
+    this.state.heading = this.checkpoint.heading;
+    this.state.velocity.x = 0;
+    this.state.velocity.z = 0;
+    this.state.health = MAX_HEALTH;
+    this.state.damageCooldown = RETRY_INVULNERABILITY_SECONDS;
+    this.state.gameOver = false;
+    this.state.boosting = false;
+    this.state.airHeight = 0;
+    this.state.verticalVelocity = 0;
+    this.state.airTime = 0;
+    this.state.drift = 0;
+    this.state.combo = 0;
+    this.state.comboTimer = 0;
+    this.activeRampId = undefined;
+    this.updateLocation();
+    this.updateNearestPhotoSpot();
+    this.updateNearestSpecialty();
+    this.events.length = 0;
   }
 
   /**
@@ -455,6 +502,9 @@ export class GameSimulation {
     this.state.arcadeScore = 0;
     this.state.specialEvent = undefined;
     this.state.specialEventRemaining = 0;
+    this.state.health = MAX_HEALTH;
+    this.state.damageCooldown = 0;
+    this.state.gameOver = false;
     this.state.destroyedArcadeObjects.clear();
     this.cruiseFlowActive = false;
     this.cruiseFlowCueCooldown = 0;
@@ -465,6 +515,11 @@ export class GameSimulation {
     this.nearMissedArcadeObjects.clear();
     this.waterReboundCooldown = 0;
     this.nextSpecialEventAt = this.state.elapsed + SPECIAL_EVENT_FIRST_SECONDS;
+    this.checkpoint = {
+      x: this.state.position.x,
+      z: this.state.position.z,
+      heading: this.state.heading,
+    };
 
     this.state.visitedCountries = new Set(snapshot.visitedCountries);
     this.state.collectedPostcards = new Set(
@@ -504,8 +559,16 @@ export class GameSimulation {
     this.state.airTime = 0;
     this.state.drift = 0;
     this.state.boosting = false;
+    this.state.health = MAX_HEALTH;
+    this.state.damageCooldown = RETRY_INVULNERABILITY_SECONDS;
+    this.state.gameOver = false;
     this.cruiseFlowActive = false;
     this.activeRampId = undefined;
+    this.checkpoint = {
+      x: world.x,
+      z: world.z,
+      heading: this.state.heading,
+    };
     this.updateLocation();
     this.updateNearestPhotoSpot();
   }
@@ -638,6 +701,32 @@ export class GameSimulation {
           this.state.velocity.x *= 1.12;
           this.state.velocity.z *= 1.12;
           this.events.push({ type: "ramp-launched", ramp: object });
+        }
+        continue;
+      }
+
+      if (object.kind === "trap") {
+        if (
+          distance < object.radius &&
+          airHeight < 0.34 &&
+          this.state.damageCooldown === 0
+        ) {
+          this.state.health = Math.max(0, this.state.health - 1);
+          this.state.damageCooldown = DAMAGE_INVULNERABILITY_SECONDS;
+          this.state.velocity.x *= -0.28;
+          this.state.velocity.z *= -0.28;
+          this.state.boosting = false;
+          this.state.combo = 0;
+          this.state.comboTimer = 0;
+          this.events.push({
+            type: "trap-hit",
+            health: this.state.health,
+            maxHealth: MAX_HEALTH,
+          });
+          if (this.state.health === 0) {
+            this.state.gameOver = true;
+            this.events.push({ type: "game-over" });
+          }
         }
         continue;
       }
@@ -782,6 +871,7 @@ export class GameSimulation {
       !this.state.collectedPostcards.has(nearest.id)
     ) {
       this.state.collectedPostcards.add(nearest.id);
+      this.setCheckpoint(nearest);
       this.events.push({
         type: "postcard-collected",
         spot: nearest,
@@ -789,6 +879,17 @@ export class GameSimulation {
         automatic: true,
       });
     }
+  }
+
+  private setCheckpoint(spot: PhotoSpotDefinition): void {
+    const world = geoToWorld(spot.point);
+    this.checkpoint = {
+      x: world.x,
+      z: world.z,
+      heading: this.state.heading,
+    };
+    this.state.health = MAX_HEALTH;
+    this.state.damageCooldown = 0;
   }
 
   /**
@@ -852,6 +953,9 @@ const CAR_LATERAL_GRIP = 7.8;
 const CAR_DRIFT_GRIP = 0.85;
 const BOAT_LATERAL_GRIP = 4;
 const AIR_LATERAL_GRIP = 0.24;
+const MAX_HEALTH = 3;
+const DAMAGE_INVULNERABILITY_SECONDS = 1.45;
+const RETRY_INVULNERABILITY_SECONDS = 1.8;
 const DIRECTIONAL_FULL_STEER_ANGLE = Math.PI * 0.38;
 const DIRECTIONAL_TURN_BRAKE = 3.8;
 const DRIFT_START_THRESHOLD = 0.14;

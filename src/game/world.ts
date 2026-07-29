@@ -62,14 +62,8 @@ interface VehicleTrailParticle {
 }
 
 interface LandmarkEffect {
-  outerRing: THREE.Mesh;
-  innerRing: THREE.Mesh;
-  scanArc: THREE.Mesh;
   lightField: THREE.Mesh;
   marker: THREE.Mesh;
-  outerRingMaterial: THREE.MeshBasicMaterial;
-  innerRingMaterial: THREE.MeshBasicMaterial;
-  scanArcMaterial: THREE.MeshBasicMaterial;
   lightFieldMaterial: THREE.MeshBasicMaterial;
   markerMaterial: THREE.MeshStandardMaterial;
   anchorX: number;
@@ -409,28 +403,8 @@ export class WorldView {
         (targetReveal - effect.reveal) * (1 - Math.exp(-4.8 * delta));
 
       const visible = acquire > 0.002;
-      const quietFactor = effect.quiet ? 0.34 : 1;
-      const pulse = 0.5 + 0.5 * Math.sin(elapsed * 1.35 + effect.phase);
-      effect.outerRing.visible = visible;
-      effect.innerRing.visible = visible;
-      effect.scanArc.visible = visible && !effect.quiet;
       effect.lightField.visible = visible && !effect.quiet;
       effect.marker.visible = visible;
-
-      effect.outerRing.scale.setScalar(1.08 - effect.reveal * 0.08 + pulse * 0.015);
-      effect.outerRing.rotation.z = elapsed * 0.08 + effect.phase;
-      effect.outerRingMaterial.opacity =
-        acquire * (0.1 + focus * 0.16) * quietFactor;
-
-      effect.innerRing.scale.setScalar(0.82 + effect.reveal * 0.18);
-      effect.innerRing.rotation.z = -elapsed * 0.16 - effect.phase;
-      effect.innerRingMaterial.opacity =
-        effect.reveal * (0.07 + focus * 0.13) * quietFactor;
-
-      effect.scanArc.rotation.z = -elapsed * (0.54 + focus * 0.24) + effect.phase;
-      effect.scanArcMaterial.opacity = effect.quiet
-        ? 0
-        : effect.reveal * (0.1 + focus * 0.28);
 
       effect.lightField.scale.y = 0.72 + effect.reveal * 0.28;
       effect.lightFieldMaterial.opacity = effect.quiet
@@ -656,79 +630,6 @@ export class WorldView {
     world: { x: number; z: number },
   ): void {
     const quiet = spot.visitMode === "reflection";
-    const reef = spot.id === "great-barrier-reef";
-    const platformMaterial = new THREE.MeshStandardMaterial({
-      color: reef ? 0x2c879a : quiet ? 0x59645f : 0x5f796d,
-      roughness: 0.96,
-      flatShading: true,
-    });
-    const platform = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.22, 1.35, 0.16, 12),
-      platformMaterial,
-    );
-    platform.position.y = 0.08;
-    platform.receiveShadow = true;
-    platform.castShadow = true;
-
-    const inset = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.02, 1.08, 0.08, 12),
-      new THREE.MeshStandardMaterial({
-        color: reef ? 0x72d0cb : quiet ? 0xc5c3b7 : 0xf0ddae,
-        roughness: 0.9,
-        flatShading: true,
-      }),
-    );
-    inset.position.y = 0.19;
-    inset.receiveShadow = true;
-
-    const outerRingMaterial = new THREE.MeshBasicMaterial({
-      color: accent,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      toneMapped: false,
-      blending: THREE.AdditiveBlending,
-    });
-    const outerRing = new THREE.Mesh(
-      new THREE.RingGeometry(1.44, 1.51, 64),
-      outerRingMaterial,
-    );
-    outerRing.rotation.x = -Math.PI / 2;
-    outerRing.position.y = 0.035;
-    outerRing.renderOrder = 4;
-
-    const innerRingMaterial = new THREE.MeshBasicMaterial({
-      color: 0xf4fbff,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      toneMapped: false,
-      blending: THREE.AdditiveBlending,
-    });
-    const innerRing = new THREE.Mesh(
-      new THREE.RingGeometry(1.16, 1.205, 64),
-      innerRingMaterial,
-    );
-    innerRing.rotation.x = -Math.PI / 2;
-    innerRing.position.y = 0.055;
-    innerRing.renderOrder = 5;
-
-    const scanArcMaterial = new THREE.MeshBasicMaterial({
-      color: accent,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      toneMapped: false,
-      blending: THREE.AdditiveBlending,
-    });
-    const scanArc = new THREE.Mesh(
-      new THREE.RingGeometry(1.27, 1.37, 48, 1, 0, Math.PI * 0.68),
-      scanArcMaterial,
-    );
-    scanArc.rotation.x = -Math.PI / 2;
-    scanArc.position.y = 0.075;
-    scanArc.renderOrder = 6;
-
     const lightFieldMaterial = new THREE.MeshBasicMaterial({
       color: accent,
       transparent: true,
@@ -762,16 +663,10 @@ export class WorldView {
     marker.position.y = 2.25;
     marker.castShadow = true;
 
-    group.add(platform, inset, lightField, outerRing, innerRing, scanArc, marker);
+    group.add(lightField, marker);
     this.landmarkEffects.push({
-      outerRing,
-      innerRing,
-      scanArc,
       lightField,
       marker,
-      outerRingMaterial,
-      innerRingMaterial,
-      scanArcMaterial,
       lightFieldMaterial,
       markerMaterial,
       anchorX: world.x,
@@ -1203,6 +1098,36 @@ export class WorldView {
           .rotation.x = Math.PI / 2;
         addPart(new THREE.CylinderGeometry(0.018, 0.018, 1.1, 5), cream, 0, 0.85, 0);
         addPart(new THREE.BoxGeometry(0.28, 0.22, 0.28), coral, 0, 0.25, 0);
+        break;
+      }
+      case "trap": {
+        addPart(
+          new THREE.CylinderGeometry(0.76, 0.84, 0.09, 14),
+          dark,
+          0,
+          0.07,
+          0,
+        );
+        for (const [x, z] of [
+          [-0.42, -0.18],
+          [0, 0.22],
+          [0.42, -0.18],
+        ] as const) {
+          addPart(
+            new THREE.ConeGeometry(0.13, 0.34, 6),
+            coral,
+            x,
+            0.22,
+            z,
+          );
+        }
+        addPart(
+          new THREE.TorusGeometry(0.58, 0.055, 6, 16),
+          yellow,
+          0,
+          0.13,
+          0,
+        ).rotation.x = Math.PI / 2;
         break;
       }
     }

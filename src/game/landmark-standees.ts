@@ -114,6 +114,39 @@ const COUNTRY_FLAGS: Readonly<Record<string, string>> = {
 
 const textureLoader = new THREE.TextureLoader();
 const LANDMARK_TEXTURE_LOAD_RADIUS = 18;
+const BOARD_SIZE = 2.9;
+const BOARD_BOTTOM = 0.65;
+const BOARD_CENTER_Y = BOARD_BOTTOM + BOARD_SIZE / 2;
+const SUPPORT_OFFSET = 0.72;
+const SUPPORT_HEIGHT = BOARD_BOTTOM + 0.28;
+const FRAME_OFFSET = BOARD_SIZE / 2 - 0.055;
+
+// Landmark materials remain independent because each placard fades and loads
+// its own artwork. The rigid mesh shapes do not change, so sharing their
+// geometries avoids rebuilding the same seven GPU buffers for every landmark.
+const BOARD_GEOMETRY = new THREE.BoxGeometry(BOARD_SIZE, BOARD_SIZE, 0.1);
+const HORIZONTAL_FRAME_GEOMETRY = new THREE.BoxGeometry(
+  BOARD_SIZE + 0.08,
+  0.1,
+  0.09,
+);
+const VERTICAL_FRAME_GEOMETRY = new THREE.BoxGeometry(
+  0.1,
+  BOARD_SIZE + 0.08,
+  0.09,
+);
+const ART_GEOMETRY = new THREE.PlaneGeometry(1, 1);
+const SUPPORT_GEOMETRY = new THREE.CylinderGeometry(
+  0.055,
+  0.065,
+  SUPPORT_HEIGHT,
+  8,
+);
+const SUPPORT_RAIL_GEOMETRY = new THREE.BoxGeometry(
+  SUPPORT_OFFSET * 2 + 0.18,
+  0.075,
+  0.09,
+);
 
 export interface LandmarkStandeeView {
   readonly root: THREE.Group;
@@ -136,12 +169,6 @@ export function createLandmarkStandee(
   const root = new THREE.Group();
   root.name = `${spot.id} rigid illustration placard`;
 
-  const boardSize = 2.9;
-  const boardBottom = 0.65;
-  const boardCenterY = boardBottom + boardSize / 2;
-  const supportOffset = 0.72;
-  const supportHeight = boardBottom + 0.28;
-
   const boardMaterial = new THREE.MeshStandardMaterial({
     color: 0xfff4d8,
     roughness: 0.86,
@@ -152,11 +179,11 @@ export function createLandmarkStandee(
   });
   boardMaterial.userData.baseOpacity = 1;
   const board = new THREE.Mesh(
-    new THREE.BoxGeometry(boardSize, boardSize, 0.1),
+    BOARD_GEOMETRY,
     boardMaterial,
   );
   board.name = `${spot.id} rigid square board`;
-  board.position.set(0, boardCenterY, -0.035);
+  board.position.set(0, BOARD_CENTER_Y, -0.035);
   root.add(board);
 
   const frameMaterial = new THREE.MeshStandardMaterial({
@@ -169,25 +196,14 @@ export function createLandmarkStandee(
   });
   frameMaterial.userData.baseOpacity = 1;
 
-  const frameOffset = boardSize / 2 - 0.055;
-  const horizontalFrameGeometry = new THREE.BoxGeometry(
-    boardSize + 0.08,
-    0.1,
-    0.09,
-  );
-  const verticalFrameGeometry = new THREE.BoxGeometry(
-    0.1,
-    boardSize + 0.08,
-    0.09,
-  );
-  const topRail = new THREE.Mesh(horizontalFrameGeometry, frameMaterial);
-  const bottomRail = new THREE.Mesh(horizontalFrameGeometry, frameMaterial);
-  const leftRail = new THREE.Mesh(verticalFrameGeometry, frameMaterial);
-  const rightRail = new THREE.Mesh(verticalFrameGeometry, frameMaterial);
-  topRail.position.set(0, boardCenterY + frameOffset, 0.055);
-  bottomRail.position.set(0, boardCenterY - frameOffset, 0.055);
-  leftRail.position.set(-frameOffset, boardCenterY, 0.055);
-  rightRail.position.set(frameOffset, boardCenterY, 0.055);
+  const topRail = new THREE.Mesh(HORIZONTAL_FRAME_GEOMETRY, frameMaterial);
+  const bottomRail = new THREE.Mesh(HORIZONTAL_FRAME_GEOMETRY, frameMaterial);
+  const leftRail = new THREE.Mesh(VERTICAL_FRAME_GEOMETRY, frameMaterial);
+  const rightRail = new THREE.Mesh(VERTICAL_FRAME_GEOMETRY, frameMaterial);
+  topRail.position.set(0, BOARD_CENTER_Y + FRAME_OFFSET, 0.055);
+  bottomRail.position.set(0, BOARD_CENTER_Y - FRAME_OFFSET, 0.055);
+  leftRail.position.set(-FRAME_OFFSET, BOARD_CENTER_Y, 0.055);
+  rightRail.position.set(FRAME_OFFSET, BOARD_CENTER_Y, 0.055);
   root.add(topRail, bottomRail, leftRail, rightRail);
 
   const fallbackTexture = createFlagCardTexture(spot, accent);
@@ -204,12 +220,12 @@ export function createLandmarkStandee(
   artMaterial.userData.baseOpacity = 1;
 
   const art = new THREE.Mesh(
-    new THREE.PlaneGeometry(1, 1),
+    ART_GEOMETRY,
     artMaterial,
   );
   art.name = `${spot.id} square placard artwork`;
   art.scale.set(2.68, 2.68, 1);
-  art.position.set(0, boardCenterY, 0.108);
+  art.position.set(0, BOARD_CENTER_Y, 0.108);
   art.renderOrder = 2;
   root.add(art);
 
@@ -222,31 +238,25 @@ export function createLandmarkStandee(
     flatShading: true,
   });
   poleMaterial.userData.baseOpacity = 1;
-  const supportGeometry = new THREE.CylinderGeometry(
-    0.055,
-    0.065,
-    supportHeight,
-    10,
-  );
   const leftSupport = new THREE.Mesh(
-    supportGeometry,
+    SUPPORT_GEOMETRY,
     poleMaterial,
   );
   leftSupport.name = `${spot.id} left centered support`;
-  leftSupport.position.set(-supportOffset, supportHeight / 2, -0.105);
+  leftSupport.position.set(-SUPPORT_OFFSET, SUPPORT_HEIGHT / 2, -0.105);
   const rightSupport = new THREE.Mesh(
-    supportGeometry,
+    SUPPORT_GEOMETRY,
     poleMaterial,
   );
   rightSupport.name = `${spot.id} right centered support`;
-  rightSupport.position.set(supportOffset, supportHeight / 2, -0.105);
+  rightSupport.position.set(SUPPORT_OFFSET, SUPPORT_HEIGHT / 2, -0.105);
 
   const supportRail = new THREE.Mesh(
-    new THREE.BoxGeometry(supportOffset * 2 + 0.18, 0.075, 0.09),
+    SUPPORT_RAIL_GEOMETRY,
     poleMaterial,
   );
   supportRail.name = `${spot.id} centered support rail`;
-  supportRail.position.set(0, boardBottom - 0.055, -0.075);
+  supportRail.position.set(0, BOARD_BOTTOM - 0.055, -0.075);
   root.add(leftSupport, rightSupport, supportRail);
 
   return {

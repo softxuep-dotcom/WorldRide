@@ -15,7 +15,8 @@ import {
  * finally buys: the only reward that shows up in the world itself.
  */
 
-export const TRIP_SIZE = 3;
+/** One visible destination at a time keeps the route readable while driving. */
+export const TRIP_SIZE = 1;
 
 /** How many nearby candidates a trip is drawn from, for route variety. */
 const TRIP_CANDIDATE_POOL = 10;

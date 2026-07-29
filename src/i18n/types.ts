@@ -74,6 +74,12 @@ export interface UiMessages {
   "toast.worldWrapped": string;
   "toast.contextLost": string;
   "toast.contextRestored": string;
+  "arcade.durability": string;
+  "trap.hit": string;
+  "gameOver.eyebrow": string;
+  "gameOver.title": string;
+  "gameOver.body": string;
+  "gameOver.retry": string;
   "quiz.world": string;
   "quiz.challenge": string;
   "quiz.start": string;

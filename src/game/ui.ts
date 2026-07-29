@@ -61,7 +61,6 @@ interface UIElements {
   countryReveal: HTMLElement;
   countryKicker: HTMLElement;
   countryName: HTMLElement;
-  countryIntro: HTMLElement;
   toast: HTMLElement;
   countryArrival: HTMLElement;
   visitedCount: HTMLElement;
@@ -106,7 +105,7 @@ interface UIElements {
   progressTotals: HTMLElement;
   progressRegions: HTMLElement;
   compassDock: HTMLElement;
-  compass: HTMLButtonElement;
+  compass: HTMLElement;
   compassArrow: HTMLElement;
   compassTarget: HTMLElement;
   compassDistance: HTMLElement;
@@ -127,6 +126,8 @@ interface UIElements {
   cruiseVeil: HTMLElement;
   tripProgress: HTMLElement;
   garageGrid: HTMLElement;
+  gameOver: HTMLElement;
+  gameOverRetry: HTMLButtonElement;
 }
 
 /** Everything the trip/paint loop needs to survive a reload. */
@@ -210,6 +211,7 @@ export class GameUI {
   private readonly onCommercialBreak: () => Promise<boolean>;
   private readonly onRewardedBreak?: () => Promise<boolean>;
   private readonly onGameplayPauseChange: (paused: boolean) => void;
+  private readonly onRetry: () => void;
   private gameplayPaused = false;
   private gameplayPauseSyncQueued = false;
   private rewardPending = false;
@@ -234,6 +236,7 @@ export class GameUI {
     onCommercialBreak: () => Promise<boolean> = async () => false,
     onRewardedBreak?: () => Promise<boolean>,
     onGameplayPauseChange: (paused: boolean) => void = () => {},
+    onRetry: () => void = () => {},
   ) {
     this.onCelebrate = onCelebrate;
     this.onPaintChange = onPaintChange;
@@ -241,11 +244,11 @@ export class GameUI {
     this.onCommercialBreak = onCommercialBreak;
     this.onRewardedBreak = onRewardedBreak;
     this.onGameplayPauseChange = onGameplayPauseChange;
+    this.onRetry = onRetry;
     this.elements = {
       countryReveal: requireElement("country-reveal"),
       countryKicker: requireElement("context-kicker"),
       countryName: requireElement("country-name"),
-      countryIntro: requireElement("country-intro"),
       toast: requireElement("toast"),
       countryArrival: requireElement("country-arrival"),
       visitedCount: requireElement("visited-count"),
@@ -290,7 +293,7 @@ export class GameUI {
       progressTotals: requireElement("progress-totals"),
       progressRegions: requireElement("progress-regions"),
       compassDock: requireElement("compass-dock"),
-      compass: requireButton("compass"),
+      compass: requireElement("compass"),
       compassArrow: requireElement("compass-arrow"),
       compassTarget: requireElement("compass-target"),
       compassDistance: requireElement("compass-distance"),
@@ -311,6 +314,8 @@ export class GameUI {
       cruiseVeil: requireElement("cruise-veil"),
       tripProgress: requireElement("trip-progress"),
       garageGrid: requireElement("garage-grid"),
+      gameOver: requireElement("game-over"),
+      gameOverRetry: requireButton("game-over-retry"),
     };
 
     this.syncChallengeAttentionState();
@@ -353,9 +358,10 @@ export class GameUI {
     this.elements.quizClose.addEventListener("click", () => this.closeQuiz());
     this.elements.quizSkip.addEventListener("click", () => this.closeQuiz());
     this.elements.quizNext.addEventListener("click", () => this.advanceQuiz());
-    this.elements.compass.addEventListener("click", () =>
-      this.setWishlistOpen(!this.wishlistOpen),
-    );
+    this.elements.gameOverRetry.addEventListener("click", () => {
+      this.onRetry();
+      this.toggleGameOver(false);
+    });
     this.elements.albumOpen.addEventListener("click", () => this.openAlbum());
     this.elements.albumBackdrop.addEventListener("click", () =>
       this.toggleAlbum(false),
@@ -419,9 +425,7 @@ export class GameUI {
     const currentProfile = currentWorldCountry
       ? getCountryProfile(currentWorldCountry)
       : undefined;
-    const profile = currentProfile?.showReveal
-      ? currentProfile
-      : undefined;
+    const profile = currentProfile;
     const localizedSpot = state.nearestPhotoSpot
       ? localizePhotoSpot(state.nearestPhotoSpot)
       : undefined;
@@ -463,7 +467,7 @@ export class GameUI {
 
     const nearestId = state.nearestPhotoSpot?.id;
     this.elements.interactButton.disabled =
-      !profile && !state.nearestPhotoSpot && !state.nearestSpecialty;
+      !state.nearestPhotoSpot && !state.nearestSpecialty;
 
     if (nearestId && nearestId !== this.previousNearestPhotoSpot) {
       const nearestSpot = state.nearestPhotoSpot!;
@@ -568,9 +572,7 @@ export class GameUI {
       this.elements.compassDistance.textContent = distanceText;
     }
 
-    if (this.wishlistOpen) {
-      this.renderTrip(stops, target.spot.id);
-    }
+    this.setWishlistOpen(false);
   }
 
   /** The active itinerary, in order, with live distance and visited state. */
@@ -884,7 +886,7 @@ export class GameUI {
 
   /** Restores the trip/paint loop from a save, then applies the paint. */
   restoreProgression(snapshot: ProgressionSnapshot): void {
-    this.trip = sanitizeTrip(snapshot.activeTrip);
+    this.trip = sanitizeTrip(snapshot.activeTrip).slice(0, 1);
     this.completedTrips = Math.max(0, Math.floor(snapshot.completedTrips));
     for (const id of snapshot.unlockedPaints) {
       if (VEHICLE_PAINTS.some((paint) => paint.id === id)) {
@@ -1508,6 +1510,17 @@ export class GameUI {
       case "specialty-discovered":
         this.announceSpecialty(event.specialty, event.firstDiscovery);
         break;
+      case "trap-hit":
+        this.showToast(
+          t("trap.hit", {
+            health: event.health,
+            total: event.maxHealth,
+          }),
+        );
+        break;
+      case "game-over":
+        this.toggleGameOver(true);
+        break;
     }
   }
 
@@ -1568,6 +1581,7 @@ export class GameUI {
       this.elements.landmarkDetail.classList.contains("is-visible") ||
       this.elements.passportPanel.classList.contains("is-visible") ||
       this.elements.postcardAlbum.classList.contains("is-visible") ||
+      this.elements.gameOver.classList.contains("is-visible") ||
       Boolean(this.activeQuiz)
     );
   }
@@ -1599,18 +1613,23 @@ export class GameUI {
     spot?: PhotoSpotDefinition,
     seaId?: SeaId,
   ): void {
-    if (!country && !spot && !seaId) {
+    const spotAtlasCountry = spot
+      ? getWorldCountryByName(spot.atlasCountryName)
+      : undefined;
+    const displayCountry =
+      country ?? (
+        spotAtlasCountry ? getCountryProfile(spotAtlasCountry) : undefined
+      );
+    if (!displayCountry && !seaId) {
       this.displayedContextId = undefined;
       this.elements.countryReveal.classList.remove("is-visible");
       return;
     }
 
     this.elements.countryReveal.classList.add("is-visible");
-    const contextId = spot
-      ? `spot:${spot.id}`
-      : country
-        ? `country:${country.id}`
-        : `sea:${seaId}`;
+    const contextId = displayCountry
+      ? `country:${displayCountry.id}`
+      : `sea:${seaId}`;
     if (contextId === this.displayedContextId) {
       return;
     }
@@ -1619,20 +1638,16 @@ export class GameUI {
     this.elements.countryReveal.classList.toggle("has-landmark", Boolean(spot));
     this.elements.countryReveal.classList.toggle(
       "has-ocean",
-      Boolean(seaId && !spot && !country),
+      Boolean(seaId && !displayCountry),
     );
-    if (spot) {
-      const atlasCountry = getWorldCountryByName(spot.atlasCountryName);
-      const spotCountry = country ?? (
-        atlasCountry ? getCountryProfile(atlasCountry) : undefined
-      );
-      this.elements.countryKicker.textContent =
-        `${spotCountry?.flag ?? "◆"} ${spotCountry?.name ?? spot.atlasCountryName} · ${t("context.landmark")}`;
-      this.elements.countryName.textContent = spot.name;
-      this.elements.countryIntro.textContent = spot.postcard;
+    if (displayCountry) {
+      this.elements.countryKicker.textContent = displayCountry.flag;
+      this.elements.countryName.textContent = displayCountry.name;
       this.elements.interactButton.setAttribute(
         "aria-label",
-        t("aria.landmarkDetail", { name: spot.name }),
+        spot
+          ? t("aria.landmarkDetail", { name: spot.name })
+          : displayCountry.name,
       );
       return;
     }
@@ -1640,21 +1655,25 @@ export class GameUI {
     if (seaId) {
       const seaName = t(`sea.${seaId}` as never);
       this.elements.countryReveal.classList.remove("has-landmark");
-      this.elements.countryKicker.textContent = `⛵ ${t("context.ocean")}`;
+      this.elements.countryKicker.textContent = "🌊";
       this.elements.countryName.textContent = seaName;
-      this.elements.countryIntro.textContent = t("ocean.sailing");
       this.elements.interactButton.setAttribute("aria-label", seaName);
       return;
     }
+  }
 
-    this.elements.countryKicker.textContent =
-      `${country!.flag} ${t("context.country")}`;
-    this.elements.countryName.textContent = country!.name;
-    this.elements.countryIntro.textContent = country!.intro;
-    this.elements.interactButton.setAttribute(
-      "aria-label",
-      t("aria.countryDetail", { name: country!.name }),
-    );
+  private toggleGameOver(visible: boolean): void {
+    this.elements.gameOver.classList.toggle("is-visible", visible);
+    this.elements.gameOver.setAttribute("aria-hidden", String(!visible));
+    if (visible) {
+      this.setWishlistOpen(false);
+      this.setSettingsOpen(false);
+      this.togglePassport(false);
+      this.toggleLandmarkDetail(false);
+      this.closeQuiz();
+      window.setTimeout(() => this.elements.gameOverRetry.focus(), 80);
+    }
+    this.syncSurfaceState();
   }
 
   private showCountryDetail(country: CountryProfile): void {
