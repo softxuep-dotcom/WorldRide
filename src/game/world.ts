@@ -37,6 +37,7 @@ import {
 } from "./arcade-course";
 import type { GameEvent } from "./simulation";
 import {
+  CHANNEL_CHALLENGE_ENABLED,
   CHANNEL_FINISH_Z,
   CHANNEL_GATE_Z,
   CHANNEL_ROUTE_LANES,
@@ -171,7 +172,9 @@ export class WorldView {
     this.root.name = "Pocket Planet world";
     this.addBoard();
     this.buildArcadePlayground();
-    this.buildChannelChallenge();
+    if (CHANNEL_CHALLENGE_ENABLED) {
+      this.buildChannelChallenge();
+    }
     this.buildImpactParticles();
     this.vehicle = this.createVehicle();
     this.root.add(this.vehicle.root);

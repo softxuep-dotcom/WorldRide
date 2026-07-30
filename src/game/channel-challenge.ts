@@ -1,6 +1,13 @@
 export type ChannelRoute = "sky" | "cargo" | "wave";
 export type ChannelChallengePhase = "approach" | "route";
 
+/**
+ * The English Channel's sky, cargo, and wave routes are parked for now.
+ * Keeping the implementation behind one switch makes the removal reversible
+ * without letting any of the three routes spawn or allocate scene geometry.
+ */
+export const CHANNEL_CHALLENGE_ENABLED = false;
+
 export interface ChannelChallengeState {
   active: boolean;
   completed: boolean;

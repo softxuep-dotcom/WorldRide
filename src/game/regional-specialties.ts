@@ -4,7 +4,9 @@ export type RegionalSpecialtyRegion =
   | "africa"
   | "central-asia"
   | "east-asia"
-  | "south-america";
+  | "south-america"
+  | "europe"
+  | "oceania";
 
 export type RegionalSpecialtyCategory = "animal" | "plant" | "culture";
 
@@ -350,5 +352,61 @@ export const REGIONAL_SPECIALTIES: readonly RegionalSpecialtyDefinition[] = [
     region: "south-america",
     category: "plant",
     point: [-75.6, 4.6],
+  },
+  {
+    id: "italian-espresso",
+    name: "意式浓缩咖啡",
+    region: "europe",
+    category: "culture",
+    point: [9.2, 45.5],
+  },
+  {
+    id: "tuscan-olive-branch",
+    name: "托斯卡纳橄榄枝",
+    region: "europe",
+    category: "plant",
+    point: [10.1, 43.6],
+  },
+  {
+    id: "venetian-mask",
+    name: "威尼斯面具",
+    region: "europe",
+    category: "culture",
+    point: [12.3, 45.5],
+  },
+  {
+    id: "sicilian-lemons",
+    name: "西西里柠檬",
+    region: "europe",
+    category: "plant",
+    point: [14.2, 37.6],
+  },
+  {
+    id: "koala",
+    name: "考拉",
+    region: "oceania",
+    category: "animal",
+    point: [152.8, -26.8],
+  },
+  {
+    id: "red-kangaroo",
+    name: "红袋鼠",
+    region: "oceania",
+    category: "animal",
+    point: [133.8, -24.8],
+  },
+  {
+    id: "eucalyptus-sprig",
+    name: "桉树枝",
+    region: "oceania",
+    category: "plant",
+    point: [138.6, -34.8],
+  },
+  {
+    id: "australian-surfboard",
+    name: "澳大利亚冲浪板",
+    region: "oceania",
+    category: "culture",
+    point: [153.4, -28],
   },
 ] as const;

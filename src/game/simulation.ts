@@ -24,6 +24,7 @@ import {
   type ArcadeCourseObject,
 } from "./arcade-course";
 import {
+  CHANNEL_CHALLENGE_ENABLED,
   CHANNEL_CHALLENGE_DURATION,
   CHANNEL_CHECKPOINT_PROGRESS,
   CHANNEL_CHOICE_SECONDS,
@@ -975,6 +976,7 @@ export class GameSimulation {
           this.state.velocity.z *= 1.12;
           this.events.push({ type: "ramp-launched", ramp: object });
           if (
+            CHANNEL_CHALLENGE_ENABLED &&
             object.id === "eiffel-tower-ramp" &&
             !this.state.channelChallenge.completed
           ) {

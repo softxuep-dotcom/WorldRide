@@ -210,6 +210,38 @@ const COPY: Readonly<Record<string, BilingualEntry>> = {
     en: { name: "Colombian Coffee", blurb: "Mountain slopes, equatorial sun, and cool nights help coffee cherries ripen slowly." },
     "zh-CN": { name: "哥伦比亚咖啡", blurb: "山坡、赤道阳光与凉爽夜晚让咖啡果实缓慢成熟。" },
   },
+  "italian-espresso": {
+    en: { name: "Italian Espresso", blurb: "A tiny cup concentrates the aroma of coffee into a quick sip often taken at the bar." },
+    "zh-CN": { name: "意式浓缩咖啡", blurb: "小小一杯浓缩着咖啡香气，许多意大利人会站在吧台边一口喝完。" },
+  },
+  "tuscan-olive-branch": {
+    en: { name: "Tuscan Olive Branch", blurb: "Silvery leaves and small fruit cover warm hills that have produced olive oil for centuries." },
+    "zh-CN": { name: "托斯卡纳橄榄枝", blurb: "银绿色叶片与小果实铺满温暖山坡，这里制作橄榄油已有数百年历史。" },
+  },
+  "venetian-mask": {
+    en: { name: "Venetian Mask", blurb: "Masks once let carnival crowds cross the city's bridges behind playful new identities." },
+    "zh-CN": { name: "威尼斯面具", blurb: "狂欢节里，人们戴着面具穿过水城桥巷，暂时换上一张神秘的新身份。" },
+  },
+  "sicilian-lemons": {
+    en: { name: "Sicilian Lemons", blurb: "Mediterranean sun gives Sicily bright lemons prized for their fragrant peel and sharp juice." },
+    "zh-CN": { name: "西西里柠檬", blurb: "地中海阳光孕育出明亮柠檬，芳香果皮与酸爽汁液都是西西里的味道。" },
+  },
+  koala: {
+    en: { name: "Koala", blurb: "This tree-dwelling marsupial rests for much of the day after feeding on eucalyptus leaves." },
+    "zh-CN": { name: "考拉", blurb: "这种住在树上的有袋动物吃完桉树叶后，一天里大部分时间都在休息。" },
+  },
+  "red-kangaroo": {
+    en: { name: "Red Kangaroo", blurb: "Powerful hind legs drive long bounds while its heavy tail steadies every landing." },
+    "zh-CN": { name: "红袋鼠", blurb: "强壮后腿推动它大步跳跃，粗大的尾巴则在落地时帮助保持平衡。" },
+  },
+  "eucalyptus-sprig": {
+    en: { name: "Eucalyptus Sprig", blurb: "Oil in these blue-green leaves releases the clean scent associated with Australia's bush." },
+    "zh-CN": { name: "桉树枝", blurb: "蓝绿色叶片中的精油散发清新气味，是澳大利亚灌木林熟悉的气息。" },
+  },
+  "australian-surfboard": {
+    en: { name: "Australian Surfboard", blurb: "Long ocean beaches and reliable swells make board riding part of coastal life." },
+    "zh-CN": { name: "澳大利亚冲浪板", blurb: "漫长海滩与稳定涌浪，让踩着冲浪板追浪成为海岸生活的一部分。" },
+  },
 };
 
 const FALLBACK_LOCALE = "en";

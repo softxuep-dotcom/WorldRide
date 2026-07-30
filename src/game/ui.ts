@@ -1316,6 +1316,12 @@ export class GameUI {
     if (this.completedCommissions.has(this.activeCommission)) {
       this.activeCommission = "";
     }
+    const nextCommission = TRAVEL_COMMISSIONS.find(
+      (commission) => !this.completedCommissions.has(commission.id),
+    );
+    if (this.activeCommission !== nextCommission?.id) {
+      this.activeCommission = "";
+    }
     this.offeredCommissionId = this.activeCommission;
     this.tripStructureSig = undefined;
     this.onPaintChange(getPaint(this.equippedPaint).color);
