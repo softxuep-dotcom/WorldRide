@@ -2147,7 +2147,7 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
   display: block;
   min-height: 12px;
   overflow: hidden;
-  color: var(--coral);
+  color: #405b62;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.06em;
@@ -2248,7 +2248,7 @@ html[data-cover-capture="true"] #game-shell > :not(#game-canvas) {
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  color: var(--coral);
+  color: #405b62;
   font-size: 9px;
   line-height: 1.2;
   text-align: left;

@@ -380,6 +380,7 @@ export class PocketEarthGame {
         this.impactFreeze = Math.max(this.impactFreeze, 0.055);
         break;
       case "trap-hit":
+      case "whirlpool-hit":
         this.cameraShake = Math.max(this.cameraShake, 0.72);
         this.impactFreeze = Math.max(this.impactFreeze, 0.09);
         break;
@@ -438,6 +439,9 @@ export class PocketEarthGame {
         break;
       case "trap-hit":
         this.audio.onArcadeHit(1);
+        break;
+      case "whirlpool-hit":
+        this.audio.onWaterRebound();
         break;
       case "arcade-near-miss":
         this.audio.onNearMiss();

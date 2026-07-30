@@ -39,6 +39,8 @@ import {
   type ChannelChallengeState,
   type ChannelRoute,
 } from "./channel-challenge";
+import { OCEAN_WHIRLPOOLS } from "./ocean-whirlpools";
+import { wrappedDeltaX } from "./progression";
 
 export interface MovementInput {
   x: number;
@@ -112,6 +114,14 @@ export type GameEvent =
     }
   | { type: "water-rebound"; points: number; combo: number }
   | { type: "trap-hit"; health: number; maxHealth: number }
+  | {
+      type: "whirlpool-hit";
+      whirlpoolId: string;
+      position: { x: number; z: number };
+      impulse: { x: number; z: number };
+      health: number;
+      maxHealth: number;
+    }
   | { type: "game-over" }
   | { type: "combo-ended"; combo: number }
   | { type: "special-event-started"; event: "ufo" }
@@ -210,6 +220,7 @@ export class GameSimulation {
   private activeRampId?: string;
   private readonly nearMissedArcadeObjects = new Set<string>();
   private waterReboundCooldown = 0;
+  private whirlpoolEjectCooldown = 0;
   private nextSpecialEventAt = SPECIAL_EVENT_FIRST_SECONDS;
   private checkpoint = {
     x: startWorld.x,
@@ -232,6 +243,10 @@ export class GameSimulation {
     );
     this.edgeCooldown = Math.max(0, this.edgeCooldown - dt);
     this.waterReboundCooldown = Math.max(0, this.waterReboundCooldown - dt);
+    this.whirlpoolEjectCooldown = Math.max(
+      0,
+      this.whirlpoolEjectCooldown - dt,
+    );
     this.cruiseFlowCueCooldown = Math.max(
       0,
       this.cruiseFlowCueCooldown - dt,
@@ -479,6 +494,7 @@ export class GameSimulation {
     }
 
     this.updateLocation();
+    this.updateWhirlpools(dt);
     this.updateNearestPhotoSpot();
     this.updateNearestSpecialty();
     this.updateArcadeCollisions();
@@ -520,6 +536,7 @@ export class GameSimulation {
     this.state.combo = 0;
     this.state.comboTimer = 0;
     this.activeRampId = undefined;
+    this.whirlpoolEjectCooldown = 0;
     this.updateLocation();
     this.updateNearestPhotoSpot();
     this.updateNearestSpecialty();
@@ -581,6 +598,7 @@ export class GameSimulation {
     this.activeRampId = undefined;
     this.nearMissedArcadeObjects.clear();
     this.waterReboundCooldown = 0;
+    this.whirlpoolEjectCooldown = 0;
     this.nextSpecialEventAt = this.state.elapsed + SPECIAL_EVENT_FIRST_SECONDS;
     this.checkpoint = {
       x: this.state.position.x,
@@ -632,6 +650,7 @@ export class GameSimulation {
     this.state.gameOver = false;
     this.cruiseFlowActive = false;
     this.activeRampId = undefined;
+    this.whirlpoolEjectCooldown = 0;
     this.checkpoint = {
       x: world.x,
       z: world.z,
@@ -1060,6 +1079,94 @@ export class GameSimulation {
     }
   }
 
+  private updateWhirlpools(dt: number): void {
+    if (this.state.vehicleMode !== "boat" || this.state.airHeight > 0.34) {
+      return;
+    }
+
+    for (const whirlpool of OCEAN_WHIRLPOOLS) {
+      const center = geoToWorld(whirlpool.point);
+      const dx = wrappedDeltaX(this.state.position.x, center.x);
+      const dz = this.state.position.z - center.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance >= whirlpool.radius) {
+        continue;
+      }
+
+      const fallbackAngle = -this.state.heading - Math.PI / 2;
+      const outwardX =
+        distance > 0.001 ? dx / distance : Math.cos(fallbackAngle);
+      const outwardZ =
+        distance > 0.001 ? dz / distance : Math.sin(fallbackAngle);
+      const tangentX = -outwardZ * whirlpool.spin;
+      const tangentZ = outwardX * whirlpool.spin;
+      const influence = smoothstep(
+        1 - distance / whirlpool.radius,
+        0,
+        1,
+      );
+      const corePull = 0.34 + influence * 0.66;
+
+      this.state.velocity.x +=
+        (-outwardX * whirlpool.pullStrength * corePull +
+          tangentX * whirlpool.swirlStrength * influence) *
+        dt;
+      this.state.velocity.z +=
+        (-outwardZ * whirlpool.pullStrength * corePull +
+          tangentZ * whirlpool.swirlStrength * influence) *
+        dt;
+
+      const flowHeading = Math.atan2(
+        -this.state.velocity.x,
+        -this.state.velocity.z,
+      );
+      this.state.heading +=
+        shortestAngleDelta(this.state.heading, flowHeading) *
+        Math.min(1, dt * (2.4 + influence * 3.6));
+
+      if (
+        distance > whirlpool.coreRadius ||
+        this.whirlpoolEjectCooldown > 0
+      ) {
+        continue;
+      }
+
+      const impulseX =
+        outwardX * whirlpool.ejectSpeed +
+        tangentX * whirlpool.ejectSpeed * 0.38;
+      const impulseZ =
+        outwardZ * whirlpool.ejectSpeed +
+        tangentZ * whirlpool.ejectSpeed * 0.38;
+      this.state.velocity.x = impulseX;
+      this.state.velocity.z = impulseZ;
+      this.state.heading = Math.atan2(-impulseX, -impulseZ);
+      this.state.boosting = false;
+      this.state.cruiseFlow = 0;
+      this.state.combo = 0;
+      this.state.comboTimer = 0;
+      this.whirlpoolEjectCooldown = WHIRLPOOL_EJECT_COOLDOWN_SECONDS;
+
+      if (this.state.damageCooldown === 0) {
+        this.state.health = Math.max(0, this.state.health - 1);
+        this.state.damageCooldown = DAMAGE_INVULNERABILITY_SECONDS;
+      }
+
+      this.events.push({
+        type: "whirlpool-hit",
+        whirlpoolId: whirlpool.id,
+        position: { ...this.state.position },
+        impulse: { x: impulseX, z: impulseZ },
+        health: this.state.health,
+        maxHealth: MAX_HEALTH,
+      });
+      if (this.state.health === 0) {
+        this.state.gameOver = true;
+        this.events.push({ type: "game-over" });
+      }
+      return;
+    }
+  }
+
   private awardCombo(rawPoints: number): { points: number; combo: number } {
     this.state.combo = Math.min(MAX_COMBO, Math.max(1, this.state.combo + 1));
     this.state.comboTimer = COMBO_SECONDS;
@@ -1238,6 +1345,7 @@ const AIR_LATERAL_GRIP = 0.24;
 const MAX_HEALTH = 3;
 const DAMAGE_INVULNERABILITY_SECONDS = 1.45;
 const RETRY_INVULNERABILITY_SECONDS = 1.8;
+const WHIRLPOOL_EJECT_COOLDOWN_SECONDS = 1.9;
 const DIRECTIONAL_FULL_STEER_ANGLE = Math.PI * 0.38;
 const DIRECTIONAL_TURN_BRAKE = 3.8;
 const DRIFT_START_THRESHOLD = 0.14;

@@ -1951,6 +1951,14 @@ export class GameUI {
           }),
         );
         break;
+      case "whirlpool-hit":
+        this.showToast(
+          t("whirlpool.hit", {
+            health: event.health,
+            total: event.maxHealth,
+          }),
+        );
+        break;
       case "channel-challenge-started":
         this.showToast(t("channel.choose"));
         break;

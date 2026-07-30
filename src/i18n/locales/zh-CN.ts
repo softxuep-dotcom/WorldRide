@@ -229,6 +229,7 @@ export const zhCN = {
     "toast.contextRestored": "画面已恢复，继续旅行吧",
     "arcade.durability": "车辆耐久",
     "trap.hit": "撞上陷阱 · 耐久 {health}/{total}",
+    "whirlpool.hit": "卷入漩涡！已被甩开 · 耐久 {health}/{total}",
     "channel.choose": "选择海峡航线",
     "channel.route.sky": "高空航线",
     "channel.route.cargo": "货轮航线",

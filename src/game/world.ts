@@ -47,6 +47,10 @@ import {
   type ChannelChallengeState,
   type ChannelRoute,
 } from "./channel-challenge";
+import {
+  OCEAN_WHIRLPOOLS,
+  type OceanWhirlpool,
+} from "./ocean-whirlpools";
 
 const RESERVED_MAP_MARKER_POSITIONS = [
   ...PHOTO_SPOTS.map((spot) => geoToWorld(spot.point)),
@@ -108,6 +112,14 @@ interface ImpactParticle {
   spinY: number;
 }
 
+interface WhirlpoolView {
+  root: THREE.Group;
+  definition: OceanWhirlpool;
+  basinMaterial: THREE.MeshStandardMaterial;
+  foamMaterials: readonly THREE.MeshBasicMaterial[];
+  core: THREE.Mesh;
+}
+
 export interface ArcadeVisualState {
   airHeight: number;
   verticalVelocity: number;
@@ -134,6 +146,7 @@ export class WorldView {
   readonly root = new THREE.Group();
   readonly vehicle: VehicleView;
   private readonly wavelets: THREE.Mesh[] = [];
+  private readonly whirlpools: WhirlpoolView[] = [];
   private readonly landmarkEffects: LandmarkEffect[] = [];
   private readonly landmarkStandees: LandmarkStandeeView[] = [];
   private readonly regionalSpecialtyStandees: RegionalSpecialtyStandeeView[] =
@@ -225,6 +238,7 @@ export class WorldView {
     await nextFrame();
     this.addGeographyFeatures();
     this.addOceanDetails();
+    this.buildOceanWhirlpools();
     this.ecology = new ecologyModule.WorldEcology(
       RESERVED_MAP_MARKER_POSITIONS,
     );
@@ -383,6 +397,7 @@ export class WorldView {
       wavelet.position.y = 0.09 + Math.sin(elapsed * 1.2 + index) * 0.025;
       wavelet.rotation.z = Math.sin(elapsed * 0.3 + index) * 0.12;
     }
+    this.updateOceanWhirlpools(elapsed, overviewBlend);
 
     for (const standee of this.landmarkStandees) {
       const distance = Math.hypot(
@@ -953,6 +968,19 @@ export class WorldView {
   }
 
   handleGameEvent(event: GameEvent): void {
+    if (event.type === "whirlpool-hit") {
+      const baseAngle = Math.atan2(event.impulse.z, event.impulse.x);
+      for (let index = 0; index < 14; index += 1) {
+        this.spawnVehicleTrailParticle(
+          event.position,
+          0,
+          true,
+          true,
+          baseAngle + (index / 14) * Math.PI * 2,
+        );
+      }
+      return;
+    }
     if (event.type !== "arcade-hit") {
       return;
     }
@@ -972,6 +1000,118 @@ export class WorldView {
     prop.spinY = -4.2 + (hash % 11) * 0.7;
     prop.spinZ = 2.8 + (hash % 5) * 0.6;
     this.spawnImpactBurst(event);
+  }
+
+  private buildOceanWhirlpools(): void {
+    const basinGeometry = createWhirlpoolBasinGeometry();
+    const spiralGeometry = createWhirlpoolSpiralGeometry();
+    const coreGeometry = new THREE.CircleGeometry(0.3, 32);
+    const rippleGeometry = new THREE.TorusGeometry(0.48, 0.024, 5, 40);
+
+    for (const definition of OCEAN_WHIRLPOOLS) {
+      const root = new THREE.Group();
+      const world = geoToWorld(definition.point);
+      root.name = `Ocean whirlpool ${definition.id}`;
+      root.position.set(world.x, 0.105, world.z);
+      root.scale.set(definition.radius, 1, definition.radius);
+
+      const basinMaterial = new THREE.MeshStandardMaterial({
+        color: 0x17677a,
+        emissive: 0x082e3a,
+        emissiveIntensity: 0.18,
+        roughness: 0.28,
+        metalness: 0.08,
+        transparent: true,
+        opacity: 0.68,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const basin = new THREE.Mesh(basinGeometry, basinMaterial);
+      basin.renderOrder = 7;
+
+      const coreMaterial = new THREE.MeshBasicMaterial({
+        color: 0x031b28,
+        transparent: true,
+        opacity: 0.82,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const core = new THREE.Mesh(coreGeometry, coreMaterial);
+      core.rotation.x = -Math.PI / 2;
+      core.position.y = 0.012;
+      core.renderOrder = 8;
+
+      const foamMaterials = [0, 1].map(
+        () =>
+          new THREE.MeshBasicMaterial({
+            color: 0xe9ffff,
+            transparent: true,
+            opacity: 0.72,
+            depthWrite: false,
+          }),
+      );
+      const firstSpiral = new THREE.Mesh(spiralGeometry, foamMaterials[0]);
+      const secondSpiral = new THREE.Mesh(spiralGeometry, foamMaterials[1]);
+      firstSpiral.renderOrder = 9;
+      secondSpiral.renderOrder = 9;
+      secondSpiral.rotation.y = Math.PI;
+      secondSpiral.scale.setScalar(0.78);
+
+      const rippleMaterial = new THREE.MeshBasicMaterial({
+        color: 0xbceff1,
+        transparent: true,
+        opacity: 0.46,
+        depthWrite: false,
+      });
+      const ripple = new THREE.Mesh(rippleGeometry, rippleMaterial);
+      ripple.rotation.x = -Math.PI / 2;
+      ripple.position.y = -0.03;
+      ripple.renderOrder = 9;
+
+      root.rotation.y = definition.phase;
+      root.add(basin, core, firstSpiral, secondSpiral, ripple);
+      this.whirlpools.push({
+        root,
+        definition,
+        basinMaterial,
+        foamMaterials,
+        core,
+      });
+      this.root.add(root);
+    }
+  }
+
+  private updateOceanWhirlpools(
+    elapsed: number,
+    overviewBlend: number,
+  ): void {
+    const visibility = 1 - THREE.MathUtils.smoothstep(overviewBlend, 0.58, 0.92);
+    for (const [index, whirlpool] of this.whirlpools.entries()) {
+      whirlpool.root.visible = visibility > 0.02;
+      if (!whirlpool.root.visible) {
+        continue;
+      }
+      const { definition } = whirlpool;
+      const pulse =
+        1 + Math.sin(elapsed * 2.2 + definition.phase) * 0.025;
+      whirlpool.root.rotation.y =
+        definition.phase + elapsed * definition.spin * 0.78;
+      whirlpool.root.scale.set(
+        definition.radius * pulse,
+        1,
+        definition.radius * pulse,
+      );
+      whirlpool.basinMaterial.opacity =
+        (0.61 + Math.sin(elapsed * 1.7 + index) * 0.07) * visibility;
+      whirlpool.foamMaterials[0].opacity =
+        (0.64 + Math.sin(elapsed * 3.1 + definition.phase) * 0.12) *
+        visibility;
+      whirlpool.foamMaterials[1].opacity =
+        (0.48 + Math.cos(elapsed * 2.7 + definition.phase) * 0.11) *
+        visibility;
+      const corePulse = 0.9 + Math.sin(elapsed * 4.4 + index) * 0.08;
+      whirlpool.core.scale.setScalar(corePulse);
+    }
   }
 
   private buildChannelChallenge(): void {
@@ -1960,6 +2100,75 @@ const DEFAULT_ARCADE_VISUAL_STATE: ArcadeVisualState = {
   specialEventRemaining: 0,
   channelChallenge: createChannelChallengeState(),
 };
+
+function createWhirlpoolBasinGeometry(): THREE.BufferGeometry {
+  const ringCount = 7;
+  const segmentCount = 48;
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  for (let ring = 0; ring <= ringCount; ring += 1) {
+    const t = ring / ringCount;
+    const radius = 0.07 + t * 0.93;
+    const y = -0.085 * Math.pow(1 - t, 1.7);
+    for (let segment = 0; segment <= segmentCount; segment += 1) {
+      const angle = (segment / segmentCount) * Math.PI * 2;
+      positions.push(
+        Math.cos(angle) * radius,
+        y,
+        Math.sin(angle) * radius,
+      );
+    }
+  }
+
+  const stride = segmentCount + 1;
+  for (let ring = 0; ring < ringCount; ring += 1) {
+    for (let segment = 0; segment < segmentCount; segment += 1) {
+      const current = ring * stride + segment;
+      const next = current + stride;
+      indices.push(
+        current,
+        next,
+        current + 1,
+        next,
+        next + 1,
+        current + 1,
+      );
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function createWhirlpoolSpiralGeometry(): THREE.TubeGeometry {
+  const points: THREE.Vector3[] = [];
+  for (let index = 0; index <= 28; index += 1) {
+    const t = index / 28;
+    const radius = 0.14 + t * 0.8;
+    const angle = t * Math.PI * 4.7;
+    points.push(
+      new THREE.Vector3(
+        Math.cos(angle) * radius,
+        -0.072 * Math.pow(1 - t, 1.45) + 0.018,
+        Math.sin(angle) * radius,
+      ),
+    );
+  }
+  return new THREE.TubeGeometry(
+    new THREE.CatmullRomCurve3(points),
+    72,
+    0.018,
+    4,
+    false,
+  );
+}
 
 function hashString(value: string): number {
   let hash = 2166136261;

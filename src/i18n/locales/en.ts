@@ -250,6 +250,7 @@ export const en = {
     "toast.contextRestored": "The view is back. Continue your journey!",
     "arcade.durability": "Vehicle durability",
     "trap.hit": "Trap hit · {health}/{total} durability",
+    "whirlpool.hit": "Whirlpool! Thrown clear · {health}/{total} durability",
     "channel.choose": "Choose a Channel route",
     "channel.route.sky": "Sky route",
     "channel.route.cargo": "Cargo route",

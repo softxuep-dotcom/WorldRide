@@ -76,6 +76,7 @@ export interface UiMessages {
   "toast.contextRestored": string;
   "arcade.durability": string;
   "trap.hit": string;
+  "whirlpool.hit": string;
   "channel.choose": string;
   "channel.route.sky": string;
   "channel.route.cargo": string;

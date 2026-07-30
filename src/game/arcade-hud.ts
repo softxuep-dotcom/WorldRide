@@ -81,6 +81,7 @@ export class ArcadeHUD {
         this.pulseCombo();
         break;
       case "trap-hit":
+      case "whirlpool-hit":
         this.flashImpact();
         this.durability.classList.remove("is-hit");
         void this.durability.offsetWidth;
