@@ -68,7 +68,6 @@ interface UIElements {
   countryKicker: HTMLElement;
   countryName: HTMLElement;
   toast: HTMLElement;
-  countryArrival: HTMLElement;
   visitedCount: HTMLElement;
   miniMapSvg: SVGSVGElement;
   interactButton: HTMLButtonElement;
@@ -186,7 +185,6 @@ export class GameUI {
   private readonly playerDot: SVGCircleElement;
   private readonly playerHalo: SVGCircleElement;
   private toastTimer?: number;
-  private countryArrivalTimer?: number;
   private displayedContextId?: string;
   private previousNearestPhotoSpot?: string;
   private selectedPhotoSpot?: PhotoSpotDefinition;
@@ -239,6 +237,7 @@ export class GameUI {
   private gameplayPaused = false;
   private gameplayPauseSyncQueued = false;
   private rewardPending = false;
+  private retryPending = false;
   private trip: PhotoSpotId[] = [];
   private completedTrips = 0;
   private readonly unlockedPaints = new Set<string>([DEFAULT_PAINT_ID]);
@@ -284,7 +283,6 @@ export class GameUI {
       countryKicker: requireElement("context-kicker"),
       countryName: requireElement("country-name"),
       toast: requireElement("toast"),
-      countryArrival: requireElement("country-arrival"),
       visitedCount: requireElement("visited-count"),
       miniMapSvg: requireSvgElement("mini-map-svg"),
       interactButton: requireButton("interact-button"),
@@ -408,8 +406,7 @@ export class GameUI {
     this.elements.quizSkip.addEventListener("click", () => this.closeQuiz());
     this.elements.quizNext.addEventListener("click", () => this.advanceQuiz());
     this.elements.gameOverRetry.addEventListener("click", () => {
-      this.onRetry();
-      this.toggleGameOver(false);
+      void this.retryAfterCommercialBreak();
     });
     this.elements.commissionBackdrop.addEventListener("click", () =>
       this.toggleCommissionPanel(false),
@@ -1897,17 +1894,14 @@ export class GameUI {
   handleEvent(event: GameEvent): void {
     switch (event.type) {
       case "country-entered":
-        this.showCountryArrival(
-          t(
-            event.firstVisit
-              ? "toast.countryEntered"
-              : "toast.countryReentered",
-            {
+        if (event.firstVisit) {
+          this.showToast(
+            t("toast.countryEntered", {
               flag: event.country.flag,
               name: event.country.name,
-            },
-          ),
-        );
+            }),
+          );
+        }
         break;
       case "mode-changed":
         this.showToast(
@@ -1981,19 +1975,6 @@ export class GameUI {
     this.toastTimer = window.setTimeout(() => {
       this.elements.toast.classList.remove("is-visible");
     }, 2200);
-  }
-
-  private showCountryArrival(message: string): void {
-    window.clearTimeout(this.countryArrivalTimer);
-    this.elements.countryArrival.textContent = message;
-    this.elements.countryArrival.classList.add("is-visible");
-    this.elements.countryReveal.classList.add("is-arriving");
-    this.elements.countryArrival.setAttribute("aria-hidden", "false");
-    this.countryArrivalTimer = window.setTimeout(() => {
-      this.elements.countryArrival.classList.remove("is-visible");
-      this.elements.countryReveal.classList.remove("is-arriving");
-      this.elements.countryArrival.setAttribute("aria-hidden", "true");
-    }, 2400);
   }
 
   setWorldOverview(active: boolean): void {
@@ -2131,6 +2112,34 @@ export class GameUI {
       window.setTimeout(() => this.elements.gameOverRetry.focus(), 80);
     }
     this.syncSurfaceState();
+  }
+
+  /**
+   * Poki treats a death/restart as a natural commercial-break opportunity:
+   * gameplay is already stopped by the game-over surface, the ad is requested
+   * only after the player expresses intent to continue, and closing the
+   * surface restarts gameplay after the request has settled.
+   */
+  private async retryAfterCommercialBreak(): Promise<void> {
+    if (this.retryPending) {
+      return;
+    }
+    this.retryPending = true;
+    this.elements.gameOverRetry.disabled = true;
+
+    try {
+      await this.onCommercialBreak();
+    } catch {
+      // Ads are optional at runtime; a failed request must never block retry.
+    }
+
+    try {
+      this.onRetry();
+      this.toggleGameOver(false);
+    } finally {
+      this.retryPending = false;
+      this.elements.gameOverRetry.disabled = false;
+    }
   }
 
   private showCountryDetail(country: CountryProfile): void {
